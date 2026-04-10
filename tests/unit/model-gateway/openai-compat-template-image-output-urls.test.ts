@@ -146,8 +146,8 @@ describe('openai-compat template image output urls', () => {
     const body = JSON.parse(capturedBody!)
     // image comes from template rendering of {{images}}, not injection
     expect(body.image).toEqual(['https://ref.test/a.png'])
-    // size comes from template rendering, not injection
-    expect(body.size).toBe('')
+    // size placeholder resolves to empty → field omitted, then auto-injected from aspectRatio
+    expect(body.size).toBe('16x9')
   })
 
   it('keeps single-url output compatible when outputUrlsPath has only one image', async () => {

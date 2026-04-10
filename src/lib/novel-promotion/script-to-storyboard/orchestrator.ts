@@ -68,6 +68,13 @@ export type ClipStoryboardPanels = {
   finalPanels: StoryboardPanel[]
 }
 
+export type StoryboardPhaseArtifact = {
+  clipId: string
+  stepKey: string
+  artifactType: string
+  payload: Record<string, unknown>
+}
+
 export type ScriptToStoryboardOrchestratorInput = {
   concurrency?: number
   locale?: 'zh' | 'en'
@@ -84,6 +91,7 @@ export type ScriptToStoryboardOrchestratorInput = {
     action: string,
     maxOutputTokens: number,
   ) => Promise<ScriptToStoryboardStepOutput>
+  onArtifact?: (artifact: StoryboardPhaseArtifact) => Promise<void>
 }
 
 export type ScriptToStoryboardOrchestratorResult = {
@@ -285,7 +293,7 @@ async function runStepWithRetry<T>(
 export async function runScriptToStoryboardOrchestrator(
   input: ScriptToStoryboardOrchestratorInput,
 ): Promise<ScriptToStoryboardOrchestratorResult> {
-  const { clips, novelPromotionData, promptTemplates, runStep, concurrency: rawConcurrency } = input
+  const { clips, novelPromotionData, promptTemplates, runStep, onArtifact, concurrency: rawConcurrency } = input
   if (!Array.isArray(clips) || clips.length === 0) {
     throw new Error('No clips found')
   }
@@ -382,6 +390,15 @@ export async function runScriptToStoryboardOrchestrator(
       )
       phase1PanelsByClipId.set(clip.id, planPanels)
 
+      if (onArtifact) {
+        await onArtifact({
+          clipId: clip.id,
+          stepKey: `clip_${clip.id}_phase1`,
+          artifactType: 'storyboard.clip.phase1',
+          payload: { panels: planPanels },
+        })
+      }
+
       const phase2Meta = withStepMeta(
         `clip_${clip.id}_phase2_cinematography`,
         'progress.streamStep.cinematographyRules',
@@ -453,6 +470,27 @@ export async function runScriptToStoryboardOrchestrator(
           (text) => parseJsonArray<ActingDirection>(text, `phase2-acting:${formatClipId(clip)}`),
         ),
       ])
+
+      phase2CinematographyByClipId.set(clip.id, photographyRules)
+      phase2ActingByClipId.set(clip.id, actingDirections)
+
+      if (onArtifact) {
+        await Promise.all([
+          onArtifact({
+            clipId: clip.id,
+            stepKey: `clip_${clip.id}_phase2_cinematography`,
+            artifactType: 'storyboard.clip.phase2.cine',
+            payload: { rules: photographyRules },
+          }),
+          onArtifact({
+            clipId: clip.id,
+            stepKey: `clip_${clip.id}_phase2_acting`,
+            artifactType: 'storyboard.clip.phase2.acting',
+            payload: { directions: actingDirections },
+          }),
+        ])
+      }
+
       const { parsed: filteredPhase3Panels } = await runStepWithRetry(
         runStep, phase3Meta, phase3Prompt, 'storyboard_phase3_detail', 2600,
         (text) => {
@@ -467,9 +505,16 @@ export async function runScriptToStoryboardOrchestrator(
         },
       )
 
-      phase2CinematographyByClipId.set(clip.id, photographyRules)
-      phase2ActingByClipId.set(clip.id, actingDirections)
       phase3PanelsByClipId.set(clip.id, filteredPhase3Panels)
+
+      if (onArtifact) {
+        await onArtifact({
+          clipId: clip.id,
+          stepKey: `clip_${clip.id}_phase3_detail`,
+          artifactType: 'storyboard.clip.phase3',
+          payload: { panels: filteredPhase3Panels },
+        })
+      }
 
       return {
         clipId: clip.id,

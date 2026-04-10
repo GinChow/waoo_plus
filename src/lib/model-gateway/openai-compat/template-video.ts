@@ -72,6 +72,7 @@ export async function generateVideoViaOpenAICompatTemplate(
   if (['POST', 'PUT', 'PATCH'].includes(createRequest.method) && !createRequest.body) {
     throw buildUnsupportedVideoFormatError('OPENAI_COMPAT_VIDEO_TEMPLATE_CREATE_BODY_REQUIRED')
   }
+
   const createResponse = await fetch(createRequest.endpointUrl, {
     method: createRequest.method,
     headers: createRequest.headers,

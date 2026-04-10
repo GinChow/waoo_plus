@@ -20,6 +20,7 @@ interface ImageSectionProps {
   imageUrl: string | null
   globalPanelNumber: number
   shotType: string
+  duration?: number | null
   videoRatio: string
   isDeleting: boolean
   isModifying: boolean
@@ -43,6 +44,7 @@ export default function ImageSection({
   imageUrl,
   globalPanelNumber,
   shotType,
+  duration,
   videoRatio,
   isDeleting,
   isModifying,
@@ -177,7 +179,8 @@ export default function ImageSection({
         <span className="glass-chip glass-chip-neutral px-2 py-0.5 text-xs font-medium">{globalPanelNumber}</span>
       </div>
 
-      <div className="absolute top-2 right-2">
+      <div className="absolute top-2 right-2 flex items-center gap-1">
+        {duration != null && <span className="glass-chip glass-chip-neutral px-1.5 py-0.5 text-xs">{duration}{t('panel.duration')}</span>}
         <span className="glass-chip glass-chip-info px-2 py-0.5 text-xs">{shotType}</span>
       </div>
 

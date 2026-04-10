@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
 import TaskStatusInline from '@/components/task/TaskStatusInline'
 import { resolveTaskPresentationState } from '@/lib/task/presentation'
 import { ModelCapabilityDropdown } from '@/components/ui/config-modals/ModelCapabilityDropdown'
@@ -7,9 +7,10 @@ import type { VideoPanelRuntime } from './hooks/useVideoPanelActions'
 
 interface VideoPanelCardBodyProps {
   runtime: VideoPanelRuntime
+  onUpdateDuration?: (storyboardId: string, panelIndex: number, duration: number | null) => void
 }
 
-export default function VideoPanelCardBody({ runtime }: VideoPanelCardBodyProps) {
+export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoPanelCardBodyProps) {
   const {
     t,
     tCommon,
@@ -55,7 +56,11 @@ export default function VideoPanelCardBody({ runtime }: VideoPanelCardBodyProps)
     <div className="p-4 space-y-2">
       <div className="flex items-center justify-between text-xs">
         <span className="px-2 py-0.5 bg-[var(--glass-tone-info-bg)] text-[var(--glass-tone-info-fg)] rounded font-medium">{panel.textPanel?.shot_type || t('panelCard.unknownShotType')}</span>
-        {panel.textPanel?.duration && <span className="text-[var(--glass-text-tertiary)]">{panel.textPanel.duration}{t('promptModal.duration')}</span>}
+        <DurationEditor
+          duration={panel.textPanel?.duration ?? null}
+          unit={t('promptModal.duration')}
+          onChange={onUpdateDuration ? (val) => onUpdateDuration(panel.storyboardId, panel.panelIndex, val) : undefined}
+        />
       </div>
 
       <p className="text-sm text-[var(--glass-text-secondary)] line-clamp-2">{panel.textPanel?.description}</p>
@@ -286,5 +291,60 @@ export default function VideoPanelCardBody({ runtime }: VideoPanelCardBodyProps)
         )}
       </div>
     </div>
+  )
+}
+
+function DurationEditor({
+  duration,
+  unit,
+  onChange,
+}: {
+  duration: number | null
+  unit: string
+  onChange?: (value: number | null) => void
+}) {
+  const [localValue, setLocalValue] = useState<string>(duration != null ? String(duration) : '')
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    setLocalValue(duration != null ? String(duration) : '')
+  }, [duration])
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value
+    setLocalValue(raw)
+    if (!onChange) return
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      const parsed = parseFloat(raw)
+      onChange(raw && !isNaN(parsed) && parsed > 0 ? parsed : null)
+    }, 600)
+  }, [onChange])
+
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+  }, [])
+
+  if (!onChange) {
+    return duration != null ? (
+      <span className="text-[var(--glass-text-tertiary)]">{duration}{unit}</span>
+    ) : null
+  }
+
+  return (
+    <span className="inline-flex items-center gap-0.5 text-[var(--glass-text-tertiary)]">
+      <input
+        type="number"
+        min={1}
+        max={30}
+        step={0.5}
+        value={localValue}
+        onChange={handleChange}
+        className="w-10 text-center bg-transparent border-b border-[var(--glass-stroke-base)] focus:border-[var(--glass-tone-info-fg)] outline-none text-xs tabular-nums"
+        placeholder="3"
+      />
+      {unit}
+    </span>
   )
 }

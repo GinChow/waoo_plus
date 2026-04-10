@@ -5,7 +5,7 @@ import { createOpenAICompatClient, parseDataUrl, resolveOpenAICompatClientConfig
 import { toFile } from 'openai'
 
 type OpenAIVideoSize = '720x1280' | '1280x720' | '1024x1792' | '1792x1024'
-type OpenAIVideoSeconds = '4' | '8' | '12'
+type OpenAIVideoSeconds = '2' | '4' | '6' | '8' | '10'
 type OpenAIVideoAspectRatio =
   | '16:9'
   | '9:16'
@@ -41,11 +41,15 @@ function assertAllowedOptions(options: Record<string, unknown>) {
 }
 
 function normalizeDuration(value: unknown): OpenAIVideoSeconds | undefined {
-  if (value === 4 || value === '4') return '4'
-  if (value === 8 || value === '8') return '8'
-  if (value === 12 || value === '12') return '12'
   if (value === undefined) return undefined
-  throw new Error(`OPENAI_COMPAT_VIDEO_DURATION_UNSUPPORTED: ${String(value)}`)
+  const num = typeof value === 'string' ? parseFloat(value) : typeof value === 'number' ? value : NaN
+  if (!Number.isFinite(num) || num <= 0) return undefined
+  // 映射到最近的合法档位 (2/4/6/8/10)
+  if (num <= 3) return '2'
+  if (num <= 5) return '4'
+  if (num <= 7) return '6'
+  if (num <= 9) return '8'
+  return '10'
 }
 
 function normalizeAspectRatio(value: unknown): OpenAIVideoAspectRatio | undefined {

@@ -302,6 +302,18 @@ export function renderTemplateValue(
   }
   const out: Record<string, TemplateBodyValue> = {}
   for (const [key, nestedValue] of Object.entries(value)) {
+    // When a field's template value is an exact placeholder (e.g. "{{duration}}")
+    // and it resolves to null or empty string, omit the field entirely.
+    // This prevents sending "seconds": null or "size": "" to external APIs.
+    if (typeof nestedValue === 'string') {
+      const placeholder = matchExactPlaceholder(nestedValue)
+      if (placeholder) {
+        const resolved = resolvePlaceholderValue(placeholder, variables)
+        if (resolved === null || resolved === undefined || resolved === '') continue
+        out[key] = cloneTemplateBodyValue(resolved)
+        continue
+      }
+    }
     out[key] = renderTemplateValue(nestedValue as TemplateBodyValue, variables)
   }
   return out
@@ -420,6 +432,27 @@ export function normalizeResponseJson(rawText: string): unknown {
   } catch {
     return trimmed
   }
+}
+
+export function deriveSizeFromAspectRatio(aspectRatio: string, resolution?: string): string {
+  const match = aspectRatio.match(/^(\d+):(\d+)$/)
+  if (!match) return ''
+  const w = Number(match[1])
+  const h = Number(match[2])
+  if (!w || !h) return ''
+  // 从 resolution (如 "720p", "1080p") 提取短边像素，默认 720
+  const resMatch = (resolution || '').match(/^(\d+)p$/)
+  const shortEdge = resMatch ? Number(resMatch[1]) : 720
+  if (w >= h) {
+    // 横屏: 短边=高度
+    const height = shortEdge
+    const width = Math.round(height * w / h)
+    return `${width}x${height}`
+  }
+  // 竖屏: 短边=宽度
+  const width = shortEdge
+  const height = Math.round(width * h / w)
+  return `${width}x${height}`
 }
 
 export function buildTemplateVariables(input: {

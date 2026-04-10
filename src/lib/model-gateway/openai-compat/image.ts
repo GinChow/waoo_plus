@@ -1,3 +1,4 @@
+import { logInfo as _ulogInfo } from '@/lib/logging/core'
 import type { GenerateResult } from '@/lib/generators/base'
 import type { OpenAICompatImageRequest } from '../types'
 import {
@@ -171,6 +172,17 @@ export async function generateImageViaOpenAICompat(request: OpenAICompatImageReq
   const size = normalizeOpenAIImageSize(rawSize)
 
   if (referenceImages.length > 0) {
+    const editParams = {
+      model: normalizedModelId,
+      prompt,
+      imageCount: referenceImages.length,
+      responseFormat,
+      ...(outputFormat ? { outputFormat } : {}),
+      ...(quality ? { quality } : {}),
+      ...(size ? { size } : {}),
+    }
+    _ulogInfo(`[OpenAICompat:ImageEdit] request: ${JSON.stringify(editParams)}`)
+
     const response = await client.images.edit({
       model: normalizedModelId,
       prompt,
@@ -201,6 +213,16 @@ export async function generateImageViaOpenAICompat(request: OpenAICompatImageReq
     }
     throw new Error('OPENAI_COMPAT_IMAGE_EMPTY_RESPONSE: no image data returned')
   }
+
+  const generateParams = {
+    model: normalizedModelId,
+    prompt,
+    responseFormat,
+    ...(outputFormat ? { outputFormat } : {}),
+    ...(quality ? { quality } : {}),
+    ...(size ? { size } : {}),
+  }
+  _ulogInfo(`[OpenAICompat:ImageGenerate] request: ${JSON.stringify(generateParams)}`)
 
   const response = await client.images.generate({
     model: normalizedModelId,

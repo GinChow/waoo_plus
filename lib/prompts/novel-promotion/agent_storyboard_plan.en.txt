@@ -42,9 +42,17 @@ Output format (JSON array only):
     "shot_type": "medium shot",
     "camera_move": "static",
     "video_prompt": "short visual motion prompt",
-    "duration": 3
+    "duration": 4
   }
 ]
+
+Duration rules (seconds per panel):
+- Fast action/fight: 2-3s
+- Dialogue/simple action: 3-4s
+- Emotional close-up: 4-5s
+- Establishing/panoramic shot: 4-6s
+- Epic/climax moment: 5-8s
+- Adjust based on content density and pacing
 
 Planning rules:
 1. Keep strict chronological order.

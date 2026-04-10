@@ -83,9 +83,10 @@ video create bodyTemplate 默认建议（除非文档明确不同）：
   "model": "{{model}}",
   "prompt": "{{prompt}}",
   "seconds": "{{duration}}",
-  "size": "{{size}}",
+  "aspect_ratio": "{{aspect_ratio}}",
   "input_reference": "{{image}}"
 }
+注意：{{duration}} / {{aspect_ratio}} 等占位符在无值时会自动从请求体中移除，不会发送 null 或空字符串。
 
 path 选择规则（非常重要）：
 1) 若文档给了完整 URL，直接完整保留

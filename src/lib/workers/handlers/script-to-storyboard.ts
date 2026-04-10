@@ -343,6 +343,15 @@ export async function handleScriptToStoryboardTask(job: Job<TaskJobData>) {
                     phase3DetailTemplate,
                   },
                   runStep,
+                  onArtifact: async (artifact) => {
+                    await createArtifact({
+                      runId,
+                      stepKey: artifact.stepKey,
+                      artifactType: artifact.artifactType,
+                      refId: artifact.clipId,
+                      payload: artifact.payload,
+                    })
+                  },
                 })
               } catch (error) {
                 if (error instanceof JsonParseError) {
@@ -364,62 +373,6 @@ export async function handleScriptToStoryboardTask(job: Job<TaskJobData>) {
           await callbacks.flush()
         }
       })()
-
-      const phase1Map = orchestratorResult.phase1PanelsByClipId || {}
-      const phase2CinematographyMap = orchestratorResult.phase2CinematographyByClipId || {}
-      const phase2ActingMap = orchestratorResult.phase2ActingByClipId || {}
-      const phase3Map = orchestratorResult.phase3PanelsByClipId || {}
-
-      for (const clip of selectedClips) {
-        const phase1Panels = phase1Map[clip.id] || []
-        if (phase1Panels.length > 0) {
-          await createArtifact({
-            runId,
-            stepKey: `clip_${clip.id}_phase1`,
-            artifactType: 'storyboard.clip.phase1',
-            refId: clip.id,
-            payload: {
-              panels: phase1Panels,
-            },
-          })
-        }
-        const phase2Cinematography = phase2CinematographyMap[clip.id] || []
-        if (phase2Cinematography.length > 0) {
-          await createArtifact({
-            runId,
-            stepKey: `clip_${clip.id}_phase2_cinematography`,
-            artifactType: 'storyboard.clip.phase2.cine',
-            refId: clip.id,
-            payload: {
-              rules: phase2Cinematography,
-            },
-          })
-        }
-        const phase2Acting = phase2ActingMap[clip.id] || []
-        if (phase2Acting.length > 0) {
-          await createArtifact({
-            runId,
-            stepKey: `clip_${clip.id}_phase2_acting`,
-            artifactType: 'storyboard.clip.phase2.acting',
-            refId: clip.id,
-            payload: {
-              directions: phase2Acting,
-            },
-          })
-        }
-        const phase3Panels = phase3Map[clip.id] || []
-        if (phase3Panels.length > 0) {
-          await createArtifact({
-            runId,
-            stepKey: `clip_${clip.id}_phase3_detail`,
-            artifactType: 'storyboard.clip.phase3',
-            refId: clip.id,
-            payload: {
-              panels: phase3Panels,
-            },
-          })
-        }
-      }
 
       await reportTaskProgress(job, 80, {
         stage: 'script_to_storyboard_persist',

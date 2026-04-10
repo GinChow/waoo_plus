@@ -25,7 +25,7 @@ Required fields per panel:
 - shot_type
 - camera_move
 - video_prompt
-- duration (optional)
+- duration (seconds, required: 2-8s based on content pacing)
 
 Output schema example (field names must be preserved):
 [
@@ -42,6 +42,14 @@ Output schema example (field names must be preserved):
     "duration": 3
   }
 ]
+
+Duration rules (seconds per panel):
+- Fast action/fight: 2-3s
+- Dialogue/simple action: 3-4s
+- Emotional close-up: 4-5s
+- Establishing/panoramic shot: 4-6s
+- Epic/climax moment: 5-8s
+- If input already has duration, keep or fine-tune based on cinematography
 
 Rules:
 1. Keep panel order unchanged.

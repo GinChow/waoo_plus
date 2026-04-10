@@ -141,6 +141,10 @@ async function generateVideoForPanel(
     }
   }
 
+  const panelDuration = typeof panel.duration === 'number' && Number.isFinite(panel.duration) && panel.duration > 0
+    ? panel.duration
+    : undefined
+
   const generatedVideo = await resolveVideoSourceFromGeneration(job, {
     userId: job.data.userId,
     modelId: model,
@@ -148,6 +152,7 @@ async function generateVideoForPanel(
     options: {
       prompt,
       ...(projectVideoRatio ? { aspectRatio: projectVideoRatio } : {}),
+      ...(typeof panelDuration === 'number' ? { duration: panelDuration } : {}),
       ...generationOptions,
       generationMode,
       ...(typeof requestedGenerateAudio === 'boolean' ? { generateAudio: requestedGenerateAudio } : {}),

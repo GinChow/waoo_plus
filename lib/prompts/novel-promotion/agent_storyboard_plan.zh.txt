@@ -30,8 +30,17 @@
    - location: 场景名称（从资产库选择）
    - scene_type: daily/emotion/action/epic/suspense
    - source_text: 对应原文片段 ⚠️ 必填，不得为空
+   - duration: 该分镜的建议时长（秒），根据内容复杂度和节奏设定，范围2-8秒
 
-3. source_text 规则（极其重要）：
+3. duration 时长规则：
+   - 快节奏动作/打斗：2-3秒
+   - 日常对话/简单动作：3-4秒
+   - 情感特写/情绪镜头：4-5秒
+   - 建立镜头/全景展示：4-6秒
+   - 史诗场景/高潮时刻：5-8秒
+   - 根据原文内容量和情绪密度灵活调整
+
+4. source_text 规则（极其重要）：
    ⚠️ 每个分镜都必须包含，不得为null或空字符串
    - 多个镜头可以共享同一段原文
    - 直接从输入内容中复制原文
@@ -242,7 +251,8 @@
     ],
     "location": "办公室",
     "scene_type": "daily",
-    "source_text": "张三走进办公室，看着正在工作的李四和王五"
+    "source_text": "张三走进办公室，看着正在工作的李四和王五",
+    "duration": 4
   },
   {
     "panel_number": 2,
@@ -254,7 +264,8 @@
     ],
     "location": "办公室",
     "scene_type": "daily",
-    "source_text": "说：开会了"
+    "source_text": "说：开会了",
+    "duration": 3
   },
   {
     "panel_number": 3,
@@ -266,7 +277,8 @@
     ],
     "location": "办公室",
     "scene_type": "daily",
-    "source_text": "李四抬头点了点头，王五放下手中的笔"
+    "source_text": "李四抬头点了点头，王五放下手中的笔",
+    "duration": 3
   },
   {
     "panel_number": 4,
@@ -278,7 +290,8 @@
     ],
     "location": "办公室",
     "scene_type": "daily",
-    "source_text": "王五站起身"
+    "source_text": "王五站起身",
+    "duration": 3
   }
 ]
 
