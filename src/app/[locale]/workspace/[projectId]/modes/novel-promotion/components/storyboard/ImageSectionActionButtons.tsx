@@ -1,5 +1,6 @@
 'use client'
 import { logInfo as _ulogInfo } from '@/lib/logging/core'
+import { useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { AppIcon } from '@/components/ui/icons'
 import ImageGenerationInlineCountButton from '@/components/image-generation/ImageGenerationInlineCountButton'
@@ -18,6 +19,9 @@ interface ImageSectionActionButtonsProps {
   onOpenEditModal: () => void
   onOpenAIDataModal: () => void
   onUndo?: (panelId: string) => void
+  onDeleteImage?: (panelId: string) => void
+  onUploadImage?: (panelId: string, file: File) => void
+  isUploading?: boolean
   triggerPulse: () => void
 }
 
@@ -31,10 +35,14 @@ export default function ImageSectionActionButtons({
   onOpenEditModal,
   onOpenAIDataModal,
   onUndo,
+  onDeleteImage,
+  onUploadImage,
+  isUploading,
   triggerPulse,
 }: ImageSectionActionButtonsProps) {
   const t = useTranslations('storyboard')
   const { count, setCount } = useImageGenerationCount('storyboard-candidates')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   return (
     <>
@@ -96,6 +104,52 @@ export default function ImageSectionActionButtons({
                   title={t('assets.image.undo')}
                 >
                   <span>{t('assets.image.undo')}</span>
+                </button>
+              </>
+            )}
+
+            {onUploadImage && (
+              <>
+                <div className="w-px h-3 bg-[var(--glass-stroke-base)]" />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isSubmittingPanelImageTask || isModifying || isUploading}
+                  className="glass-btn-base glass-btn-secondary flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] transition-all active:scale-95 disabled:opacity-50"
+                  title={t('image.uploadLocal')}
+                >
+                  <AppIcon name="upload" className="w-2.5 h-2.5" />
+                  <span>{isUploading ? t('image.uploading') : t('image.uploadLocal')}</span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      onUploadImage(panelId, file)
+                      e.target.value = ''
+                    }
+                  }}
+                />
+              </>
+            )}
+
+            {imageUrl && onDeleteImage && (
+              <>
+                <div className="w-px h-3 bg-[var(--glass-stroke-base)]" />
+                <button
+                  onClick={() => {
+                    if (window.confirm(t('image.deleteImageConfirm'))) {
+                      onDeleteImage(panelId)
+                    }
+                  }}
+                  disabled={isSubmittingPanelImageTask || isModifying}
+                  className="glass-btn-base glass-btn-tone-danger flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] transition-all active:scale-95 disabled:opacity-50"
+                  title={t('image.deleteImage')}
+                >
+                  <AppIcon name="trash" className="w-2.5 h-2.5" />
                 </button>
               </>
             )}

@@ -36,6 +36,9 @@ interface ImageSectionProps {
   onCancelCandidate: (panelId: string) => void
   onClearError: () => void
   onUndo?: (panelId: string) => void
+  onDeleteImage?: (panelId: string) => void
+  onUploadImage?: (panelId: string, file: File) => void
+  isUploading?: boolean
   onPreviewImage?: (url: string) => void
 }
 
@@ -60,6 +63,9 @@ export default function ImageSection({
   onCancelCandidate,
   onClearError,
   onUndo,
+  onDeleteImage,
+  onUploadImage,
+  isUploading,
   onPreviewImage,
 }: ImageSectionProps) {
   const t = useTranslations('storyboard')
@@ -195,6 +201,9 @@ export default function ImageSection({
           onOpenEditModal={onOpenEditModal}
           onOpenAIDataModal={onOpenAIDataModal}
           onUndo={onUndo}
+          onDeleteImage={onDeleteImage}
+          onUploadImage={onUploadImage}
+          isUploading={isUploading}
           triggerPulse={triggerPulse}
         />
       )}

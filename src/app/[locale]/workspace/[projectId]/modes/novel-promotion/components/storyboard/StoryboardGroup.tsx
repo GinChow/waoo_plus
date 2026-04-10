@@ -66,6 +66,9 @@ export default function StoryboardGroup({
   insertingAfterPanelId,
   projectId,
   episodeId,
+  onDeletePanelImage,
+  onUploadPanelImage,
+  uploadingPanelIds,
   onPanelVariant,
   submittingVariantPanelId,
 }: StoryboardGroupProps) {
@@ -229,6 +232,9 @@ export default function StoryboardGroup({
         onConfirmPanelCandidate={onConfirmPanelCandidate}
         onCancelPanelCandidate={onCancelPanelCandidate}
         onClearPanelTaskError={clearPanelTaskError}
+        onDeletePanelImage={onDeletePanelImage}
+        onUploadPanelImage={onUploadPanelImage}
+        uploadingPanelIds={uploadingPanelIds}
         onPreviewImage={onPreviewImage}
         onInsertAfter={handleOpenInsertModal}
         onVariant={handleOpenVariantModal}

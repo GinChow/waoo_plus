@@ -148,7 +148,11 @@
         "generateMultiple": "生成多张候选",
         "generateCount": "生成 {count} 张",
         "generateCountSuffix": "张",
-        "undoShort": "返回"
+        "undoShort": "返回",
+        "deleteImage": "删除图片",
+        "deleteImageConfirm": "确定要删除这张分镜图片吗？",
+        "uploadLocal": "上传本地图片",
+        "uploading": "上传中..."
     },
     "candidate": {
         "title": "选择候选图",

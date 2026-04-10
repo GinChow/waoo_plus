@@ -37,6 +37,9 @@ interface StoryboardPanelListProps {
   onConfirmPanelCandidate: (panelId: string, imageUrl: string) => Promise<void>
   onCancelPanelCandidate: (panelId: string) => void
   onClearPanelTaskError: (panelId: string) => void
+  onDeletePanelImage: (panelId: string) => void
+  onUploadPanelImage: (panelId: string, file: File) => void
+  uploadingPanelIds: Set<string>
   onPreviewImage: (url: string) => void
   onInsertAfter: (panelIndex: number) => void
   onVariant: (panelIndex: number) => void
@@ -72,6 +75,9 @@ export default function StoryboardPanelList({
   onConfirmPanelCandidate,
   onCancelPanelCandidate,
   onClearPanelTaskError,
+  onDeletePanelImage,
+  onUploadPanelImage,
+  uploadingPanelIds,
   onPreviewImage,
   onInsertAfter,
   onVariant,
@@ -137,6 +143,9 @@ export default function StoryboardPanelList({
               onConfirmCandidate={onConfirmPanelCandidate}
               onCancelCandidate={onCancelPanelCandidate}
               onClearError={() => onClearPanelTaskError(panel.id)}
+              onDeleteImage={onDeletePanelImage}
+              onUploadImage={onUploadPanelImage}
+              isUploading={uploadingPanelIds.has(panel.id)}
               onPreviewImage={onPreviewImage}
               onInsertAfter={() => onInsertAfter(index)}
               onVariant={() => onVariant(index)}

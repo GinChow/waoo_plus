@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useCallback } from 'react'
 import { NovelPromotionStoryboard, NovelPromotionClip } from '@/types/project'
 import { CharacterPickerModal, LocationPickerModal } from '../PanelEditForm'
 import ImageEditModal from './ImageEditModal'
@@ -10,6 +11,7 @@ import StoryboardToolbar from './StoryboardToolbar'
 import StoryboardCanvas from './StoryboardCanvas'
 import { useStoryboardStageController } from './hooks/useStoryboardStageController'
 import { useStoryboardModalRuntime } from './hooks/useStoryboardModalRuntime'
+import { useRefreshProjectAssets } from '@/lib/query/hooks'
 
 interface StoryboardStageProps {
   projectId: string
@@ -142,6 +144,42 @@ export default function StoryboardStage({
     updatePanelActingNotesMutation,
   })
 
+  const onRefresh = useRefreshProjectAssets(projectId)
+  const [uploadingPanelIds, setUploadingPanelIds] = useState<Set<string>>(new Set())
+
+  const handleDeletePanelImage = useCallback(async (panelId: string) => {
+    try {
+      await fetch(`/api/novel-promotion/${projectId}/panel/update-image?panelId=${panelId}`, {
+        method: 'DELETE',
+      })
+      onRefresh()
+    } catch {
+      // ignore
+    }
+  }, [projectId, onRefresh])
+
+  const handleUploadPanelImage = useCallback(async (panelId: string, file: File) => {
+    setUploadingPanelIds((prev) => new Set(prev).add(panelId))
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('panelId', panelId)
+      await fetch(`/api/novel-promotion/${projectId}/panel/update-image`, {
+        method: 'POST',
+        body: formData,
+      })
+      onRefresh()
+    } catch {
+      // ignore
+    } finally {
+      setUploadingPanelIds((prev) => {
+        const next = new Set(prev)
+        next.delete(panelId)
+        return next
+      })
+    }
+  }, [projectId, onRefresh])
+
   return (
       <StoryboardStageShell
         isTransitioning={isTransitioning}
@@ -210,6 +248,9 @@ export default function StoryboardStage({
           onSelectPanelCandidateIndex={selectPanelCandidateIndex}
           onConfirmPanelCandidate={selectPanelCandidate}
           onCancelPanelCandidate={cancelPanelCandidate}
+          onDeletePanelImage={handleDeletePanelImage}
+          onUploadPanelImage={handleUploadPanelImage}
+          uploadingPanelIds={uploadingPanelIds}
 
           onInsertPanel={insertPanel}
           onPanelVariant={generatePanelVariant}

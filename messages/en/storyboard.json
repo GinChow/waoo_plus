@@ -148,7 +148,11 @@
         "generateMultiple": "Generate multiple candidates",
         "generateCount": "Generate {count}",
         "generateCountSuffix": "candidates",
-        "undoShort": "Back"
+        "undoShort": "Back",
+        "deleteImage": "Delete Image",
+        "deleteImageConfirm": "Are you sure you want to delete this panel image?",
+        "uploadLocal": "Upload Local Image",
+        "uploading": "Uploading..."
     },
     "candidate": {
         "title": "Select Candidate Image",

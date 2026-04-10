@@ -44,6 +44,9 @@ interface PanelCardProps {
   onCancelCandidate: (panelId: string) => void
   onClearError: () => void
   onUndo?: (panelId: string) => void  // 撤回到上一版本
+  onDeleteImage?: (panelId: string) => void  // 删除分镜图片
+  onUploadImage?: (panelId: string, file: File) => void  // 上传本地图片
+  isUploading?: boolean
   onPreviewImage?: (url: string) => void  // 放大预览图片
   onInsertAfter?: () => void  // 在此镜头后插入
   onVariant?: () => void  // 生成镜头变体
@@ -81,6 +84,9 @@ export default function PanelCard({
   onCancelCandidate,
   onClearError,
   onUndo,
+  onDeleteImage,
+  onUploadImage,
+  isUploading,
   onPreviewImage,
   onInsertAfter,
   onVariant,
@@ -128,6 +134,9 @@ export default function PanelCard({
           onCancelCandidate={onCancelCandidate}
           onClearError={onClearError}
           onUndo={onUndo}
+          onDeleteImage={onDeleteImage}
+          onUploadImage={onUploadImage}
+          isUploading={isUploading}
           onPreviewImage={onPreviewImage}
         />
         {/* 插入分镜/镜头变体按钮 - 在图片区域右侧垂直居中 */}
