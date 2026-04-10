@@ -1,4 +1,4 @@
-import { logWarn as _ulogWarn } from '@/lib/logging/core'
+import { logWarn as _ulogWarn, logInfo as _ulogInfo } from '@/lib/logging/core'
 /**
  * 生成器基础接口和类型定义
  * 
@@ -96,6 +96,7 @@ export abstract class BaseImageGenerator implements ImageGenerator {
      * 生成图片（带重试）
      */
     async generate(params: ImageGenerateParams): Promise<GenerateResult> {
+        _ulogInfo(`[ImageGenerator] prompt: ${params.prompt}`)
         const maxRetries = 2
         let lastError: unknown = null
 

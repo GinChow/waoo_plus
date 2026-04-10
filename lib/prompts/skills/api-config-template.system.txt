@@ -62,6 +62,22 @@
 3) 文档未明确时必须追问，不能猜
 4) 只有 create.contentType 未写明时，可根据请求示例判断为 application/json 或 multipart/form-data
 
+可用 bodyTemplate 占位符变量（非常重要，必须区分）：
+- {{model}}：模型 ID（字符串）
+- {{prompt}}：提示词（字符串）
+- {{image}}：第一张参考图 URL（字符串，仅单张）
+- {{images}}：所有参考图 URL（数组，如 ["url1","url2"]）
+- {{aspect_ratio}}：宽高比（字符串）
+- {{size}}：尺寸（字符串）
+- {{duration}}：视频时长（数字）
+- {{resolution}}：分辨率（字符串）
+- {{task_id}}：异步任务 ID（仅 status.path 中使用）
+
+⚠️ image vs images 选择规则：
+- 若 API 文档中图片字段的类型是 array（如 "image": ["url1","url2"]），必须用 {{images}}
+- 若 API 文档中图片字段的类型是 string（如 "image_url": "url"），用 {{image}}
+- 不要看字段名，要看字段的值类型来决定
+
 video create bodyTemplate 默认建议（除非文档明确不同）：
 {
   "model": "{{model}}",

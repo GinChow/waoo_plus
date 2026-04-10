@@ -207,6 +207,9 @@ export async function resolveImageSourceFromGeneration(
     provider: params.options?.provider || undefined,
     details: {
       model: params.modelId,
+      prompt: params.prompt,
+      referenceImageCount: params.options?.referenceImages?.length ?? 0,
+      referenceImages: params.options?.referenceImages?.map((u) => u.substring(0, 120)) ?? [],
     },
   })
 
@@ -331,7 +334,12 @@ export async function resolveImageSourcesFromGeneration(
   logger.info({
     message: 'image sources generation started',
     provider: params.options?.provider || undefined,
-    details: { model: params.modelId },
+    details: {
+      model: params.modelId,
+      prompt: params.prompt,
+      referenceImageCount: params.options?.referenceImages?.length ?? 0,
+      referenceImages: params.options?.referenceImages?.map((u) => u.substring(0, 120)) ?? [],
+    },
   })
 
   const runtimeSelections: Record<string, string | number | boolean> = {}

@@ -103,6 +103,7 @@ export async function generateImage(
 
     // 调用生成（提取 referenceImages 单独传递，其余选项合并进 options）
     const { referenceImages, ...generatorOptions } = options || {}
+    _ulogInfo(`[generateImage] gatewayRoute=${gatewayRoute}, referenceImageCount=${referenceImages?.length ?? 0}`)
     if (gatewayRoute === 'openai-compat') {
         const compatTemplate = selection.compatMediaTemplate
         if (providerKey === 'openai-compatible' && !compatTemplate) {

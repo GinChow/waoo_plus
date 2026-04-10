@@ -172,6 +172,17 @@ describe('worker panel-image-task-handler behavior', () => {
     })
   })
 
+  it('passes normalized reference images through to resolveImageSourceFromGeneration', async () => {
+    outboundMock.normalizeReferenceImagesForGeneration.mockResolvedValueOnce(['norm-ref-1', 'norm-ref-2'])
+    const job = buildJob({ candidateCount: 1 })
+    await handlePanelImageTask(job)
+
+    const call = utilsMock.resolveImageSourceFromGeneration.mock.calls[0]
+    expect(call).toBeTruthy()
+    const params = call[1]
+    expect(params.options.referenceImages).toEqual(['norm-ref-1', 'norm-ref-2'])
+  })
+
   it('regeneration branch -> keeps old image in previousImageUrl and stores candidates only', async () => {
     utilsMock.resolveImageSourceFromGeneration.mockReset()
     utilsMock.uploadImageSourceToCos.mockReset()

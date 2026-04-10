@@ -1,3 +1,4 @@
+import { logInfo as _ulogInfo } from '@/lib/logging/core'
 import type { GenerateResult } from '@/lib/generators/base'
 import type { OpenAICompatImageRequest } from '../types'
 import {
@@ -67,16 +68,24 @@ export async function generateImageViaOpenAICompatTemplate(
   const firstReference = Array.isArray(request.referenceImages) && request.referenceImages.length > 0
     ? request.referenceImages[0]
     : ''
+  const refImages = request.referenceImages || []
   const variables = buildTemplateVariables({
     model: request.modelId || 'gpt-image-1',
     prompt: request.prompt,
     image: firstReference,
-    images: request.referenceImages || [],
+    images: refImages,
     aspectRatio: typeof request.options?.aspectRatio === 'string' ? request.options.aspectRatio : undefined,
     resolution: typeof request.options?.resolution === 'string' ? request.options.resolution : undefined,
     size: typeof request.options?.size === 'string' ? request.options.size : undefined,
     extra: request.options,
   })
+  // 图片生成场景：大多数 API 的 image 字段期望数组（如 huobao），
+  // 将 image 变量也设为数组，使模板中 {{ image }} 和 {{ images }} 等效
+  if (refImages.length > 0) {
+    variables.image = refImages
+  }
+
+  _ulogInfo(`[OpenAICompatTemplate:Image] referenceImageCount=${refImages.length}, templateBodyTemplate=${JSON.stringify(request.template.create.bodyTemplate)?.substring(0, 500)}`)
 
   const createRequest = await buildRenderedTemplateRequest({
     baseUrl: config.baseUrl,
@@ -84,6 +93,41 @@ export async function generateImageViaOpenAICompatTemplate(
     variables,
     defaultAuthHeader: `Bearer ${config.apiKey}`,
   })
+
+  // 自动补全：模板 bodyTemplate 缺少 image/size 字段时，注入到 JSON 请求体中
+  if (typeof createRequest.body === 'string') {
+    try {
+      const bodyObj = JSON.parse(createRequest.body)
+      if (bodyObj && typeof bodyObj === 'object' && !Array.isArray(bodyObj)) {
+        let injected = false
+        if (refImages.length > 0 && !('image' in bodyObj) && !('images' in bodyObj)) {
+          bodyObj.image = refImages
+          injected = true
+        }
+        if (!('size' in bodyObj)) {
+          const ar = typeof request.options?.aspectRatio === 'string' ? request.options.aspectRatio.trim() : ''
+          if (ar) {
+            bodyObj.size = ar.replace(':', 'x')
+            injected = true
+          }
+        }
+        if (injected) {
+          createRequest.body = JSON.stringify(bodyObj)
+          _ulogInfo(`[OpenAICompatTemplate:Image] auto-injected fields into request body, imageCount=${refImages.length}, size=${bodyObj.size || 'none'}`)
+        }
+      }
+    } catch {
+      // body 不是 JSON，跳过注入
+    }
+  }
+
+  // 打印实际发送的请求体（截断 base64 避免日志过大）
+  let bodySnippet = ''
+  if (typeof createRequest.body === 'string') {
+    bodySnippet = createRequest.body.replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]{50,}/g, 'data:image/...BASE64_TRUNCATED...').substring(0, 1000)
+  }
+  _ulogInfo(`[OpenAICompatTemplate:Image] requestUrl=${createRequest.endpointUrl}, method=${createRequest.method}, bodySnippet=${bodySnippet}`)
+
   if (['POST', 'PUT', 'PATCH'].includes(createRequest.method) && !createRequest.body) {
     throw new Error('OPENAI_COMPAT_IMAGE_TEMPLATE_CREATE_BODY_REQUIRED')
   }

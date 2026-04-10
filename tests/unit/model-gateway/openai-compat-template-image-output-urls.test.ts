@@ -59,6 +59,97 @@ describe('openai-compat template image output urls', () => {
     })
   })
 
+  it('auto-injects image and size fields when template bodyTemplate omits them', async () => {
+    let capturedBody: string | undefined
+    globalThis.fetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      capturedBody = typeof init?.body === 'string' ? init.body : undefined
+      return new Response(JSON.stringify({
+        data: [{ url: 'https://cdn.test/result.png' }],
+      }), { status: 200 })
+    }) as unknown as typeof fetch
+
+    await generateImageViaOpenAICompatTemplate({
+      userId: 'user-1',
+      providerId: 'openai-compatible:test-provider',
+      modelId: 'nano-banana-2',
+      modelKey: 'openai-compatible:test-provider::nano-banana-2',
+      prompt: 'draw a cat',
+      referenceImages: ['https://ref.test/a.png', 'https://ref.test/b.png'],
+      options: { aspectRatio: '16:9' },
+      profile: 'openai-compatible',
+      template: {
+        version: 1,
+        mediaType: 'image',
+        mode: 'sync',
+        create: {
+          method: 'POST',
+          path: '/images/generations',
+          contentType: 'application/json',
+          bodyTemplate: {
+            model: '{{model}}',
+            prompt: '{{prompt}}',
+          },
+        },
+        response: {
+          outputUrlsPath: '$.data',
+        },
+      },
+    })
+
+    expect(capturedBody).toBeDefined()
+    const body = JSON.parse(capturedBody!)
+    expect(body.model).toBe('nano-banana-2')
+    expect(body.image).toEqual(['https://ref.test/a.png', 'https://ref.test/b.png'])
+    expect(body.size).toBe('16x9')
+  })
+
+  it('does not inject image/size when template already includes them', async () => {
+    let capturedBody: string | undefined
+    globalThis.fetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      capturedBody = typeof init?.body === 'string' ? init.body : undefined
+      return new Response(JSON.stringify({
+        data: [{ url: 'https://cdn.test/result.png' }],
+      }), { status: 200 })
+    }) as unknown as typeof fetch
+
+    await generateImageViaOpenAICompatTemplate({
+      userId: 'user-1',
+      providerId: 'openai-compatible:test-provider',
+      modelId: 'nano-banana-2',
+      modelKey: 'openai-compatible:test-provider::nano-banana-2',
+      prompt: 'draw a cat',
+      referenceImages: ['https://ref.test/a.png'],
+      options: { aspectRatio: '16:9' },
+      profile: 'openai-compatible',
+      template: {
+        version: 1,
+        mediaType: 'image',
+        mode: 'sync',
+        create: {
+          method: 'POST',
+          path: '/images/generations',
+          contentType: 'application/json',
+          bodyTemplate: {
+            model: '{{model}}',
+            prompt: '{{prompt}}',
+            image: '{{images}}',
+            size: '{{size}}',
+          },
+        },
+        response: {
+          outputUrlsPath: '$.data',
+        },
+      },
+    })
+
+    expect(capturedBody).toBeDefined()
+    const body = JSON.parse(capturedBody!)
+    // image comes from template rendering of {{images}}, not injection
+    expect(body.image).toEqual(['https://ref.test/a.png'])
+    // size comes from template rendering, not injection
+    expect(body.size).toBe('')
+  })
+
   it('keeps single-url output compatible when outputUrlsPath has only one image', async () => {
     globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
       data: [{ url: 'https://cdn.test/only.png' }],
