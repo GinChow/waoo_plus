@@ -17,4 +17,5 @@ export interface LipSyncSubmitContext {
   providerId: string
   modelId: string
   modelKey: string
+  customEndpoint?: string
 }

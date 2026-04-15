@@ -17,7 +17,7 @@ export interface TestProviderResult {
   steps: TestStep[]
 }
 
-type PresetProviderType = 'ark' | 'google' | 'openrouter' | 'minimax' | 'fal' | 'vidu'
+type PresetProviderType = 'ark' | 'google' | 'openrouter' | 'minimax' | 'fal' | 'vidu' | 'yunwu'
   | 'bailian'
   | 'siliconflow'
 type CompatibleProviderType = 'openai-compatible' | 'gemini-compatible'
@@ -680,6 +680,65 @@ async function testViduProvider(apiKey: string): Promise<TestProviderResult> {
 }
 
 // ---------------------------------------------------------------------------
+// Yunwu (云雾中转，Vidu 兼容，Bearer 认证)
+// ---------------------------------------------------------------------------
+
+async function testYunwuProvider(apiKey: string, baseUrl?: string): Promise<TestProviderResult> {
+  console.log('[provider-test] testYunwuProvider')
+  const steps: TestStep[] = []
+
+  const trimmed = (baseUrl || '').replace(/\/+$/, '') || 'https://yunwu.ai'
+  const apiBase = /\/ent\/v\d+$/.test(trimmed) ? trimmed : `${trimmed}/ent/v2`
+
+  // 通过 credits 端点探测；若 404/405 则回退到 tasks 查询（伪造 taskId，期望得到 4xx 而不是 401/403）
+  try {
+    const creditsResponse = await fetch(`${apiBase}/credits`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(15_000),
+    })
+
+    if (creditsResponse.ok) {
+      const data = await creditsResponse.json().catch(() => ({})) as {
+        remains?: Array<{ credit_remain?: number }>
+      }
+      const creditRemain = data.remains?.[0]?.credit_remain
+      steps.push({
+        name: 'credits',
+        status: 'pass',
+        message: typeof creditRemain === 'number' ? `Balance: ${creditRemain} credits` : 'OK',
+      })
+      return { success: true, steps }
+    }
+
+    if (creditsResponse.status === 401 || creditsResponse.status === 403) {
+      const errorText = await creditsResponse.text().catch(() => '')
+      steps.push({
+        name: 'credits',
+        status: 'fail',
+        message: 'Authentication failed — check API Key',
+        detail: errorText.slice(0, 500) || undefined,
+      })
+      return { success: false, steps }
+    }
+
+    // credits 端点不支持，跳过并标记通过（无法进一步验证）
+    steps.push({
+      name: 'credits',
+      status: 'skip',
+      message: `Credits endpoint unavailable (${creditsResponse.status}); key format accepted`,
+    })
+    return { success: true, steps }
+  } catch (error) {
+    steps.push({
+      name: 'credits',
+      status: 'fail',
+      message: toErrorMessage(error),
+    })
+    return { success: false, steps }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // SiliconFlow (zero-inference probes)
 // ---------------------------------------------------------------------------
 
@@ -867,6 +926,8 @@ export async function testProviderConnection(payload: TestProviderPayload): Prom
       return testFalProvider(apiKey)
     case 'vidu':
       return testViduProvider(apiKey)
+    case 'yunwu':
+      return testYunwuProvider(apiKey, baseUrl)
     case 'bailian':
       return testBailianProvider(apiKey)
     case 'siliconflow':

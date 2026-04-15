@@ -1,4 +1,5 @@
 import { getProviderConfig } from '@/lib/api-config'
+import { resolveCustomBaseUrl } from '@/lib/generators/base'
 import type { LipSyncParams, LipSyncResult, LipSyncSubmitContext } from '@/lib/lipsync/types'
 
 interface ViduLipSyncSubmitResponse {
@@ -76,8 +77,9 @@ export async function submitViduLipSync(
 ): Promise<LipSyncResult> {
   const videoUrl = normalizeProviderPullUrl(params.videoUrl, 'video_url')
   const audioUrl = normalizeProviderPullUrl(params.audioUrl, 'audio_url')
-  const { apiKey } = await getProviderConfig(context.userId, context.providerId)
-  const response = await fetch('https://api.vidu.cn/ent/v2/lip-sync', {
+  const { apiKey, baseUrl: providerBaseUrl } = await getProviderConfig(context.userId, context.providerId)
+  const viduBaseUrl = resolveCustomBaseUrl(providerBaseUrl, context.customEndpoint) || 'https://api.vidu.cn/ent/v2'
+  const response = await fetch(`${viduBaseUrl}/lip-sync`, {
     method: 'POST',
     headers: {
       Authorization: `Token ${apiKey}`,
@@ -103,9 +105,15 @@ export async function submitViduLipSync(
     throw new Error(`VIDU_LIPSYNC_SUBMIT_FAILED: ${data.err_code || 'unknown'}`)
   }
 
+  const defaultViduBase = 'https://api.vidu.cn/ent/v2'
+  const useCustomBase = viduBaseUrl !== defaultViduBase
+  const externalId = useCustomBase
+    ? `VIDU:VIDEO:ep_${Buffer.from(viduBaseUrl, 'utf8').toString('base64url')}:${taskId}`
+    : `VIDU:VIDEO:${taskId}`
+
   return {
     requestId: taskId,
-    externalId: `VIDU:VIDEO:${taskId}`,
+    externalId,
     async: true,
   }
 }

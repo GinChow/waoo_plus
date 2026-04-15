@@ -21,6 +21,7 @@ import { queryGeminiBatchStatus, querySeedanceVideoStatus, queryGoogleVideoStatu
 import { getProviderConfig, getUserModels } from './api-config'
 import { buildRenderedTemplateRequest, buildTemplateVariables, normalizeResponseJson, readJsonPath } from './openai-compat-template-runtime'
 import { composeModelKey } from './model-config-contract'
+import { normalizeYunwuBaseUrl } from './generators/yunwu'
 
 const OPENAI_COMPAT_PROVIDER_PREFIX = 'openai-compatible:'
 const PROVIDER_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -48,12 +49,13 @@ function getErrorMessage(error: unknown): string {
  * 解析 externalId 获取 provider、type 和请求信息
  */
 export function parseExternalId(externalId: string): {
-    provider: 'FAL' | 'ARK' | 'GEMINI' | 'GOOGLE' | 'MINIMAX' | 'VIDU' | 'OPENAI' | 'OCOMPAT' | 'BAILIAN' | 'SILICONFLOW' | 'UNKNOWN'
+    provider: 'FAL' | 'ARK' | 'GEMINI' | 'GOOGLE' | 'MINIMAX' | 'VIDU' | 'YUNWU' | 'OPENAI' | 'OCOMPAT' | 'BAILIAN' | 'SILICONFLOW' | 'UNKNOWN'
     type: 'VIDEO' | 'IMAGE' | 'BATCH' | 'UNKNOWN'
     endpoint?: string
     requestId: string
     providerToken?: string
     modelKeyToken?: string
+    customBaseUrl?: string
 } {
     // 标准格式：PROVIDER:TYPE:...
     if (externalId.startsWith('FAL:')) {
@@ -123,8 +125,25 @@ export function parseExternalId(externalId: string): {
     if (externalId.startsWith('MINIMAX:')) {
         const parts = externalId.split(':')
         const type = parts[1]
+        if (type !== 'VIDEO' && type !== 'IMAGE') {
+            throw new Error(`无效 MINIMAX externalId: "${externalId}"，应为 MINIMAX:TYPE:taskId`)
+        }
+        const maybeEpToken = parts[2]
+        if (maybeEpToken && maybeEpToken.startsWith('ep_')) {
+            const requestId = parts.slice(3).join(':')
+            if (!requestId) {
+                throw new Error(`无效 MINIMAX externalId: "${externalId}"，缺少 taskId`)
+            }
+            const customBaseUrl = Buffer.from(maybeEpToken.slice(3), 'base64url').toString('utf8')
+            return {
+                provider: 'MINIMAX',
+                type: type as 'VIDEO' | 'IMAGE',
+                requestId,
+                customBaseUrl,
+            }
+        }
         const requestId = parts.slice(2).join(':')
-        if ((type !== 'VIDEO' && type !== 'IMAGE') || !requestId) {
+        if (!requestId) {
             throw new Error(`无效 MINIMAX externalId: "${externalId}"，应为 MINIMAX:TYPE:taskId`)
         }
         return {
@@ -134,15 +153,34 @@ export function parseExternalId(externalId: string): {
         }
     }
 
-    if (externalId.startsWith('VIDU:')) {
+    if (externalId.startsWith('VIDU:') || externalId.startsWith('YUNWU:')) {
+        const flavor = externalId.startsWith('YUNWU:') ? 'YUNWU' : 'VIDU'
         const parts = externalId.split(':')
         const type = parts[1]
+        if (type !== 'VIDEO' && type !== 'IMAGE') {
+            throw new Error(`无效 ${flavor} externalId: "${externalId}"，应为 ${flavor}:TYPE:taskId`)
+        }
+        // 支持带自定义端点的格式：{flavor}:TYPE:ep_{base64url}:{taskId}
+        const maybeEpToken = parts[2]
+        if (maybeEpToken && maybeEpToken.startsWith('ep_')) {
+            const requestId = parts.slice(3).join(':')
+            if (!requestId) {
+                throw new Error(`无效 ${flavor} externalId: "${externalId}"，缺少 taskId`)
+            }
+            const customBaseUrl = Buffer.from(maybeEpToken.slice(3), 'base64url').toString('utf8')
+            return {
+                provider: flavor,
+                type: type as 'VIDEO' | 'IMAGE',
+                requestId,
+                customBaseUrl,
+            }
+        }
         const requestId = parts.slice(2).join(':')
-        if ((type !== 'VIDEO' && type !== 'IMAGE') || !requestId) {
-            throw new Error(`无效 VIDU externalId: "${externalId}"，应为 VIDU:TYPE:taskId`)
+        if (!requestId) {
+            throw new Error(`无效 ${flavor} externalId: "${externalId}"，应为 ${flavor}:TYPE:taskId`)
         }
         return {
-            provider: 'VIDU',
+            provider: flavor,
             type: type as 'VIDEO' | 'IMAGE',
             requestId,
         }
@@ -241,9 +279,11 @@ export async function pollAsyncTask(
         case 'GOOGLE':
             return await pollGoogleVideoTask(parsed.requestId, userId)
         case 'MINIMAX':
-            return await pollMinimaxTask(parsed.requestId, userId)
+            return await pollMinimaxTask(parsed.requestId, userId, parsed.customBaseUrl)
         case 'VIDU':
-            return await pollViduTask(parsed.requestId, userId)
+            return await pollViduTask(parsed.requestId, userId, parsed.customBaseUrl, 'vidu')
+        case 'YUNWU':
+            return await pollViduTask(parsed.requestId, userId, parsed.customBaseUrl, 'yunwu')
         case 'OPENAI':
             return await pollOpenAIVideoTask(parsed.requestId, userId, parsed.providerToken)
         case 'OCOMPAT':
@@ -560,10 +600,12 @@ async function pollGoogleVideoTask(
  */
 async function pollMinimaxTask(
     taskId: string,
-    userId: string
+    userId: string,
+    customBaseUrl?: string,
 ): Promise<PollResult> {
-    const { apiKey } = await getProviderConfig(userId, 'minimax')
-    const result = await queryMinimaxTaskStatus(taskId, apiKey)
+    const { apiKey, baseUrl: providerBaseUrl } = await getProviderConfig(userId, 'minimax')
+    const minimaxBaseUrl = customBaseUrl || providerBaseUrl || 'https://api.minimaxi.com/v1'
+    const result = await queryMinimaxTaskStatus(taskId, apiKey, minimaxBaseUrl)
 
     return {
         status: result.status,
@@ -579,12 +621,13 @@ async function pollMinimaxTask(
  */
 async function queryMinimaxTaskStatus(
     taskId: string,
-    apiKey: string
+    apiKey: string,
+    baseUrl: string = 'https://api.minimaxi.com/v1',
 ): Promise<{ status: 'pending' | 'completed' | 'failed'; videoUrl?: string; imageUrl?: string; error?: string }> {
     const logPrefix = '[MiniMax Query]'
 
     try {
-        const response = await fetch(`https://api.minimaxi.com/v1/query/video_generation?task_id=${taskId}`, {
+        const response = await fetch(`${baseUrl}/query/video_generation?task_id=${taskId}`, {
             headers: {
                 'Authorization': `Bearer ${apiKey}`
             }
@@ -693,14 +736,20 @@ async function queryMinimaxTaskStatus(
  */
 async function pollViduTask(
     taskId: string,
-    userId: string
+    userId: string,
+    customBaseUrl: string | undefined,
+    flavor: 'vidu' | 'yunwu',
 ): Promise<PollResult> {
-    _ulogInfo(`[Poll Vidu] 开始轮询 task_id=${taskId}, userId=${userId}`)
+    _ulogInfo(`[Poll Vidu] 开始轮询 task_id=${taskId}, userId=${userId}, flavor=${flavor}`)
 
-    const { apiKey } = await getProviderConfig(userId, 'vidu')
+    const { apiKey, baseUrl: providerBaseUrl } = await getProviderConfig(userId, flavor)
     _ulogInfo(`[Poll Vidu] API Key 长度: ${apiKey?.length || 0}`)
 
-    const result = await queryViduTaskStatus(taskId, apiKey)
+    const defaultBaseUrl = flavor === 'yunwu' ? 'https://yunwu.ai/ent/v2' : 'https://api.vidu.cn/ent/v2'
+    const rawBaseUrl = customBaseUrl || providerBaseUrl || defaultBaseUrl
+    const viduBaseUrl = flavor === 'yunwu' ? normalizeYunwuBaseUrl(rawBaseUrl) : rawBaseUrl
+    const useBearer = flavor === 'yunwu'
+    const result = await queryViduTaskStatus(taskId, apiKey, viduBaseUrl, useBearer)
     _ulogInfo(`[Poll Vidu] 查询结果:`, result)
 
     return {
@@ -864,17 +913,19 @@ async function pollSiliconFlowTask(requestId: string): Promise<PollResult> {
  */
 async function queryViduTaskStatus(
     taskId: string,
-    apiKey: string
+    apiKey: string,
+    baseUrl: string = 'https://api.vidu.cn/ent/v2',
+    useBearer: boolean = false,
 ): Promise<{ status: 'pending' | 'completed' | 'failed'; videoUrl?: string; error?: string }> {
     const logPrefix = '[Vidu Query]'
 
     try {
         _ulogInfo(`${logPrefix} 查询任务 task_id=${taskId}`)
 
-        // 🔥 正确的查询接口路径：/tasks/{id}/creations
-        const response = await fetch(`https://api.vidu.cn/ent/v2/tasks/${taskId}/creations`, {
+        const authHeader = useBearer ? `Bearer ${apiKey}` : `Token ${apiKey}`
+        const response = await fetch(`${baseUrl}/tasks/${taskId}/creations`, {
             headers: {
-                'Authorization': `Token ${apiKey}`
+                'Authorization': authHeader
             }
         })
 

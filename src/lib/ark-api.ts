@@ -417,6 +417,7 @@ export async function arkImageGeneration(
     request: ArkImageGenerationRequest,
     options?: {
         apiKey: string  // 必须传入 API Key
+        baseUrl?: string
         timeoutMs?: number
         maxRetries?: number
         logPrefix?: string
@@ -433,7 +434,7 @@ export async function arkImageGeneration(
         logPrefix = '[Ark Image]'
     } = options
 
-    const url = `${ARK_BASE_URL}/images/generations`
+    const url = `${options.baseUrl || ARK_BASE_URL}/images/generations`
 
     _ulogInfo(`${logPrefix} 开始图片生成请求, 模型: ${request.model}`)
     _ulogInfo(`${logPrefix} 请求参数:`, JSON.stringify({
@@ -477,6 +478,7 @@ export async function arkCreateVideoTask(
     request: ArkVideoTaskRequest,
     options: {
         apiKey: string  // 必须传入 API Key
+        baseUrl?: string
         timeoutMs?: number
         maxRetries?: number
         logPrefix?: string
@@ -494,7 +496,7 @@ export async function arkCreateVideoTask(
         logPrefix = '[Ark Video]'
     } = options
 
-    const url = `${ARK_BASE_URL}/contents/generations/tasks`
+    const url = `${options.baseUrl || ARK_BASE_URL}/contents/generations/tasks`
 
     _ulogInfo(`${logPrefix} 创建视频任务, 模型: ${request.model}`)
 
@@ -531,6 +533,7 @@ export async function arkQueryVideoTask(
     taskId: string,
     options: {
         apiKey: string  // 必须传入 API Key
+        baseUrl?: string
         timeoutMs?: number
         maxRetries?: number
         logPrefix?: string
@@ -547,7 +550,7 @@ export async function arkQueryVideoTask(
         logPrefix = '[Ark Video]'
     } = options
 
-    const url = `${ARK_BASE_URL}/contents/generations/tasks/${taskId}`
+    const url = `${options.baseUrl || ARK_BASE_URL}/contents/generations/tasks/${taskId}`
 
     const response = await fetchWithRetry(
         url,

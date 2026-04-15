@@ -236,6 +236,17 @@ export function ProviderAdvancedFields({
               {state.isModelSavePending ? t('saving') : t('save')}
             </button>
           </div>
+          <div className="mt-2">
+            <input
+              type="text"
+              value={state.newModel.customEndpoint || ''}
+              onChange={(event) =>
+                state.setNewModel({ ...state.newModel, customEndpoint: event.target.value })
+              }
+              placeholder={t('customEndpoint')}
+              className="glass-input-base w-full px-3 py-1.5 text-[12px] font-mono"
+            />
+          </div>
           {shouldShowVideoHint && (
             <p className="mt-2 text-xs text-[var(--glass-text-tertiary)]">
               {t('openaiCompatVideoOnlyHint')}
@@ -331,6 +342,17 @@ export function ProviderAdvancedFields({
               {state.isModelSavePending ? t('saving') : t('save')}
             </button>
           </div>
+          <div className="mt-2">
+            <input
+              type="text"
+              value={state.newModel.customEndpoint || ''}
+              onChange={(event) =>
+                state.setNewModel({ ...state.newModel, customEndpoint: event.target.value })
+              }
+              placeholder={t('customEndpoint')}
+              className="glass-input-base w-full px-3 py-1.5 text-[12px] font-mono"
+            />
+          </div>
           {shouldShowOpenAICompatVideoHint(provider.id, state.showAddForm) && (
             <p className="mt-2 text-xs text-[var(--glass-text-tertiary)]">
               {t('openaiCompatVideoOnlyHint')}
@@ -391,6 +413,15 @@ function ModelRow({
               className="glass-input-base w-full px-3 py-1.5 text-[12px] font-mono"
               placeholder={t('modelActualId')}
             />
+            <input
+              type="text"
+              value={state.editModel.customEndpoint || ''}
+              onChange={(event) =>
+                state.setEditModel({ ...state.editModel, customEndpoint: event.target.value })
+              }
+              className="glass-input-base w-full px-3 py-1.5 text-[12px] font-mono"
+              placeholder={t('customEndpoint')}
+            />
             {hasPriceText && (
               <div className="text-xs text-[var(--glass-text-tertiary)]">{priceText}</div>
             )}
@@ -432,10 +463,13 @@ function ModelRow({
               )}
             </div>
             <span className="break-all text-[11px] text-[var(--glass-text-tertiary)]">{model.modelId}</span>
+            {model.customEndpoint && (
+              <span className="break-all text-[10px] text-[var(--glass-tone-info-fg)]">{model.customEndpoint}</span>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">
-            {!state.isPresetModel(model.modelKey) && onUpdateModel && (
+            {(!state.isPresetModel(model.modelKey) || getProviderKey(model.provider) === 'yunwu') && onUpdateModel && (
               <button
                 onClick={() => state.handleEditModel(model)}
                 className="glass-icon-btn-sm opacity-0 transition-opacity group-hover:opacity-100"

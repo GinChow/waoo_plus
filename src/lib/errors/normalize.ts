@@ -95,6 +95,16 @@ function isEmptyResponseMessage(message: string): boolean {
   ])
 }
 
+function isInvalidRequestMessage(message: string): boolean {
+  return containsAny(message, [
+    'invalid_request',
+    'json: cannot unmarshal',
+    'cannot unmarshal string into',
+    'invalid params',
+    'invalid parameter',
+  ])
+}
+
 function isVideoApiFormatUnsupportedMessage(message: string): boolean {
   if (containsAny(message, [
     'video_api_format_unsupported',
@@ -143,7 +153,9 @@ function inferCodeFromMessage(message: string): UnifiedErrorCode | null {
     return explicitMatch[1]
   }
 
-  const statusMatch = message.match(/\bstatus\s+(\d{3})\b/)
+  const statusMatch = message.match(/\bstatus\s+(\d{3})\b/i)
+    || message.match(/\berror:\s*(\d{3})\b/i)
+    || message.match(/\bhttp\s+(\d{3})\b/i)
   if (statusMatch) {
     const parsedStatus = Number.parseInt(statusMatch[1] || '', 10)
     if (Number.isFinite(parsedStatus)) {
@@ -179,6 +191,7 @@ function inferCodeFromMessage(message: string): UnifiedErrorCode | null {
   if (containsAny(message, ['insufficient balance', 'creditinsufficient', 'balance is not enough', '402', 'insufficient credits', '余额不足', '余额不够', '请充值'])) return 'INSUFFICIENT_BALANCE'
   if (containsAny(message, ['sensitive', 'unsafe', 'safety', 'blocked', 'prohibited', 'policy_violation', 'moderation', 'harm', '敏感', '违规', '不当', '安全策略', '被过滤']) && !containsAny(message, ['case-sensitive', 'case sensitive'])) return 'SENSITIVE_CONTENT'
   if (containsAny(message, ['timeout', 'timed out', 'deadline exceeded'])) return 'GENERATION_TIMEOUT'
+  if (/\b502\s+bad\s+gateway\b/i.test(message)) return 'EXTERNAL_ERROR'
   if (containsAny(message, ['503', 'unavailable', 'overloaded', 'upstream error'])) return 'EXTERNAL_ERROR'
   if (containsAny(message, ['network', 'fetch failed', 'econnreset', 'enotfound', 'econnrefused', 'eai_again', 'terminated', 'aborted', 'socket hang up'])) return 'NETWORK_ERROR'
   if (containsAny(message, ['conflict', 'already exists', 'duplicate'])) return 'CONFLICT'
@@ -259,6 +272,9 @@ export function normalizeAnyError(input: unknown, options: NormalizeOptions = {}
   }
   if (isEmptyResponseMessage(lowerMessage)) {
     return buildNormalizedError('EMPTY_RESPONSE', message, options.details, provider)
+  }
+  if (isInvalidRequestMessage(lowerMessage)) {
+    return buildNormalizedError('INVALID_PARAMS', message, options.details, provider)
   }
 
   if (typeof errorLike.status === 'number') {

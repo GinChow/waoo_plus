@@ -1,9 +1,36 @@
 import { logWarn as _ulogWarn, logInfo as _ulogInfo } from '@/lib/logging/core'
 /**
  * 生成器基础接口和类型定义
- * 
+ *
  * 策略模式核心：所有生成器实现统一接口
  */
+
+/**
+ * 将 provider baseUrl 与模型级 customEndpoint 拼接为完整的 API base URL。
+ * customEndpoint 是相对路径（如 /ent/v2），会追加到 baseUrl 后面。
+ * 返回 undefined 表示均未配置，调用方应使用硬编码默认值。
+ */
+export function resolveCustomBaseUrl(
+    providerBaseUrl: string | undefined,
+    customEndpoint: string | undefined,
+): string | undefined {
+    const base = providerBaseUrl?.replace(/\/+$/, '')
+    const endpoint = customEndpoint?.replace(/\/+$/, '')
+    if (!base && !endpoint) return undefined
+    if (!base) return endpoint
+    if (!endpoint) return base
+    const separator = endpoint.startsWith('/') ? '' : '/'
+    return `${base}${separator}${endpoint}`
+}
+
+/**
+ * 从 options 中安全读取 customEndpoint 字符串
+ */
+export function readCustomEndpoint(options: Record<string, unknown> | undefined): string | undefined {
+    if (!options) return undefined
+    const value = options.customEndpoint
+    return typeof value === 'string' ? value.trim() || undefined : undefined
+}
 
 // ============================================================
 // 通用类型

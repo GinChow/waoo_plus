@@ -21,7 +21,10 @@ import {
 import { generateBailianAudio, generateBailianImage, generateBailianVideo } from './providers/bailian'
 import { generateSiliconFlowAudio, generateSiliconFlowImage, generateSiliconFlowVideo } from './providers/siliconflow'
 
+// 图像/通用场景：只有原生 official 实现的厂商才强制 official 路由
 const OFFICIAL_ONLY_PROVIDER_KEYS = new Set(['bailian', 'siliconflow'])
+// 视频场景：Vidu/Yunwu 只能走官方实现（有专门的 VideoGenerator），不能走 openai-compat 模板
+const OFFICIAL_ONLY_VIDEO_PROVIDER_KEYS = new Set(['bailian', 'siliconflow', 'vidu', 'yunwu'])
 
 /**
  * 将 aspectRatio 映射为 OpenAI 兼容的 size
@@ -165,6 +168,7 @@ export async function generateImage(
             provider: selection.provider,
             modelId: selection.modelId,
             modelKey: selection.modelKey,
+            ...(selection.customEndpoint ? { customEndpoint: selection.customEndpoint } : {}),
         }
     })
 }
@@ -223,7 +227,7 @@ export async function generateVideo(
     }
     const providerConfig = await getProviderConfig(userId, selection.provider)
     const defaultGatewayRoute = resolveModelGatewayRoute(selection.provider)
-    const gatewayRoute = OFFICIAL_ONLY_PROVIDER_KEYS.has(providerKey)
+    const gatewayRoute = OFFICIAL_ONLY_VIDEO_PROVIDER_KEYS.has(providerKey)
         ? 'official'
         : (providerConfig.gatewayRoute || defaultGatewayRoute)
 
@@ -279,6 +283,7 @@ export async function generateVideo(
             provider: selection.provider,
             modelId: selection.modelId,
             modelKey: selection.modelKey,
+            ...(selection.customEndpoint ? { customEndpoint: selection.customEndpoint } : {}),
         }
     })
 }
@@ -334,6 +339,7 @@ export async function generateAudio(
             provider: selection.provider,
             modelId: selection.modelId,
             modelKey: selection.modelKey,
+            ...(selection.customEndpoint ? { customEndpoint: selection.customEndpoint } : {}),
         },
     })
 }

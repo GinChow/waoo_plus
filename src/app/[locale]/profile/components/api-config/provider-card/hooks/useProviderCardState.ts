@@ -175,10 +175,12 @@ export function buildProviderConnectionPayload(params: {
   const apiKey = params.apiKey.trim()
   const compatibleBaseUrl = params.baseUrl?.trim()
   const llmModel = params.llmModel?.trim()
-  const isCompatibleProvider =
-    params.providerKey === 'openai-compatible' || params.providerKey === 'gemini-compatible'
+  const allowsBaseUrl =
+    params.providerKey === 'openai-compatible' ||
+    params.providerKey === 'gemini-compatible' ||
+    params.providerKey === 'yunwu'
 
-  if (isCompatibleProvider && compatibleBaseUrl) {
+  if (allowsBaseUrl && compatibleBaseUrl) {
     return {
       apiType: params.providerKey,
       apiKey,
@@ -386,7 +388,7 @@ export function useProviderCardState({
     (presetProvider) => presetProvider.id === provider.id,
   )
   const showBaseUrlEdit =
-    ['gemini-compatible', 'openai-compatible'].includes(providerKey) &&
+    ['gemini-compatible', 'openai-compatible', 'yunwu'].includes(providerKey) &&
     Boolean(onUpdateBaseUrl)
   const tutorial = getProviderTutorial(provider.id)
 
@@ -551,6 +553,7 @@ export function useProviderCardState({
     setEditModel({
       name: model.name,
       modelId: model.modelId,
+      customEndpoint: model.customEndpoint || '',
     })
   }
 
@@ -621,10 +624,12 @@ export function useProviderCardState({
         }
       }
 
+      const customEndpointValue = editModel.customEndpoint?.trim() || ''
       onUpdateModel?.(originalModelKey, {
         name: editModel.name,
         modelId: editModel.modelId,
         ...(protocolUpdates ? protocolUpdates : {}),
+        customEndpoint: customEndpointValue,
       })
 
       handleCancelEditModel()
@@ -675,6 +680,7 @@ export function useProviderCardState({
         }
       }
 
+      const addCustomEndpoint = newModel.customEndpoint?.trim() || undefined
       onAddModel({
         modelId: finalModelId,
         modelKey: finalModelKey,
@@ -683,6 +689,7 @@ export function useProviderCardState({
         provider: provider.id,
         price: 0,
         ...(protocolFields ? protocolFields : {}),
+        ...(addCustomEndpoint ? { customEndpoint: addCustomEndpoint } : {}),
       })
 
       setNewModel(EMPTY_MODEL_FORM)

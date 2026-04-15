@@ -21,7 +21,9 @@ import {
     BaseVideoGenerator,
     ImageGenerateParams,
     VideoGenerateParams,
-    GenerateResult
+    GenerateResult,
+    resolveCustomBaseUrl,
+    readCustomEndpoint,
 } from './base'
 import { getProviderConfig } from '@/lib/api-config'
 import { arkImageGeneration, arkCreateVideoTask } from '@/lib/ark-api'
@@ -193,7 +195,9 @@ export class ArkImageGenerator extends BaseImageGenerator {
     protected async doGenerate(params: ImageGenerateParams): Promise<GenerateResult> {
         const { userId, prompt, referenceImages = [], options = {} } = params
 
-        const { apiKey } = await getProviderConfig(userId, 'ark')
+        const { apiKey, baseUrl: providerBaseUrl } = await getProviderConfig(userId, 'ark')
+        const customEndpoint = readCustomEndpoint(options as Record<string, unknown>)
+        const arkBaseUrl = resolveCustomBaseUrl(providerBaseUrl, customEndpoint)
         const {
             aspectRatio,
             modelId = 'doubao-seedream-4-5-251128',
@@ -207,6 +211,7 @@ export class ArkImageGenerator extends BaseImageGenerator {
             'aspectRatio',
             'size',
             'resolution',
+            'customEndpoint',
         ])
         for (const [key, value] of Object.entries(options)) {
             if (value === undefined) continue
@@ -278,6 +283,7 @@ export class ArkImageGenerator extends BaseImageGenerator {
         // 调用 ARK API
         const arkData = await arkImageGeneration(requestBody, {
             apiKey,
+            ...(arkBaseUrl ? { baseUrl: arkBaseUrl } : {}),
             logPrefix: '[ARK Image]'
         })
 
@@ -308,7 +314,9 @@ export class ArkVideoGenerator extends BaseVideoGenerator {
     protected async doGenerate(params: VideoGenerateParams): Promise<GenerateResult> {
         const { userId, imageUrl, prompt = '', options = {} } = params
 
-        const { apiKey } = await getProviderConfig(userId, 'ark')
+        const { apiKey, baseUrl: providerBaseUrl } = await getProviderConfig(userId, 'ark')
+        const customEndpoint = readCustomEndpoint(options as Record<string, unknown>)
+        const arkBaseUrl = resolveCustomBaseUrl(providerBaseUrl, customEndpoint)
         const {
             modelId = 'doubao-seedance-1-0-pro-fast-251015',
             resolution,
@@ -343,6 +351,7 @@ export class ArkVideoGenerator extends BaseVideoGenerator {
             'seed',
             'cameraFixed',
             'watermark',
+            'customEndpoint',
         ])
         for (const [key, value] of Object.entries(options)) {
             if (value === undefined) continue
@@ -531,6 +540,7 @@ export class ArkVideoGenerator extends BaseVideoGenerator {
         try {
             const taskData = await arkCreateVideoTask(requestBody, {
                 apiKey,
+                ...(arkBaseUrl ? { baseUrl: arkBaseUrl } : {}),
                 logPrefix: '[ARK Video]'
             })
 

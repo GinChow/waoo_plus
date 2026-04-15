@@ -3,11 +3,11 @@ import { logInfo as _ulogInfo, logError as _ulogError } from '@/lib/logging/core
  * Vidu 视频生成器
  */
 
-import { BaseVideoGenerator, VideoGenerateParams, GenerateResult } from './base'
+import { BaseVideoGenerator, VideoGenerateParams, GenerateResult, resolveCustomBaseUrl, readCustomEndpoint } from './base'
 import { getProviderConfig } from '@/lib/api-config'
 import { normalizeToBase64ForGeneration } from '@/lib/media/outbound-image'
 
-const VIDU_BASE_URL = 'https://api.vidu.cn/ent/v2'
+export const VIDU_BASE_URL = 'https://api.vidu.cn/ent/v2'
 const VIDU_STANDARD_RATIOS = new Set(['16:9', '9:16', '1:1'])
 const VIDU_Q2_EXTRA_RATIOS = new Set(['4:3', '3:4', '21:9', '2:3', '3:2', 'auto'])
 const VIDU_AUDIO_TYPES = new Set(['all', 'speech_only', 'sound_effect_only'])
@@ -33,7 +33,7 @@ type ViduModeSpec = {
     resolutionRulesByDuration: Readonly<Record<number, ViduResolutionRule>>
 }
 
-interface ViduModelSpec {
+export interface ViduModelSpec {
     aspectRatioProfile: ViduAspectRatioProfile
     supportsFirstLastFrame: boolean
     supportsGenerateAudio: boolean
@@ -76,7 +76,7 @@ interface ViduVideoOptions {
     callback_url?: string
 }
 
-interface ViduRequestBody {
+export interface ViduRequestBody {
     model: string
     images: string[]
     prompt?: string
@@ -168,8 +168,29 @@ const Q3_DURATIONS = range(1, 16)
 const Q2_NORMAL_DURATIONS = range(1, 10)
 const Q2_FIRSTLAST_DURATIONS = range(1, 8)
 
-const VIDU_MODEL_SPECS: Record<string, ViduModelSpec> = {
+export const VIDU_MODEL_SPECS: Record<string, ViduModelSpec> = {
     'viduq3-pro': {
+        aspectRatioProfile: 'standard',
+        supportsFirstLastFrame: true,
+        supportsGenerateAudio: true,
+        defaultAudioByMode: {
+            normal: true,
+            firstlastframe: true,
+        },
+        normalMode: buildUniformModeSpec({
+            durationOptions: Q3_DURATIONS,
+            defaultDuration: 5,
+            resolutionOptions: ['540p', '720p', '1080p'],
+            defaultResolution: '720p',
+        }),
+        firstLastMode: buildUniformModeSpec({
+            durationOptions: Q3_DURATIONS,
+            defaultDuration: 5,
+            resolutionOptions: ['540p', '720p', '1080p'],
+            defaultResolution: '720p',
+        }),
+    },
+    'viduq3-turbo': {
         aspectRatioProfile: 'standard',
         supportsFirstLastFrame: true,
         supportsGenerateAudio: true,
@@ -372,17 +393,57 @@ function normalizeOptionalBoolean(raw: unknown, field: string): boolean | undefi
 }
 
 export class ViduVideoGenerator extends BaseVideoGenerator {
+    /** 子类可覆盖：默认 provider id（用于读取 provider 配置） */
+    protected readonly defaultProviderId: string = 'vidu'
+    /** 子类可覆盖：默认 base URL（当 provider 未配置 baseUrl 时使用） */
+    protected readonly defaultBaseUrl: string = VIDU_BASE_URL
+    /** 子类可覆盖：日志前缀标签 */
+    protected readonly flavorTag: string = 'Vidu'
+
+    /** 子类可覆盖：认证头格式（Vidu 官方用 Token，yunwu 用 Bearer） */
+    protected buildAuthHeader(apiKey: string): string {
+        return `Token ${apiKey}`
+    }
+
+    /** 子类可覆盖：请求体序列化转换（yunwu 需要把布尔值转成字符串） */
+    protected serializeRequestBody(body: ViduRequestBody): unknown {
+        return body
+    }
+
+    /** 子类可覆盖：构造 externalId 前缀（便于轮询时识别 flavor） */
+    protected buildExternalIdPrefix(): string {
+        return 'VIDU:VIDEO'
+    }
+
+    /** 子类可覆盖：根据 provider 的 baseUrl 推导真正的 API 根（yunwu 需要补 /ent/v2） */
+    protected resolveFlavorBaseUrl(rawBaseUrl: string): string {
+        return rawBaseUrl
+    }
+
+    /**
+     * 子类可覆盖：根据 modelId 解析参数 spec
+     * - Vidu 官方：严格查表，未知 modelId 抛错
+     * - 中转网关（yunwu 等）：未知 modelId 可回退到相近 spec，以支持官方未公开的新型号
+     */
+    protected resolveModelSpec(modelId: string): ViduModelSpec {
+        const spec = VIDU_MODEL_SPECS[modelId]
+        if (!spec) {
+            throw new Error(`VIDU_VIDEO_MODEL_UNSUPPORTED: ${modelId}`)
+        }
+        return spec
+    }
+
     protected async doGenerate(params: VideoGenerateParams): Promise<GenerateResult> {
         const { userId, imageUrl, prompt = '', options = {} } = params
 
-        const { apiKey } = await getProviderConfig(userId, 'vidu')
         const rawOptions = options as ViduVideoOptions
+        const providerId = (options as Record<string, unknown>).provider as string | undefined || this.defaultProviderId
+
+        const { apiKey, baseUrl: providerBaseUrl } = await getProviderConfig(userId, providerId)
+        const customEndpoint = readCustomEndpoint(options as Record<string, unknown>)
 
         const modelId = rawOptions.modelId || 'viduq2-turbo'
-        const modelSpec = VIDU_MODEL_SPECS[modelId]
-        if (!modelSpec) {
-            throw new Error(`VIDU_VIDEO_MODEL_UNSUPPORTED: ${modelId}`)
-        }
+        const modelSpec = this.resolveModelSpec(modelId)
 
         const allowedOptionKeys = new Set([
             'provider',
@@ -418,6 +479,7 @@ export class ViduVideoGenerator extends BaseVideoGenerator {
             'meta_data',
             'callbackUrl',
             'callback_url',
+            'customEndpoint',
         ])
 
         for (const [key, value] of Object.entries(options)) {
@@ -553,7 +615,7 @@ export class ViduVideoGenerator extends BaseVideoGenerator {
             throw new Error(`VIDU_VIDEO_OPTION_VALUE_UNSUPPORTED: prompt length > ${MAX_PROMPT_LENGTH}`)
         }
 
-        const logPrefix = `[Vidu Video ${modelId}]`
+        const logPrefix = `[${this.flavorTag} Video ${modelId}]`
 
         const firstFrameDataUrl = imageUrl.startsWith('data:') ? imageUrl : await normalizeToBase64ForGeneration(imageUrl)
         const images: string[] = [firstFrameDataUrl]
@@ -625,32 +687,101 @@ export class ViduVideoGenerator extends BaseVideoGenerator {
         }
 
         const endpoint = resolveViduEndpoint(generationMode)
+        const rawBaseUrl = resolveCustomBaseUrl(providerBaseUrl, customEndpoint) || this.defaultBaseUrl
+        const viduBaseUrl = this.resolveFlavorBaseUrl(rawBaseUrl)
+        const requestUrl = `${viduBaseUrl}${endpoint}`
 
         _ulogInfo(`${logPrefix} 提交任务`)
         _ulogInfo(`${logPrefix} - Model: ${modelId}`)
+        _ulogInfo(`${logPrefix} - Endpoint: ${requestUrl}`)
         _ulogInfo(`${logPrefix} - Duration: ${duration}s`)
         _ulogInfo(`${logPrefix} - Resolution: ${pickedResolution}`)
         _ulogInfo(`${logPrefix} - Mode: ${generationMode}`)
         _ulogInfo(`${logPrefix} - GenerateAudio: ${resolvedGenerateAudio}`)
+        _ulogInfo(`${logPrefix} - 请求路由诊断:`, {
+            providerId,
+            providerBaseUrl: providerBaseUrl || null,
+            customEndpoint: customEndpoint || null,
+            rawBaseUrl,
+            resolvedBaseUrl: viduBaseUrl,
+            endpoint,
+            requestUrl,
+        })
+        _ulogInfo(`${logPrefix} - 参数摘要:`, {
+            duration,
+            resolution: pickedResolution,
+            aspectRatio: pickedAspectRatio || null,
+            generationMode,
+            generateAudio: resolvedGenerateAudio,
+            audioType: resolvedAudioType || null,
+            seed: rawOptions.seed ?? null,
+            hasPrompt: Boolean(prompt),
+            promptLength: prompt.length,
+            imagesCount: images.length,
+            firstImageIsDataUrl: firstFrameDataUrl.startsWith('data:'),
+            hasLastFrameImage: Boolean(lastFrameImageUrl),
+            payloadLength: payload?.length ?? 0,
+            hasCallbackUrl: Boolean(callbackUrl),
+        })
         _ulogInfo(`${logPrefix} - 完整请求体:`, JSON.stringify(requestBody, null, 2))
 
         try {
-            const response = await fetch(`${VIDU_BASE_URL}${endpoint}`, {
+            const authHeader = this.buildAuthHeader(apiKey)
+            const finalBody = this.serializeRequestBody(requestBody)
+
+            const response = await fetch(requestUrl, {
                 method: 'POST',
                 headers: {
-                    Authorization: `Token ${apiKey}`,
+                    Authorization: authHeader,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(requestBody),
+                body: JSON.stringify(finalBody),
             })
 
+            const rawBody = await response.text()
+
             if (!response.ok) {
-                const errorText = await response.text()
-                _ulogError(`${logPrefix} API请求失败:`, response.status, errorText)
-                throw new Error(`Vidu API Error: ${response.status} - ${errorText}`)
+                _ulogError(`${logPrefix} API请求失败:`, {
+                    requestUrl,
+                    status: response.status,
+                    contentType: response.headers.get('content-type') || null,
+                    server: response.headers.get('server') || null,
+                    via: response.headers.get('via') || null,
+                    xRequestId: response.headers.get('x-request-id') || response.headers.get('x-amzn-requestid') || null,
+                    cfRay: response.headers.get('cf-ray') || null,
+                    date: response.headers.get('date') || null,
+                    bodyHead: rawBody.slice(0, 500),
+                })
+                throw new Error(`Vidu API Error: ${response.status} - ${rawBody.slice(0, 500)}`)
             }
 
-            const data = await response.json()
+            const trimmedBody = rawBody.trimStart()
+            if (!trimmedBody || trimmedBody[0] === '<') {
+                _ulogError(
+                    `${logPrefix} 响应非 JSON（疑似网关错误页）:`,
+                    `url=${requestUrl}`,
+                    `status=${response.status}`,
+                    `contentType=${response.headers.get('content-type') || 'unknown'}`,
+                    `bodyHead=${rawBody.slice(0, 300)}`,
+                )
+                throw new Error(
+                    `Vidu API Error: 服务返回非 JSON 响应（status=${response.status}，可能是中转网关错误页或 URL 路径不正确）。URL=${requestUrl}`,
+                )
+            }
+
+            let data: { task_id?: string; state?: string }
+            try {
+                data = JSON.parse(rawBody)
+            } catch (parseError) {
+                _ulogError(
+                    `${logPrefix} JSON 解析失败:`,
+                    `url=${requestUrl}`,
+                    `status=${response.status}`,
+                    `bodyHead=${rawBody.slice(0, 300)}`,
+                    parseError,
+                )
+                throw new Error(`Vidu API Error: 响应 JSON 解析失败 - ${rawBody.slice(0, 300)}`)
+            }
 
             const taskId = data.task_id
             if (!taskId) {
@@ -666,11 +797,17 @@ export class ViduVideoGenerator extends BaseVideoGenerator {
 
             _ulogInfo(`${logPrefix} 任务已提交，task_id=${taskId}, state=${state}`)
 
+            const idPrefix = this.buildExternalIdPrefix()
+            const useCustomBase = viduBaseUrl !== this.defaultBaseUrl
+            const externalId = useCustomBase
+                ? `${idPrefix}:ep_${Buffer.from(viduBaseUrl, 'utf8').toString('base64url')}:${taskId}`
+                : `${idPrefix}:${taskId}`
+
             return {
                 success: true,
                 async: true,
                 requestId: taskId,
-                externalId: `VIDU:VIDEO:${taskId}`,
+                externalId,
             }
         } catch (error: unknown) {
             _ulogError(`${logPrefix} 生成失败:`, error)

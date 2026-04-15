@@ -6,7 +6,7 @@ import { logInfo as _ulogInfo, logError as _ulogError } from '@/lib/logging/core
  * 视频：MiniMax-Hailuo-2.3, MiniMax-Hailuo-2.3-Fast, MiniMax-Hailuo-02, T2V-01, T2V-01-Director
  */
 
-import { BaseVideoGenerator, VideoGenerateParams, GenerateResult } from './base'
+import { BaseVideoGenerator, VideoGenerateParams, GenerateResult, resolveCustomBaseUrl, readCustomEndpoint } from './base'
 import { getProviderConfig } from '@/lib/api-config'
 import { normalizeToBase64ForGeneration } from '@/lib/media/outbound-image'
 
@@ -164,7 +164,9 @@ export class MinimaxVideoGenerator extends BaseVideoGenerator {
     protected async doGenerate(params: VideoGenerateParams): Promise<GenerateResult> {
         const { userId, imageUrl, prompt = '', options = {} } = params
 
-        const { apiKey } = await getProviderConfig(userId, 'minimax')
+        const { apiKey, baseUrl: providerBaseUrl } = await getProviderConfig(userId, 'minimax')
+        const customEndpoint = readCustomEndpoint(options as Record<string, unknown>)
+        const minimaxBaseUrl = resolveCustomBaseUrl(providerBaseUrl, customEndpoint) || MINIMAX_BASE_URL
         const {
             modelId,
             duration,
@@ -273,7 +275,7 @@ export class MinimaxVideoGenerator extends BaseVideoGenerator {
         )
 
         try {
-            const response = await fetch(`${MINIMAX_BASE_URL}/video_generation`, {
+            const response = await fetch(`${minimaxBaseUrl}/video_generation`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${apiKey}`,
@@ -305,11 +307,16 @@ export class MinimaxVideoGenerator extends BaseVideoGenerator {
 
             _ulogInfo(`${logPrefix} 任务已提交，task_id=${taskId}`)
 
+            const useCustomBase = minimaxBaseUrl !== MINIMAX_BASE_URL
+            const externalId = useCustomBase
+                ? `MINIMAX:VIDEO:ep_${Buffer.from(minimaxBaseUrl, 'utf8').toString('base64url')}:${taskId}`
+                : `MINIMAX:VIDEO:${taskId}`
+
             return {
                 success: true,
                 async: true,
                 requestId: taskId,
-                externalId: `MINIMAX:VIDEO:${taskId}`
+                externalId,
             }
         } catch (error: unknown) {
             _ulogError(`${logPrefix} 生成失败:`, error)

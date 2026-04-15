@@ -37,6 +37,7 @@
   "probeRequestFailed": "Model protocol probe request failed. Please try again.",
   "modelDisplayName": "Display Name (for your reference)",
   "modelActualId": "Actual Model ID (API parameter)",
+  "customEndpoint": "Custom endpoint path (optional, appended to Base URL, e.g. /ent/v2)",
   "noModelsForProvider": "No models configured for this provider",
   "defaultModels": "Default Model Configuration",
   "textDefault": "Text Model",

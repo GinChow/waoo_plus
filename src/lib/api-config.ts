@@ -31,6 +31,7 @@ export interface CustomModel {
   compatMediaTemplate?: OpenAICompatMediaTemplate
   compatMediaTemplateCheckedAt?: string
   compatMediaTemplateSource?: OpenAICompatMediaTemplateSource
+  customEndpoint?: string
   // Non-authoritative display field; billing uses unified server pricing catalog.
   price: number
 }
@@ -44,6 +45,7 @@ export interface ModelSelection {
   mediaType: ModelMediaType
   llmProtocol?: 'responses' | 'chat-completions'
   compatMediaTemplate?: OpenAICompatMediaTemplate
+  customEndpoint?: string
 }
 
 type GatewayRouteType = 'official' | 'openai-compat'
@@ -241,6 +243,8 @@ function normalizeStoredModel(raw: unknown, index: number): CustomModel {
     ? compatMediaTemplateSourceRaw
     : undefined
 
+  const customEndpoint = readTrimmedString(raw.customEndpoint) || undefined
+
   return {
     modelId,
     modelKey,
@@ -252,6 +256,7 @@ function normalizeStoredModel(raw: unknown, index: number): CustomModel {
     ...(compatMediaTemplate ? { compatMediaTemplate } : {}),
     ...(compatMediaTemplateCheckedAt ? { compatMediaTemplateCheckedAt } : {}),
     ...(compatMediaTemplateSource ? { compatMediaTemplateSource } : {}),
+    ...(customEndpoint ? { customEndpoint } : {}),
     price: 0,
   }
 }
@@ -340,6 +345,7 @@ export async function resolveModelSelection(
   const compatMediaTemplate = (mediaType === 'image' || mediaType === 'video') && providerKey === 'openai-compatible'
     ? exact.compatMediaTemplate
     : undefined
+  const customEndpoint = exact.customEndpoint
 
   return {
     provider: exact.provider,
@@ -348,6 +354,7 @@ export async function resolveModelSelection(
     mediaType,
     ...(llmProtocol ? { llmProtocol } : {}),
     ...(compatMediaTemplate ? { compatMediaTemplate } : {}),
+    ...(customEndpoint ? { customEndpoint } : {}),
   }
 }
 
@@ -371,6 +378,7 @@ async function resolveSingleModelSelection(
   const compatMediaTemplate = (mediaType === 'image' || mediaType === 'video') && providerKey === 'openai-compatible'
     ? model.compatMediaTemplate
     : undefined
+  const customEndpoint = model.customEndpoint
 
   return {
     provider: model.provider,
@@ -379,6 +387,7 @@ async function resolveSingleModelSelection(
     mediaType,
     ...(llmProtocol ? { llmProtocol } : {}),
     ...(compatMediaTemplate ? { compatMediaTemplate } : {}),
+    ...(customEndpoint ? { customEndpoint } : {}),
   }
 }
 

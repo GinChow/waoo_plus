@@ -93,6 +93,7 @@ interface StoredModel {
   compatMediaTemplate?: OpenAICompatMediaTemplate
   compatMediaTemplateCheckedAt?: string
   compatMediaTemplateSource?: OpenAICompatMediaTemplateSource
+  customEndpoint?: string
   // Non-authoritative display field; billing always uses server pricing catalog.
   price: number
   priceMin?: number
@@ -815,6 +816,8 @@ function normalizeStoredModel(raw: unknown, index: number, options?: { strictCus
     compatMediaTemplateSource = compatMediaTemplateSourceRaw
   }
 
+  const customEndpoint = readTrimmedString(raw.customEndpoint) || undefined
+
   return {
     modelId,
     modelKey,
@@ -826,6 +829,7 @@ function normalizeStoredModel(raw: unknown, index: number, options?: { strictCus
     ...(compatMediaTemplate ? { compatMediaTemplate } : {}),
     ...(compatMediaTemplateCheckedAt ? { compatMediaTemplateCheckedAt } : {}),
     ...(compatMediaTemplateSource ? { compatMediaTemplateSource } : {}),
+    ...(customEndpoint ? { customEndpoint } : {}),
     price: 0,
     ...(customPricing ? { customPricing } : {}),
   }

@@ -37,6 +37,7 @@
   "probeRequestFailed": "模型协议探测请求失败，请稍后重试",
   "modelDisplayName": "外显名称（你自己看的）",
   "modelActualId": "实际调用 ID（模型参数）",
+  "customEndpoint": "自定义端点路径（可选，拼接到 Base URL 后，如 /ent/v2）",
   "noModelsForProvider": "该厂商暂无配置模型",
   "defaultModels": "默认模型配置",
   "textDefault": "文本模型",

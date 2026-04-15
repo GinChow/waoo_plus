@@ -53,6 +53,7 @@ export interface CustomModel {
     compatMediaTemplate?: OpenAICompatMediaTemplate
     compatMediaTemplateCheckedAt?: string
     compatMediaTemplateSource?: OpenAICompatMediaTemplateSource
+    customEndpoint?: string
     price: number
     priceMin?: number
     priceMax?: number
@@ -184,6 +185,16 @@ export const PRESET_MODELS: PresetModel[] = [
     { modelId: 'viduq1', name: 'Vidu Q1', type: 'video', provider: 'vidu' },
     { modelId: 'viduq1-classic', name: 'Vidu Q1 Classic', type: 'video', provider: 'vidu' },
     { modelId: 'vidu2.0', name: 'Vidu 2.0', type: 'video', provider: 'vidu' },
+
+    // Yunwu（云雾中转，Vidu 兼容）视频模型
+    { modelId: 'viduq3-pro', name: 'Vidu Q3 Pro', type: 'video', provider: 'yunwu' },
+    { modelId: 'viduq3-turbo', name: 'Vidu Q3 Turbo', type: 'video', provider: 'yunwu' },
+    { modelId: 'viduq2-pro-fast', name: 'Vidu Q2 Pro Fast', type: 'video', provider: 'yunwu' },
+    { modelId: 'viduq2-pro', name: 'Vidu Q2 Pro', type: 'video', provider: 'yunwu' },
+    { modelId: 'viduq2-turbo', name: 'Vidu Q2 Turbo', type: 'video', provider: 'yunwu' },
+    { modelId: 'viduq1', name: 'Vidu Q1', type: 'video', provider: 'yunwu' },
+    { modelId: 'viduq1-classic', name: 'Vidu Q1 Classic', type: 'video', provider: 'yunwu' },
+    { modelId: 'vidu2.0', name: 'Vidu 2.0', type: 'video', provider: 'yunwu' },
 ]
 
 const PRESET_COMING_SOON_MODEL_KEYS = new Set<string>([])
@@ -204,6 +215,7 @@ export const PRESET_PROVIDERS: Omit<Provider, 'apiKey' | 'hasApiKey'>[] = [
     { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1' },
     { id: 'minimax', name: 'MiniMax Hailuo', baseUrl: 'https://api.minimaxi.com/v1' },
     { id: 'vidu', name: 'Vidu' },
+    { id: 'yunwu', name: 'Yunwu', baseUrl: 'https://yunwu.ai' },
     { id: 'fal', name: 'FAL' },
 ]
 
@@ -211,6 +223,7 @@ const ZH_PROVIDER_NAME_MAP: Record<string, string> = {
     ark: '火山引擎 Ark',
     minimax: '海螺 MiniMax',
     vidu: '生数科技 Vidu',
+    yunwu: '云雾中转 Yunwu',
     bailian: '阿里云百炼',
     siliconflow: '硅基流动',
 }

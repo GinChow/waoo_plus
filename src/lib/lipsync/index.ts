@@ -8,13 +8,14 @@ import type { LipSyncParams, LipSyncResult, LipSyncSubmitContext } from '@/lib/l
 
 function createSubmitContext(
   userId: string,
-  selection: { provider: string; modelId: string; modelKey: string },
+  selection: { provider: string; modelId: string; modelKey: string; customEndpoint?: string },
 ): LipSyncSubmitContext {
   return {
     userId,
     providerId: selection.provider,
     modelId: selection.modelId,
     modelKey: selection.modelKey,
+    ...(selection.customEndpoint ? { customEndpoint: selection.customEndpoint } : {}),
   }
 }
 

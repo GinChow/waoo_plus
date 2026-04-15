@@ -47,6 +47,18 @@ describe('normalizeAnyError provider-specific mapping', () => {
     expect(normalized.retryable).toBe(true)
   })
 
+  it('maps Vidu API Error 502 message to EXTERNAL_ERROR', () => {
+    const normalized = normalizeAnyError(new Error('Vidu API Error: 502 - <html><h1>502 Bad Gateway</h1></html>'))
+    expect(normalized.code).toBe('EXTERNAL_ERROR')
+    expect(normalized.retryable).toBe(true)
+  })
+
+  it('maps plain 502 bad gateway message to EXTERNAL_ERROR', () => {
+    const normalized = normalizeAnyError(new Error('502 Bad Gateway'))
+    expect(normalized.code).toBe('EXTERNAL_ERROR')
+    expect(normalized.retryable).toBe(true)
+  })
+
   it('maps openai-compatible video template mismatch to VIDEO_API_FORMAT_UNSUPPORTED', () => {
     const normalized = normalizeAnyError(
       new Error('VIDEO_API_FORMAT_UNSUPPORTED: OPENAI_COMPAT_VIDEO_TEMPLATE_TASK_ID_NOT_FOUND'),
@@ -60,6 +72,15 @@ describe('normalizeAnyError provider-specific mapping', () => {
       new Error('Template request failed with status 415: unsupported media type'),
     )
     expect(normalized.code).toBe('VIDEO_API_FORMAT_UNSUPPORTED')
+    expect(normalized.retryable).toBe(false)
+  })
+
+  it('maps invalid_request unmarshal message to INVALID_PARAMS even when status is 429', () => {
+    const normalized = normalizeAnyError({
+      status: 429,
+      message: 'Vidu API Error: 429 - {"code":"invalid_request","message":"json: cannot unmarshal string into Go struct field ViduImageToVideoRequest.audio of type bool"}',
+    })
+    expect(normalized.code).toBe('INVALID_PARAMS')
     expect(normalized.retryable).toBe(false)
   })
 })
