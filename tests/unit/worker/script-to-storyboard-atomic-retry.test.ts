@@ -141,7 +141,11 @@ describe('script-to-storyboard atomic retry', () => {
       description: 'phase3-new',
       photographyPlan: expect.objectContaining({
         composition: '居中',
-        lighting: '顶光',
+        lighting: {
+          direction: '顶光',
+          quality: '',
+        },
+        color_tone: '冷色',
       }),
       actingNotes: [{ name: 'Narrator', expression: 'serious' }],
     }))

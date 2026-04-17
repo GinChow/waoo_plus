@@ -291,7 +291,15 @@ export function applyRunStreamEvent(prev: RunState | null, event: RunStreamEvent
 
   if (event.event === 'run.start') {
     const nextStatus = normalizeRunStatus(event.status)
-    base.status = lockForwardRunStatus(base.status, nextStatus === 'idle' ? 'running' : nextStatus)
+    const resolvedNextStatus = nextStatus === 'idle' ? 'running' : nextStatus
+    if (resolvedNextStatus === 'running') {
+      // Retry on the same runId reopens a previously terminal run.
+      base.status = 'running'
+      base.terminalAt = null
+      base.errorMessage = ''
+    } else {
+      base.status = lockForwardRunStatus(base.status, resolvedNextStatus)
+    }
     if (event.payload && typeof event.payload === 'object') {
       base.payload = event.payload
     }

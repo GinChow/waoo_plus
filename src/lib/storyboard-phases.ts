@@ -94,8 +94,20 @@ export type StoryboardPanel = JsonRecord & {
 
 export type PhotographyRule = JsonRecord & {
     panel_number?: number
+    scene_summary?: string
+    lighting?: string | {
+        direction?: string
+        quality?: string
+    }
+    characters?: Array<{
+        name?: string
+        screen_position?: string
+        posture?: string
+        facing?: string
+    }>
+    depth_of_field?: string
+    color_tone?: string
     composition?: string
-    lighting?: string
     color_palette?: string
     atmosphere?: string
     technical_notes?: string

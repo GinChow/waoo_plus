@@ -367,4 +367,40 @@ describe('run stream state-machine', () => {
     expect(state?.stepsById['analyze_locations']?.reasoningOutput).toBe('先分析文本')
     expect(state?.stepsById['analyze_locations']?.textOutput).toBe('{"locations":[]}')
   })
+
+  it('reopens a failed run when retry emits run.start on the same runId', () => {
+    const runId = 'run-9'
+    const state = applySequence([
+      { runId, event: 'run.start', ts: '2026-02-26T23:00:00.000Z', status: 'running' },
+      {
+        runId,
+        event: 'step.error',
+        ts: '2026-02-26T23:00:01.000Z',
+        status: 'failed',
+        stepId: 'clip_a_phase2_cinematography',
+        stepTitle: 'cine',
+        stepIndex: 1,
+        stepTotal: 1,
+        message: 'first attempt failed',
+      },
+      {
+        runId,
+        event: 'run.error',
+        ts: '2026-02-26T23:00:02.000Z',
+        status: 'failed',
+        message: 'run failed',
+      },
+      {
+        runId,
+        event: 'run.start',
+        ts: '2026-02-26T23:00:03.000Z',
+        status: 'running',
+        message: 'retrying',
+      },
+    ])
+
+    expect(state?.status).toBe('running')
+    expect(state?.terminalAt).toBeNull()
+    expect(state?.errorMessage).toBe('')
+  })
 })

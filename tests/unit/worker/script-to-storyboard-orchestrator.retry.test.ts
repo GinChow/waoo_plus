@@ -100,6 +100,42 @@ describe('script-to-storyboard orchestrator retry', () => {
     expect(callCount).toBe(1)
   })
 
+  it('respects maxStepAttempts=1 for retryable errors', async () => {
+    let callCount = 0
+    const runStep = vi.fn(async () => {
+      callCount += 1
+      throw new TypeError('fetch failed')
+    })
+
+    await expect(
+      runScriptToStoryboardOrchestrator({
+        maxStepAttempts: 1,
+        clips: [
+          {
+            id: 'clip-1',
+            content: '文本',
+            characters: JSON.stringify([{ name: '角色A' }]),
+            location: '场景A',
+            screenplay: null,
+          },
+        ],
+        novelPromotionData: {
+          characters: [{ name: '角色A', appearances: [] }],
+          locations: [{ name: '场景A', images: [] }],
+        },
+        promptTemplates: {
+          phase1PlanTemplate: '{clip_content} {clip_json} {characters_lib_name} {locations_lib_name} {characters_introduction} {characters_appearance_list} {characters_full_description}',
+          phase2CinematographyTemplate: '{panels_json} {panel_count} {locations_description} {characters_info}',
+          phase2ActingTemplate: '{panels_json} {panel_count} {characters_info}',
+          phase3DetailTemplate: '{panels_json} {characters_age_gender} {locations_description}',
+        },
+        runStep,
+      }),
+    ).rejects.toThrow('fetch failed')
+
+    expect(callCount).toBe(1)
+  })
+
   it('does not retry Ark invalid parameter error even when message contains json', async () => {
     let callCount = 0
     const runStep = vi.fn(async () => {

@@ -77,6 +77,7 @@ export type StoryboardPhaseArtifact = {
 
 export type ScriptToStoryboardOrchestratorInput = {
   concurrency?: number
+  maxStepAttempts?: number
   locale?: 'zh' | 'en'
   clips: ClipInput[]
   novelPromotionData: {
@@ -92,6 +93,7 @@ export type ScriptToStoryboardOrchestratorInput = {
     maxOutputTokens: number,
   ) => Promise<ScriptToStoryboardStepOutput>
   onArtifact?: (artifact: StoryboardPhaseArtifact) => Promise<void>
+  onClipCompleted?: (clip: ClipStoryboardPanels) => Promise<void>
 }
 
 export type ScriptToStoryboardOrchestratorResult = {
@@ -177,6 +179,141 @@ function withStepMeta(
   }
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function asText(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function normalizeLighting(value: PhotographyRule['lighting']) {
+  if (typeof value === 'string') {
+    return {
+      direction: value,
+      quality: '',
+    }
+  }
+  const record = asRecord(value)
+  return {
+    direction: asText(record?.direction),
+    quality: asText(record?.quality),
+  }
+}
+
+function normalizePhotographyCharacters(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value.map((item) => {
+    const record = asRecord(item)
+    return {
+      name: asText(record?.name),
+      screen_position: asText(record?.screen_position),
+      posture: asText(record?.posture),
+      facing: asText(record?.facing),
+    }
+  })
+}
+
+function normalizeName(name: string): string {
+  return name.trim().toLowerCase()
+}
+
+function parsePanelCharacters(value: unknown): Array<{ name: string; appearance?: string; slot?: string }> {
+  if (!Array.isArray(value)) return []
+  return value.reduce<Array<{ name: string; appearance?: string; slot?: string }>>((acc, item) => {
+      const record = asRecord(item)
+      const name = asText(record?.name).trim()
+      if (!name) return acc
+      const appearance = asText(record?.appearance).trim()
+      const slot = asText(record?.slot).trim()
+      acc.push({
+        name,
+        appearance: appearance || undefined,
+        slot: slot || undefined,
+      })
+      return acc
+    }, [])
+}
+
+function backfillPanelCharacterSlots(
+  current: Array<{ name: string; appearance?: string; slot?: string }>,
+  plan: Array<{ name: string; appearance?: string; slot?: string }>,
+) {
+  if (current.length === 0 || plan.length === 0) return current
+  const slotByName = new Map<string, string>()
+  for (const item of plan) {
+    if (typeof item.slot === 'string' && item.slot.trim()) {
+      slotByName.set(normalizeName(item.name), item.slot.trim())
+    }
+  }
+  return current.map((item) => {
+    if (typeof item.slot === 'string' && item.slot.trim()) return item
+    const slot = slotByName.get(normalizeName(item.name))
+    return slot ? { ...item, slot } : item
+  })
+}
+
+function hydrateFinalPanelCharactersWithPlanSlots(params: {
+  finalPanels: StoryboardPanel[]
+  planPanels: StoryboardPanel[]
+}) {
+  const planCharsByPanel = new Map<number, Array<{ name: string; appearance?: string; slot?: string }>>()
+  for (const panel of params.planPanels) {
+    if (typeof panel.panel_number !== 'number') continue
+    planCharsByPanel.set(panel.panel_number, parsePanelCharacters(panel.characters))
+  }
+
+  return params.finalPanels.map((panel) => {
+    if (typeof panel.panel_number !== 'number') return panel
+    const currentChars = parsePanelCharacters(panel.characters)
+    const planChars = planCharsByPanel.get(panel.panel_number) || []
+    const mergedChars = backfillPanelCharacterSlots(currentChars, planChars)
+    return {
+      ...panel,
+      characters: mergedChars,
+    }
+  })
+}
+
+function fallbackPhotographyCharactersFromPanel(panel: StoryboardPanel) {
+  return parsePanelCharacters(panel.characters).map((item) => ({
+    name: item.name,
+    screen_position: item.slot || '',
+    posture: '',
+    facing: '',
+  }))
+}
+
+function buildUnifiedPhotographyPlan(rule: PhotographyRule, panel: StoryboardPanel) {
+  const sceneSummary = asText(rule.scene_summary) || asText(rule.composition)
+  const lighting = normalizeLighting(rule.lighting)
+  const characters = (() => {
+    const fromRules = normalizePhotographyCharacters(rule.characters).filter((item) => item.name)
+    if (fromRules.length > 0) return fromRules
+    return fallbackPhotographyCharactersFromPanel(panel)
+  })()
+  const depthOfField = asText(rule.depth_of_field)
+  const colorTone = asText(rule.color_tone) || asText(rule.color_palette)
+  const composition = asText(rule.composition) || sceneSummary
+  const atmosphere = asText(rule.atmosphere)
+  const technicalNotes = asText(rule.technical_notes)
+
+  return {
+    panel_number: rule.panel_number,
+    scene_summary: sceneSummary,
+    lighting,
+    characters,
+    depth_of_field: depthOfField,
+    color_tone: colorTone,
+    // 兼容历史字段，避免旧调用链回归
+    composition,
+    colorPalette: asText(rule.color_palette) || colorTone,
+    atmosphere,
+    technicalNotes,
+  }
+}
+
 function mergePanelsWithRules(params: {
   finalPanels: StoryboardPanel[]
   photographyRules: PhotographyRule[]
@@ -195,19 +332,13 @@ function mergePanelsWithRules(params: {
 
     return {
       ...panel,
-      photographyPlan: {
-        composition: rules.composition,
-        lighting: rules.lighting,
-        colorPalette: rules.color_palette,
-        atmosphere: rules.atmosphere,
-        technicalNotes: rules.technical_notes,
-      },
+      photographyPlan: buildUnifiedPhotographyPlan(rules, panel),
       actingNotes: acting.characters,
     }
   })
 }
 
-const MAX_STEP_ATTEMPTS = 3
+const DEFAULT_MAX_STEP_ATTEMPTS = 3
 const MAX_RETRY_DELAY_MS = 10_000
 
 function wait(ms: number) {
@@ -241,9 +372,10 @@ async function runStepWithRetry<T>(
   action: string,
   maxOutputTokens: number,
   parse: (text: string) => T,
+  maxStepAttempts: number,
 ): Promise<{ output: ScriptToStoryboardStepOutput; parsed: T }> {
   let lastError: Error | null = null
-  for (let attempt = 1; attempt <= MAX_STEP_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= maxStepAttempts; attempt++) {
     const meta = attempt === 1
       ? baseMeta
       : {
@@ -259,7 +391,7 @@ async function runStepWithRetry<T>(
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error))
       const normalizedError = normalizeAnyError(error, { context: 'worker' })
-      const shouldRetry = attempt < MAX_STEP_ATTEMPTS
+      const shouldRetry = attempt < maxStepAttempts
         && shouldRetryStepError(error, normalizedError.message, normalizedError.retryable)
 
       orchestratorLogger.error({
@@ -271,7 +403,7 @@ async function runStepWithRetry<T>(
           stepId: baseMeta.stepId,
           action,
           attempt,
-          maxAttempts: MAX_STEP_ATTEMPTS,
+          maxAttempts: maxStepAttempts,
         },
         error: {
           name: lastError.name,
@@ -293,7 +425,19 @@ async function runStepWithRetry<T>(
 export async function runScriptToStoryboardOrchestrator(
   input: ScriptToStoryboardOrchestratorInput,
 ): Promise<ScriptToStoryboardOrchestratorResult> {
-  const { clips, novelPromotionData, promptTemplates, runStep, onArtifact, concurrency: rawConcurrency } = input
+  const {
+    clips,
+    novelPromotionData,
+    promptTemplates,
+    runStep,
+    onArtifact,
+    onClipCompleted,
+    concurrency: rawConcurrency,
+  } = input
+  const maxStepAttempts =
+    typeof input.maxStepAttempts === 'number' && Number.isFinite(input.maxStepAttempts)
+      ? Math.max(1, Math.floor(input.maxStepAttempts))
+      : DEFAULT_MAX_STEP_ATTEMPTS
   if (!Array.isArray(clips) || clips.length === 0) {
     throw new Error('No clips found')
   }
@@ -387,6 +531,7 @@ export async function runScriptToStoryboardOrchestrator(
           }
           return panels
         },
+        maxStepAttempts,
       )
       phase1PanelsByClipId.set(clip.id, planPanels)
 
@@ -464,10 +609,12 @@ export async function runScriptToStoryboardOrchestrator(
         runStepWithRetry(
           runStep, phase2Meta, phase2Prompt, 'storyboard_phase2_cinematography', 2400,
           (text) => parseJsonArray<PhotographyRule>(text, `phase2:${formatClipId(clip)}`),
+          maxStepAttempts,
         ),
         runStepWithRetry(
           runStep, phase2ActingMeta, phase2ActingPrompt, 'storyboard_phase2_acting', 2400,
           (text) => parseJsonArray<ActingDirection>(text, `phase2-acting:${formatClipId(clip)}`),
+          maxStepAttempts,
         ),
       ])
 
@@ -503,28 +650,38 @@ export async function runScriptToStoryboardOrchestrator(
           }
           return filtered
         },
+        maxStepAttempts,
       )
 
-      phase3PanelsByClipId.set(clip.id, filteredPhase3Panels)
+      const normalizedPhase3Panels = hydrateFinalPanelCharactersWithPlanSlots({
+        finalPanels: filteredPhase3Panels,
+        planPanels,
+      })
+
+      phase3PanelsByClipId.set(clip.id, normalizedPhase3Panels)
 
       if (onArtifact) {
         await onArtifact({
           clipId: clip.id,
           stepKey: `clip_${clip.id}_phase3_detail`,
           artifactType: 'storyboard.clip.phase3',
-          payload: { panels: filteredPhase3Panels },
+          payload: { panels: normalizedPhase3Panels },
         })
       }
 
-      return {
+      const clipResult = {
         clipId: clip.id,
         clipIndex,
         finalPanels: mergePanelsWithRules({
-          finalPanels: filteredPhase3Panels,
+          finalPanels: normalizedPhase3Panels,
           photographyRules,
           actingDirections,
         }),
       }
+      if (onClipCompleted) {
+        await onClipCompleted(clipResult)
+      }
+      return clipResult
     },
   )
 

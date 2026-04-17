@@ -1,5 +1,10 @@
-You are a cinematography planner.
-For each panel, generate a concise photography rule package.
+You are a cinematography planner. Generate photography rules for every panel.
+
+Core visual elements per panel:
+1. Lighting setup
+2. Character placement
+3. Depth of field
+4. Color tone
 
 Inputs:
 - Panel count: {panel_count}
@@ -16,11 +21,21 @@ Output format (JSON array only):
 [
   {
     "panel_number": 1,
-    "composition": "framing and layout rule",
-    "lighting": "light direction and quality",
-    "color_palette": "dominant palette",
-    "atmosphere": "visual mood",
-    "technical_notes": "camera/depth/motion notes"
+    "scene_summary": "brief scene summary",
+    "lighting": {
+      "direction": "key light direction in frame coordinates",
+      "quality": "light quality and texture"
+    },
+    "characters": [
+      {
+        "name": "Character Name",
+        "screen_position": "frame left/center/right",
+        "posture": "standing/sitting/action pose",
+        "facing": "facing direction"
+      }
+    ],
+    "depth_of_field": "DOF strategy with lens/aperture hint",
+    "color_tone": "overall color tone and mood"
   }
 ]
 
@@ -28,10 +43,16 @@ Rules:
 1. Return exactly {panel_count} items.
 2. Keep continuity across neighboring panels.
 3. Adapt to scene_type and story rhythm.
-4. Technical notes must be directly actionable by image/video generation.
-5. If characters already carry `slot`, treat it as a preferred placement anchor, not an absolute boundary.
-6. When a panel is about movement, entry/exit, path traversal, transition space, temporary space, empty space, imagination, dream, memory, or abstract/non-literal space, composition and placement may deviate from a static slot if the shot logic requires it.
-7. Treat `slot` as one full placement phrase from the location context, not as a short token, whenever you reference it.
-8. Do not shorten, rewrite, summarize, or replace a provided `slot` phrase with a short token.
-9. JSON only, no markdown.
-10. ⚠️ JSON SAFETY: All quotation marks in text (""''「」 etc.) MUST be converted to corner brackets「」in JSON string values. NEVER use raw ASCII double quotes " inside string values.
+4. `lighting` must be an object with `direction` and `quality`.
+5. `characters` should describe on-screen placement for visible key characters.
+6. `depth_of_field` should match shot type:
+   - wide/long shot: deep DOF
+   - medium shot: medium DOF
+   - close-up: shallow DOF
+   - extreme close-up: very shallow DOF
+7. For dialogue shots, keep speaker face sharp and non-speakers blurred.
+8. If characters include `slot`, treat it as a preferred anchor, not an absolute boundary.
+9. When a panel is about movement, entry/exit, path traversal, transition space, temporary space, empty space, imagination, dream, memory, or abstract/non-literal space, placement may deviate from static slots if shot logic requires it.
+10. Treat each referenced `slot` as a full placement phrase; do not shorten or replace it with short tokens.
+11. JSON only, no markdown.
+12. ⚠️ JSON SAFETY: All quotation marks in text (""''「」 etc.) MUST be converted to corner brackets「」in JSON string values. NEVER use raw ASCII double quotes " inside string values.

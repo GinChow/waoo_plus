@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiHandler, ApiError, getRequestId } from '@/lib/api-errors'
 import { isErrorResponse, requireUserAuth } from '@/lib/api-auth'
-import { retryFailedStep, getRunById } from '@/lib/run-runtime/service'
+import { retryFailedStep, getRunById, getRunSnapshot } from '@/lib/run-runtime/service'
 import { resolveRequiredTaskLocale } from '@/lib/task/resolve-locale'
 import { submitTask } from '@/lib/task/submitter'
 import { TASK_TYPE, type TaskType } from '@/lib/task/types'
@@ -20,6 +20,27 @@ function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function resolveLocalePayload(payload: Record<string, unknown>, runInput: Record<string, unknown>) {
+  const payloadMeta = toObject(payload.meta)
+  const inputMeta = toObject(runInput.meta)
+  const localeFromPayloadMeta = readString(payloadMeta.locale)
+  const localeFromPayload = readString(payload.locale)
+  const localeFromInputMeta = readString(inputMeta.locale)
+  const localeFromInput = readString(runInput.locale)
+  const locale = localeFromPayloadMeta || localeFromPayload || localeFromInputMeta || localeFromInput || undefined
+
+  return {
+    ...runInput,
+    ...payload,
+    ...(locale ? { locale } : {}),
+    meta: {
+      ...inputMeta,
+      ...payloadMeta,
+      ...(locale ? { locale } : {}),
+    },
+  }
+}
+
 function resolveTaskType(run: {
   workflowType: string
   taskType: string | null
@@ -32,6 +53,19 @@ function resolveTaskType(run: {
     })
   }
   return candidate as TaskType
+}
+
+function isAlreadyRetriedState(params: {
+  runStatus: string
+  stepStatus: string
+}): boolean {
+  const runActive = (
+    params.runStatus === 'queued'
+    || params.runStatus === 'running'
+    || params.runStatus === 'canceling'
+  )
+  const stepInFlight = params.stepStatus === 'pending' || params.stepStatus === 'running'
+  return runActive && stepInFlight
 }
 
 export const POST = apiHandler(async (
@@ -70,6 +104,26 @@ export const POST = apiHandler(async (
       throw new ApiError('NOT_FOUND')
     }
     if (message === 'RUN_STEP_NOT_FAILED') {
+      const snapshot = await getRunSnapshot(runId)
+      const currentStep = snapshot?.steps.find((item) => item.stepKey === stepKey) || null
+      const runStatus = readString(snapshot?.run?.status)
+      const stepStatus = readString(currentStep?.status)
+      if (
+        runStatus
+        && stepStatus
+        && isAlreadyRetriedState({ runStatus, stepStatus })
+      ) {
+        return NextResponse.json({
+          success: true,
+          runId,
+          stepKey,
+          retryAttempt: currentStep?.currentAttempt || null,
+          taskId: null,
+          async: true,
+          deduped: true,
+          afterSeq: typeof snapshot?.run?.lastSeq === 'number' ? snapshot.run.lastSeq : 0,
+        })
+      }
       throw new ApiError('INVALID_PARAMS', {
         code: 'RUN_STEP_RETRY_ONLY_FAILED',
         stepKey,
@@ -82,8 +136,9 @@ export const POST = apiHandler(async (
   }
 
   const taskType = resolveTaskType(run)
-  const locale = resolveRequiredTaskLocale(request, payload)
   const runInput = toObject(run.input)
+  const localePayload = resolveLocalePayload(payload, runInput)
+  const locale = resolveRequiredTaskLocale(request, localePayload)
   const taskPayload: Record<string, unknown> = {
     ...runInput,
     episodeId: run.episodeId || runInput.episodeId || null,
@@ -127,5 +182,6 @@ export const POST = apiHandler(async (
     retryAttempt: prepared.retryAttempt,
     taskId: submitResult.taskId,
     async: true,
+    afterSeq: typeof prepared.run?.lastSeq === 'number' ? prepared.run.lastSeq : 0,
   })
 })

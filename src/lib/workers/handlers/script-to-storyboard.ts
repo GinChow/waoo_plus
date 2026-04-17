@@ -23,6 +23,7 @@ import type { TaskJobData } from '@/lib/task/types'
 import {
   buildStoryboardJsonFromClipPanels,
   parseEffort,
+  persistStoryboardsAndPanels,
   parseTemperature,
   parseVoiceLinesJson,
   persistStoryboardOutputs,
@@ -125,6 +126,8 @@ export async function handleScriptToStoryboardTask(job: Job<TaskJobData>) {
     throw new Error(`Retry clip not found: ${retryClipId}`)
   }
   const skipVoiceAnalyze = !!retryStepKey && retryStepKey !== 'voice_analyze'
+  const orchestratorMaxStepAttempts = retryStepKey ? 1 : undefined
+  const voiceAnalyzeMaxAttempts = retryStepKey ? 1 : MAX_VOICE_ANALYZE_ATTEMPTS
 
   const model = await resolveAnalysisModel({
     userId: job.data.userId,
@@ -223,6 +226,7 @@ export async function handleScriptToStoryboardTask(job: Job<TaskJobData>) {
       messages: [{ role: 'user', content: prompt }],
       projectId,
       action,
+      maxRetries: retryStepKey ? 0 : undefined,
       meta: {
         ...meta,
         stepAttempt,
@@ -277,6 +281,7 @@ export async function handleScriptToStoryboardTask(job: Job<TaskJobData>) {
                   runId,
                   retryTarget,
                   retryStepAttempt,
+                  maxStepAttempts: orchestratorMaxStepAttempts,
                   locale: job.data.locale,
                   clip: {
                     id: clip.id,
@@ -320,6 +325,7 @@ export async function handleScriptToStoryboardTask(job: Job<TaskJobData>) {
               try {
                 return await runScriptToStoryboardOrchestrator({
                   concurrency: workflowConcurrency.analysis,
+                  maxStepAttempts: orchestratorMaxStepAttempts,
                   locale: job.data.locale,
                   clips: selectedClips.map((clip) => ({
                     id: clip.id,
@@ -350,6 +356,12 @@ export async function handleScriptToStoryboardTask(job: Job<TaskJobData>) {
                       artifactType: artifact.artifactType,
                       refId: artifact.clipId,
                       payload: artifact.payload,
+                    })
+                  },
+                  onClipCompleted: async (clipEntry) => {
+                    await persistStoryboardsAndPanels({
+                      episodeId,
+                      clipPanels: [clipEntry],
                     })
                   },
                 })
@@ -434,7 +446,7 @@ export async function handleScriptToStoryboardTask(job: Job<TaskJobData>) {
         retryable: true,
       }
       try {
-        for (let voiceAttempt = 1; voiceAttempt <= MAX_VOICE_ANALYZE_ATTEMPTS; voiceAttempt++) {
+        for (let voiceAttempt = 1; voiceAttempt <= voiceAnalyzeMaxAttempts; voiceAttempt++) {
           const meta: ScriptToStoryboardStepMeta = {
             ...voiceStepMeta,
             stepAttempt: voiceAttempt,
@@ -451,12 +463,12 @@ export async function handleScriptToStoryboardTask(job: Job<TaskJobData>) {
               throw error
             }
             voiceLastError = error instanceof Error ? error : new Error(String(error))
-            if (voiceAttempt < MAX_VOICE_ANALYZE_ATTEMPTS) {
+            if (voiceAttempt < voiceAnalyzeMaxAttempts) {
               await reportTaskProgress(job, 84, {
                 stage: 'script_to_storyboard_step',
                 stageLabel: 'progress.stage.scriptToStoryboardStep',
                 displayMode: 'detail',
-                message: `台词分析失败，准备重试 (${voiceAttempt + 1}/${MAX_VOICE_ANALYZE_ATTEMPTS})`,
+                message: `台词分析失败，准备重试 (${voiceAttempt + 1}/${voiceAnalyzeMaxAttempts})`,
                 stepId: voiceStepMeta.stepId,
                 stepAttempt: voiceAttempt + 1,
                 stepTitle: voiceStepMeta.stepTitle,

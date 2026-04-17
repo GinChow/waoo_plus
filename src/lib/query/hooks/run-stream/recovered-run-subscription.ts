@@ -52,6 +52,7 @@ type SubscribeRecoveredRunArgs = {
   taskStreamTimeoutMs: number
   applyAndCapture: (event: RunStreamEvent) => void
   onSettled: () => void
+  initialAfterSeq?: number
 }
 
 type Cleanup = () => void
@@ -59,7 +60,9 @@ type Cleanup = () => void
 export function subscribeRecoveredRun(args: SubscribeRecoveredRunArgs): Cleanup {
   let settled = false
   let polling = false
-  let afterSeq = 0
+  let afterSeq = Number.isFinite(args.initialAfterSeq || 0)
+    ? Math.max(0, Math.floor(args.initialAfterSeq || 0))
+    : 0
   let emptyPollCount = 0
   let idleTimeoutTimer: ReturnType<typeof setTimeout> | null = null
   let pollTimer: ReturnType<typeof setInterval> | null = null

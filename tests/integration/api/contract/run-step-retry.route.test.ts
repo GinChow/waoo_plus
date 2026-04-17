@@ -7,6 +7,7 @@ type RouteContext = {
 
 const authState = vi.hoisted(() => ({ authenticated: true }))
 const getRunByIdMock = vi.hoisted(() => vi.fn())
+const getRunSnapshotMock = vi.hoisted(() => vi.fn())
 const retryFailedStepMock = vi.hoisted(() => vi.fn())
 const submitTaskMock = vi.hoisted(() => vi.fn())
 const resolveRequiredTaskLocaleMock = vi.hoisted(() => vi.fn(() => 'zh'))
@@ -28,6 +29,7 @@ vi.mock('@/lib/api-auth', () => {
 
 vi.mock('@/lib/run-runtime/service', () => ({
   getRunById: getRunByIdMock,
+  getRunSnapshot: getRunSnapshotMock,
   retryFailedStep: retryFailedStepMock,
 }))
 
@@ -64,6 +66,17 @@ describe('api contract - run step retry route', () => {
       step: { stepKey: 'screenplay_clip_2' },
       retryAttempt: 2,
     })
+    getRunSnapshotMock.mockResolvedValue({
+      run: {
+        id: 'run-1',
+        status: 'running',
+      },
+      steps: [{
+        stepKey: 'screenplay_clip_2',
+        status: 'pending',
+        currentAttempt: 2,
+      }],
+    })
     submitTaskMock.mockResolvedValue({
       success: true,
       async: true,
@@ -76,6 +89,17 @@ describe('api contract - run step retry route', () => {
 
   it('rejects retry when step is not failed', async () => {
     retryFailedStepMock.mockRejectedValue(new Error('RUN_STEP_NOT_FAILED'))
+    getRunSnapshotMock.mockResolvedValue({
+      run: {
+        id: 'run-1',
+        status: 'failed',
+      },
+      steps: [{
+        stepKey: 'screenplay_clip_2',
+        status: 'completed',
+        currentAttempt: 1,
+      }],
+    })
     const route = await import('@/app/api/runs/[runId]/steps/[stepKey]/retry/route')
 
     const req = buildMockRequest({
@@ -113,12 +137,14 @@ describe('api contract - run step retry route', () => {
       stepKey: string
       retryAttempt: number
       taskId: string
+      afterSeq: number
     }
     expect(payload.success).toBe(true)
     expect(payload.runId).toBe('run-1')
     expect(payload.stepKey).toBe('screenplay_clip_2')
     expect(payload.retryAttempt).toBe(2)
     expect(payload.taskId).toBe('task-retry-1')
+    expect(payload.afterSeq).toBe(0)
 
     expect(submitTaskMock).toHaveBeenCalledWith(expect.objectContaining({
       projectId: 'project-1',
@@ -130,5 +156,56 @@ describe('api contract - run step retry route', () => {
         model: 'openai/gpt-5',
       }),
     }))
+  })
+
+  it('reuses run locale when retry body has no locale', async () => {
+    const route = await import('@/app/api/runs/[runId]/steps/[stepKey]/retry/route')
+
+    const req = buildMockRequest({
+      path: '/api/runs/run-1/steps/screenplay_clip_2/retry',
+      method: 'POST',
+      body: {
+        reason: 'manual retry',
+      },
+    })
+    const res = await route.POST(req, {
+      params: Promise.resolve({ runId: 'run-1', stepKey: 'screenplay_clip_2' }),
+    } as RouteContext)
+
+    expect(res.status).toBe(200)
+    const localePayload = resolveRequiredTaskLocaleMock.mock.calls.at(-1)?.[1] as
+      | { locale?: string; meta?: { locale?: string } }
+      | undefined
+    expect(localePayload?.locale).toBe('zh')
+    expect(localePayload?.meta?.locale).toBe('zh')
+  })
+
+  it('treats already-inflight retry as deduped success', async () => {
+    retryFailedStepMock.mockRejectedValue(new Error('RUN_STEP_NOT_FAILED'))
+    const route = await import('@/app/api/runs/[runId]/steps/[stepKey]/retry/route')
+
+    const req = buildMockRequest({
+      path: '/api/runs/run-1/steps/screenplay_clip_2/retry',
+      method: 'POST',
+      body: {
+        reason: 'manual retry',
+      },
+    })
+    const res = await route.POST(req, {
+      params: Promise.resolve({ runId: 'run-1', stepKey: 'screenplay_clip_2' }),
+    } as RouteContext)
+
+    expect(res.status).toBe(200)
+    const payload = await res.json() as {
+      success: boolean
+      deduped?: boolean
+      taskId: string | null
+      afterSeq?: number
+    }
+    expect(payload.success).toBe(true)
+    expect(payload.deduped).toBe(true)
+    expect(payload.taskId).toBeNull()
+    expect(payload.afterSeq).toBe(0)
+    expect(submitTaskMock).not.toHaveBeenCalled()
   })
 })

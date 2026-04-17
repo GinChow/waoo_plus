@@ -36,6 +36,7 @@ export function useRunStreamState<TParams extends Record<string, unknown>>(
   const [clock, setClock] = useState(() => Date.now())
   const [isLiveRunning, setIsLiveRunning] = useState(false)
   const [isRecoveredRunning, setIsRecoveredRunning] = useState(false)
+  const [recoveredAfterSeq, setRecoveredAfterSeq] = useState(0)
   const abortRef = useRef<AbortController | null>(null)
   const finalResultRef = useRef<RunResult | null>(null)
   const resolveActiveRunIdRef = useRef(resolveActiveRunId)
@@ -102,9 +103,11 @@ export function useRunStreamState<TParams extends Record<string, unknown>>(
     return subscribeRecoveredRun({
       runId,
       taskStreamTimeoutMs: TASK_STREAM_TIMEOUT_MS,
+      initialAfterSeq: recoveredAfterSeq,
       applyAndCapture: applyEvent,
       onSettled: () => {
         setIsRecoveredRunning(false)
+        setRecoveredAfterSeq(0)
       },
     })
   }, [
@@ -112,6 +115,7 @@ export function useRunStreamState<TParams extends Record<string, unknown>>(
     isLiveRunning,
     isRecoveredRunning,
     projectId,
+    recoveredAfterSeq,
     runState?.runId,
     runState?.status,
   ])
@@ -201,6 +205,11 @@ export function useRunStreamState<TParams extends Record<string, unknown>>(
       throw new Error(errorMessage)
     }
 
+    const afterSeq =
+      payload && typeof payload === 'object' && typeof (payload as { afterSeq?: unknown }).afterSeq === 'number'
+        ? Math.max(0, Math.floor((payload as { afterSeq: number }).afterSeq))
+        : 0
+
     applyEvent({
       runId,
       event: 'run.start',
@@ -208,6 +217,7 @@ export function useRunStreamState<TParams extends Record<string, unknown>>(
       status: 'running',
       message: 'retrying failed step',
     })
+    setRecoveredAfterSeq(afterSeq)
     setIsRecoveredRunning(true)
     return {
       runId,
