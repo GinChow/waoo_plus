@@ -217,7 +217,10 @@ export default function AssetsStage({
   const {
     isGlobalAnalyzing,
     globalAnalyzingState,
+    currentAnalyzeMode,
     handleGlobalAnalyze,
+    handleGlobalAnalyzeCharacters,
+    handleGlobalAnalyzeLocations,
   } = useAssetsGlobalActions({
     projectId,
     triggerGlobalAnalyze,
@@ -365,6 +368,22 @@ export default function AssetsStage({
     closeCharacterImageEditModal,
   })
 
+  const globalAnalyzingTitle = currentAnalyzeMode === 'characters'
+    ? t('toolbar.globalAnalyzingCharacters')
+    : currentAnalyzeMode === 'locations'
+      ? t('toolbar.globalAnalyzingLocations')
+      : t('toolbar.globalAnalyzing')
+  const globalAnalyzingHint = currentAnalyzeMode === 'characters'
+    ? t('toolbar.globalAnalyzingCharactersHint')
+    : currentAnalyzeMode === 'locations'
+      ? t('toolbar.globalAnalyzingLocationsHint')
+      : t('toolbar.globalAnalyzingHint')
+  const globalAnalyzingTip = currentAnalyzeMode === 'characters'
+    ? t('toolbar.globalAnalyzingCharactersTip')
+    : currentAnalyzeMode === 'locations'
+      ? t('toolbar.globalAnalyzingLocationsTip')
+      : t('toolbar.globalAnalyzingTip')
+
   return (
     <div className="space-y-4">
       <AssetsStageStatusOverlays
@@ -372,9 +391,9 @@ export default function AssetsStage({
         onCloseToast={() => setToast(null)}
         isGlobalAnalyzing={isGlobalAnalyzing}
         globalAnalyzingState={globalAnalyzingState}
-        globalAnalyzingTitle={t('toolbar.globalAnalyzing')}
-        globalAnalyzingHint={t('toolbar.globalAnalyzingHint')}
-        globalAnalyzingTip={t('toolbar.globalAnalyzingTip')}
+        globalAnalyzingTitle={globalAnalyzingTitle}
+        globalAnalyzingHint={globalAnalyzingHint}
+        globalAnalyzingTip={globalAnalyzingTip}
       />
 
       {/* 资产工具栏 */}
@@ -388,6 +407,8 @@ export default function AssetsStage({
         isAnalyzingAssets={isAnalyzingAssets}
         isGlobalAnalyzing={isGlobalAnalyzing}
         onGlobalAnalyze={handleGlobalAnalyze}
+        onAnalyzeCharacters={handleGlobalAnalyzeCharacters}
+        onAnalyzeLocations={handleGlobalAnalyzeLocations}
         episodeId={episodeFilter}
         onEpisodeChange={setEpisodeFilter}
         episodes={episodeOptions}

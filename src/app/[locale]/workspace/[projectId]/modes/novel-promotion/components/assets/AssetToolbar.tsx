@@ -28,6 +28,8 @@ interface AssetToolbarProps {
     isAnalyzingAssets: boolean
     isGlobalAnalyzing?: boolean
     onGlobalAnalyze?: () => void
+    onAnalyzeCharacters?: () => void
+    onAnalyzeLocations?: () => void
     /** Episode filter */
     episodeId: string | null
     onEpisodeChange: (episodeId: string | null) => void
@@ -162,6 +164,8 @@ export default function AssetToolbar({
     isAnalyzingAssets,
     isGlobalAnalyzing = false,
     onGlobalAnalyze,
+    onAnalyzeCharacters,
+    onAnalyzeLocations,
     episodeId,
     onEpisodeChange,
     episodes,
@@ -171,6 +175,37 @@ export default function AssetToolbar({
     const { data: projectData } = useProjectData(projectId)
     const projectName = projectData?.name
     const [isDownloading, setIsDownloading] = useState(false)
+
+    const requestAnalyzeConfirmation = useCallback((type: 'characters' | 'locations' | 'all'): boolean => {
+        if (type === 'characters') {
+            if (totalAppearances <= 0) return true
+            return window.confirm(t('toolbar.globalAnalyzeCharactersConfirm'))
+        }
+        if (type === 'locations') {
+            if (totalLocations <= 0) return true
+            return window.confirm(t('toolbar.globalAnalyzeLocationsConfirm'))
+        }
+        if (totalAppearances <= 0 && totalLocations <= 0) return true
+        return window.confirm(t('toolbar.globalAnalyzeConfirm'))
+    }, [t, totalAppearances, totalLocations])
+
+    const handleAnalyzeCharactersClick = useCallback(() => {
+        if (!onAnalyzeCharacters) return
+        if (!requestAnalyzeConfirmation('characters')) return
+        onAnalyzeCharacters()
+    }, [onAnalyzeCharacters, requestAnalyzeConfirmation])
+
+    const handleAnalyzeLocationsClick = useCallback(() => {
+        if (!onAnalyzeLocations) return
+        if (!requestAnalyzeConfirmation('locations')) return
+        onAnalyzeLocations()
+    }, [onAnalyzeLocations, requestAnalyzeConfirmation])
+
+    const handleAnalyzeAllClick = useCallback(() => {
+        if (!onGlobalAnalyze) return
+        if (!requestAnalyzeConfirmation('all')) return
+        onGlobalAnalyze()
+    }, [onGlobalAnalyze, requestAnalyzeConfirmation])
 
     const handleDownloadAll = async () => {
         const characters = assets?.characters ?? []
@@ -265,17 +300,43 @@ export default function AssetToolbar({
                     <span className="text-sm text-[var(--glass-text-tertiary)]">
                         {t("toolbar.assetCount", { total: totalAssets, appearances: totalAppearances, locations: totalLocations, props: totalProps })}
                     </span>
-                    {/* 全局资产分析按钮 */}
-                    {onGlobalAnalyze && (
-                        <button
-                            onClick={onGlobalAnalyze}
-                            disabled={isGlobalAnalyzing || isBatchSubmitting || isAnalyzingAssets}
-                            className="glass-btn-base glass-btn-primary flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={t("toolbar.globalAnalyzeHint")}
-                        >
-                            <AppIcon name="idea" className="w-3.5 h-3.5" />
-                            <span>{t("toolbar.globalAnalyze")}</span>
-                        </button>
+                    {/* 资产分析按钮 */}
+                    {(onGlobalAnalyze || onAnalyzeCharacters || onAnalyzeLocations) && (
+                        <div className="flex items-center gap-2">
+                            {onAnalyzeCharacters && (
+                                <button
+                                    onClick={handleAnalyzeCharactersClick}
+                                    disabled={isGlobalAnalyzing || isBatchSubmitting || isAnalyzingAssets}
+                                    className="glass-btn-base glass-btn-secondary flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title={t("toolbar.globalAnalyzeCharactersHint")}
+                                >
+                                    <AppIcon name="user" className="w-3.5 h-3.5" />
+                                    <span>{t("toolbar.globalAnalyzeCharacters")}</span>
+                                </button>
+                            )}
+                            {onAnalyzeLocations && (
+                                <button
+                                    onClick={handleAnalyzeLocationsClick}
+                                    disabled={isGlobalAnalyzing || isBatchSubmitting || isAnalyzingAssets}
+                                    className="glass-btn-base glass-btn-secondary flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title={t("toolbar.globalAnalyzeLocationsHint")}
+                                >
+                                    <AppIcon name="globe" className="w-3.5 h-3.5" />
+                                    <span>{t("toolbar.globalAnalyzeLocations")}</span>
+                                </button>
+                            )}
+                            {onGlobalAnalyze && (
+                                <button
+                                    onClick={handleAnalyzeAllClick}
+                                    disabled={isGlobalAnalyzing || isBatchSubmitting || isAnalyzingAssets}
+                                    className="glass-btn-base glass-btn-primary flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title={t("toolbar.globalAnalyzeHint")}
+                                >
+                                    <AppIcon name="idea" className="w-3.5 h-3.5" />
+                                    <span>{t("toolbar.globalAnalyze")}</span>
+                                </button>
+                            )}
+                        </div>
                     )}
                 </div>
                 <div className="flex items-center gap-2">

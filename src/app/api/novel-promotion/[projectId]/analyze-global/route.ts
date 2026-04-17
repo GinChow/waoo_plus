@@ -16,6 +16,7 @@ export const POST = apiHandler(async (
   if (isErrorResponse(authResult)) return authResult
   const { session } = authResult
   const body = await request.json().catch(() => ({}))
+  const mode = body?.mode === 'characters' || body?.mode === 'locations' ? body.mode : 'all'
 
   const asyncTaskResponse = await maybeSubmitLLMTask({
     request,
@@ -25,8 +26,11 @@ export const POST = apiHandler(async (
     targetType: 'NovelPromotionProject',
     targetId: projectId,
     routePath: `/api/novel-promotion/${projectId}/analyze-global`,
-    body,
-    dedupeKey: `analyze_global:${projectId}`})
+    body: {
+      ...body,
+      mode,
+    },
+    dedupeKey: `analyze_global:${projectId}:${mode}`})
   if (asyncTaskResponse) return asyncTaskResponse
 
   throw new ApiError('INVALID_PARAMS')

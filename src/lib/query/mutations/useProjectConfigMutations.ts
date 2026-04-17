@@ -24,13 +24,13 @@ function isAsyncTaskSubmission(value: unknown): value is AsyncTaskSubmission {
 
 export function useAnalyzeProjectGlobalAssets(projectId: string) {
     return useMutation({
-        mutationFn: async () => {
+        mutationFn: async ({ mode = 'all' }: { mode?: 'all' | 'characters' | 'locations' } = {}) => {
             const response = await requestTaskResponseWithError(
                 `/api/novel-promotion/${projectId}/analyze-global`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ async: true }),
+                    body: JSON.stringify({ async: true, mode }),
                 },
                 'Failed to analyze global assets',
             )

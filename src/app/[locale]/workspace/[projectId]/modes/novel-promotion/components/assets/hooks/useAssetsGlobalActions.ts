@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { logInfo as _ulogInfo, logError as _ulogError } from '@/lib/logging/core'
 import { resolveTaskPresentationState } from '@/lib/task/presentation'
 import { useAnalyzeProjectGlobalAssets } from '@/lib/query/hooks'
@@ -14,6 +14,7 @@ type ToastType = 'success' | 'warning' | 'error'
 type ShowToast = (message: string, type?: ToastType, duration?: number) => void
 type TranslateValues = Record<string, string | number | Date>
 type Translate = (key: string, values?: TranslateValues) => string
+type GlobalAnalyzeMode = 'all' | 'characters' | 'locations'
 
 interface UseAssetsGlobalActionsParams {
   projectId: string
@@ -82,9 +83,11 @@ export function useAssetsGlobalActions({
 }: UseAssetsGlobalActionsParams) {
   const queryClient = useQueryClient()
   const analyzeGlobalAssets = useAnalyzeProjectGlobalAssets(projectId)
+  const [currentAnalyzeMode, setCurrentAnalyzeMode] = useState<GlobalAnalyzeMode>('all')
   const hasTriggeredGlobalAnalyze = useRef(false)
   const lastRunningTaskIdRef = useRef<string | null>(null)
   const lastHandledTaskIdRef = useRef<string | null>(null)
+  const taskModeRef = useRef<Map<string, GlobalAnalyzeMode>>(new Map())
   const isSubmittingRef = useRef(false)
   const globalAnalyzeTaskStateQuery = useTaskTargetStateMap(
     projectId,
@@ -111,11 +114,12 @@ export function useAssetsGlobalActions({
     })
   }, [globalAnalyzeTaskState?.intent, globalAnalyzeTaskState?.phase, isGlobalAnalyzing])
 
-  const handleGlobalAnalyze = useCallback(async () => {
+  const runGlobalAnalyze = useCallback(async (mode: GlobalAnalyzeMode) => {
     if (isGlobalAnalyzing || isSubmittingRef.current) return
 
     try {
       isSubmittingRef.current = true
+      setCurrentAnalyzeMode(mode)
       upsertTaskTargetOverlay(queryClient, {
         projectId,
         targetType: 'NovelPromotionProject',
@@ -123,10 +127,16 @@ export function useAssetsGlobalActions({
         runningTaskType: 'analyze_global',
         intent: 'analyze',
       })
-      showToast(t('toolbar.globalAnalyzing'), 'warning', 60000)
+      const analyzingMessage = mode === 'characters'
+        ? t('toolbar.globalAnalyzingCharacters')
+        : mode === 'locations'
+          ? t('toolbar.globalAnalyzingLocations')
+          : t('toolbar.globalAnalyzing')
+      showToast(analyzingMessage, 'warning', 60000)
 
-      const submission = await analyzeGlobalAssets.mutateAsync()
+      const submission = await analyzeGlobalAssets.mutateAsync({ mode })
       lastRunningTaskIdRef.current = submission.taskId
+      taskModeRef.current.set(submission.taskId, mode)
     } catch (error: unknown) {
       clearTaskTargetOverlay(queryClient, {
         projectId,
@@ -134,15 +144,34 @@ export function useAssetsGlobalActions({
         targetId: projectId,
       })
       _ulogError('Global analyze error:', error)
-      showToast(`${t('toolbar.globalAnalyzeFailed')}: ${getErrorMessage(error)}`, 'error', 5000)
+      const failedLabel = mode === 'characters'
+        ? t('toolbar.globalAnalyzeCharactersFailed')
+        : mode === 'locations'
+          ? t('toolbar.globalAnalyzeLocationsFailed')
+          : t('toolbar.globalAnalyzeFailed')
+      showToast(`${failedLabel}: ${getErrorMessage(error)}`, 'error', 5000)
     } finally {
       isSubmittingRef.current = false
     }
   }, [analyzeGlobalAssets, isGlobalAnalyzing, projectId, queryClient, showToast, t])
 
+  const handleGlobalAnalyze = useCallback(async () => {
+    await runGlobalAnalyze('all')
+  }, [runGlobalAnalyze])
+
+  const handleGlobalAnalyzeCharacters = useCallback(async () => {
+    await runGlobalAnalyze('characters')
+  }, [runGlobalAnalyze])
+
+  const handleGlobalAnalyzeLocations = useCallback(async () => {
+    await runGlobalAnalyze('locations')
+  }, [runGlobalAnalyze])
+
   useEffect(() => {
     if (isGlobalAnalyzing && globalAnalyzeTaskState?.runningTaskId) {
       lastRunningTaskIdRef.current = globalAnalyzeTaskState.runningTaskId
+      const runningMode = taskModeRef.current.get(globalAnalyzeTaskState.runningTaskId)
+      if (runningMode) setCurrentAnalyzeMode(runningMode)
     }
   }, [globalAnalyzeTaskState?.runningTaskId, isGlobalAnalyzing])
 
@@ -159,9 +188,16 @@ export function useAssetsGlobalActions({
     lastRunningTaskIdRef.current = null
 
     void (async () => {
+      const finishedMode = taskModeRef.current.get(completion.finishedTaskId) || 'all'
+      taskModeRef.current.delete(completion.finishedTaskId)
       if (completion.status === 'failed') {
+        const failedLabel = finishedMode === 'characters'
+          ? t('toolbar.globalAnalyzeCharactersFailed')
+          : finishedMode === 'locations'
+            ? t('toolbar.globalAnalyzeLocationsFailed')
+            : t('toolbar.globalAnalyzeFailed')
         showToast(
-          `${t('toolbar.globalAnalyzeFailed')}: ${completion.errorMessage || t('toolbar.globalAnalyzeFailed')}`,
+          `${failedLabel}: ${completion.errorMessage || failedLabel}`,
           'error',
           5000,
         )
@@ -174,17 +210,27 @@ export function useAssetsGlobalActions({
           timeoutMs: 2_000,
         }) as { stats?: { newCharacters?: number; newLocations?: number } }
         await Promise.resolve(onRefresh())
-        showToast(
-          t('toolbar.globalAnalyzeSuccess', {
+        const message = finishedMode === 'characters'
+          ? t('toolbar.globalAnalyzeCharactersSuccess', {
             characters: result.stats?.newCharacters || 0,
-            locations: result.stats?.newLocations || 0,
-          }),
-          'success',
-          5000,
-        )
+          })
+          : finishedMode === 'locations'
+            ? t('toolbar.globalAnalyzeLocationsSuccess', {
+              locations: result.stats?.newLocations || 0,
+            })
+            : t('toolbar.globalAnalyzeSuccess', {
+              characters: result.stats?.newCharacters || 0,
+              locations: result.stats?.newLocations || 0,
+            })
+        showToast(message, 'success', 5000)
       } catch (error: unknown) {
         _ulogError('Global analyze finalize error:', error)
-        showToast(`${t('toolbar.globalAnalyzeFailed')}: ${getErrorMessage(error)}`, 'error', 5000)
+        const failedLabel = finishedMode === 'characters'
+          ? t('toolbar.globalAnalyzeCharactersFailed')
+          : finishedMode === 'locations'
+            ? t('toolbar.globalAnalyzeLocationsFailed')
+            : t('toolbar.globalAnalyzeFailed')
+        showToast(`${failedLabel}: ${getErrorMessage(error)}`, 'error', 5000)
       }
     })()
   }, [globalAnalyzeTaskState, onRefresh, showToast, t])
@@ -199,17 +245,20 @@ export function useAssetsGlobalActions({
 
     const timer = window.setTimeout(() => {
       void (async () => {
-        await handleGlobalAnalyze()
+        await runGlobalAnalyze('all')
         onGlobalAnalyzeComplete?.()
       })()
     }, 500)
 
     return () => window.clearTimeout(timer)
-  }, [handleGlobalAnalyze, isGlobalAnalyzing, onGlobalAnalyzeComplete, triggerGlobalAnalyze])
+  }, [isGlobalAnalyzing, onGlobalAnalyzeComplete, runGlobalAnalyze, triggerGlobalAnalyze])
 
   return {
     isGlobalAnalyzing,
     globalAnalyzingState,
+    currentAnalyzeMode,
     handleGlobalAnalyze,
+    handleGlobalAnalyzeCharacters,
+    handleGlobalAnalyzeLocations,
   }
 }

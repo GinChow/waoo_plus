@@ -24,7 +24,19 @@ function readAssetKind(value: Record<string, unknown>): string {
   return typeof value.assetKind === 'string' ? value.assetKind : 'location'
 }
 
+type AnalyzeGlobalMode = 'all' | 'characters' | 'locations'
+
+function readAnalyzeGlobalMode(payload: Record<string, unknown>): AnalyzeGlobalMode {
+  if (payload.mode === 'characters' || payload.mode === 'locations') return payload.mode
+  return 'all'
+}
+
 export async function handleAnalyzeGlobalTask(job: Job<TaskJobData>) {
+  const payload = (job.data.payload || {}) as Record<string, unknown>
+  const mode = readAnalyzeGlobalMode(payload)
+  const analyzeCharacters = mode === 'all' || mode === 'characters'
+  const analyzeLocations = mode === 'all' || mode === 'locations'
+  const analyzeProps = mode === 'all'
   const projectId = job.data.projectId
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -131,58 +143,79 @@ export async function handleAnalyzeGlobalTask(job: Job<TaskJobData>) {
         existingPropNames,
       })
 
-      const [characterCompletion, locationCompletion, propCompletion] = await withInternalLLMStreamCallbacks(
+      let characterResponse = '{}'
+      let locationResponse = '{}'
+      let propResponse = '{}'
+
+      await withInternalLLMStreamCallbacks(
         streamCallbacks,
-        async () =>
-          await Promise.all([
-            executeAiTextStep({
-              userId: job.data.userId,
-              model: analysisModel,
-              messages: [{ role: 'user', content: characterPrompt }],
-              temperature: 0.7,
-              projectId,
-              action: 'analyze_global_characters',
-              meta: {
-                stepId: `analyze_global_characters_${i + 1}`,
-                stepTitle: `角色分析 ${i + 1}/${chunks.length}`,
-                stepIndex: i + 1,
-                stepTotal: chunks.length,
-              },
-            }),
-            executeAiTextStep({
-              userId: job.data.userId,
-              model: analysisModel,
-              messages: [{ role: 'user', content: locationPrompt }],
-              temperature: 0.7,
-              projectId,
-              action: 'analyze_global_locations',
-              meta: {
-                stepId: `analyze_global_locations_${i + 1}`,
-                stepTitle: `场景分析 ${i + 1}/${chunks.length}`,
-                stepIndex: i + 1,
-                stepTotal: chunks.length,
-              },
-            }),
-            executeAiTextStep({
-              userId: job.data.userId,
-              model: analysisModel,
-              messages: [{ role: 'user', content: propPrompt }],
-              temperature: 0.7,
-              projectId,
-              action: 'analyze_global_props',
-              meta: {
-                stepId: `analyze_global_props_${i + 1}`,
-                stepTitle: `道具分析 ${i + 1}/${chunks.length}`,
-                stepIndex: i + 1,
-                stepTotal: chunks.length,
-              },
-            }),
-          ]),
+        async () => {
+          const tasks: Array<Promise<void>> = []
+
+          if (analyzeCharacters) {
+            tasks.push((async () => {
+              const completion = await executeAiTextStep({
+                userId: job.data.userId,
+                model: analysisModel,
+                messages: [{ role: 'user', content: characterPrompt }],
+                temperature: 0.7,
+                projectId,
+                action: 'analyze_global_characters',
+                meta: {
+                  stepId: `analyze_global_characters_${i + 1}`,
+                  stepTitle: `角色分析 ${i + 1}/${chunks.length}`,
+                  stepIndex: i + 1,
+                  stepTotal: chunks.length,
+                },
+              })
+              characterResponse = completion.text
+            })())
+          }
+
+          if (analyzeLocations) {
+            tasks.push((async () => {
+              const completion = await executeAiTextStep({
+                userId: job.data.userId,
+                model: analysisModel,
+                messages: [{ role: 'user', content: locationPrompt }],
+                temperature: 0.7,
+                projectId,
+                action: 'analyze_global_locations',
+                meta: {
+                  stepId: `analyze_global_locations_${i + 1}`,
+                  stepTitle: `场景分析 ${i + 1}/${chunks.length}`,
+                  stepIndex: i + 1,
+                  stepTotal: chunks.length,
+                },
+              })
+              locationResponse = completion.text
+            })())
+          }
+
+          if (analyzeProps) {
+            tasks.push((async () => {
+              const completion = await executeAiTextStep({
+                userId: job.data.userId,
+                model: analysisModel,
+                messages: [{ role: 'user', content: propPrompt }],
+                temperature: 0.7,
+                projectId,
+                action: 'analyze_global_props',
+                meta: {
+                  stepId: `analyze_global_props_${i + 1}`,
+                  stepTitle: `道具分析 ${i + 1}/${chunks.length}`,
+                  stepIndex: i + 1,
+                  stepTotal: chunks.length,
+                },
+              })
+              propResponse = completion.text
+            })())
+          }
+
+          await Promise.all(tasks)
+        },
       )
 
-      const characterResponse = characterCompletion.text
-      const locationResponse = locationCompletion.text
-      const propResponse = propCompletion.text
       const charactersData = safeParseCharactersResponse(characterResponse)
       const locationsData = safeParseLocationsResponse(locationResponse)
       const propsData = safeParsePropsResponse(propResponse)
