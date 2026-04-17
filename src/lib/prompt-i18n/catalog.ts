@@ -138,7 +138,7 @@ export const PROMPT_CATALOG: Record<PromptId, PromptCatalogEntry> = {
     variableKeys: ['input', 'props_lib_name'],
   },
   [PROMPT_IDS.NP_SELECT_LOCATION]: {
-    pathStem: 'novel-promotion/select_location',
+    pathStem: 'novel-promotion/select_location_v2',
     variableKeys: ['input', 'locations_lib_name'],
   },
   [PROMPT_IDS.NP_SINGLE_PANEL_IMAGE]: {
