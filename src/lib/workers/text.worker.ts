@@ -241,6 +241,90 @@ function parsePanelProps(panel: Record<string, unknown> | null | undefined): str
   }
 }
 
+function asText(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function normalizeLighting(value: unknown) {
+  if (typeof value === 'string') {
+    return {
+      direction: value,
+      quality: '',
+    }
+  }
+  const record = asRecord(value)
+  return {
+    direction: asText(record?.direction),
+    quality: asText(record?.quality),
+  }
+}
+
+function normalizePhotographyCharacters(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => {
+      const record = asRecord(item)
+      return {
+        name: asText(record?.name),
+        screen_position: asText(record?.screen_position),
+        posture: asText(record?.posture),
+        facing: asText(record?.facing),
+      }
+    })
+    .filter((item) => item.name)
+}
+
+function fallbackPhotographyCharactersFromPanel(panel: AnyObj) {
+  const panelCharacters = Array.isArray(panel.characters) ? panel.characters : []
+  return panelCharacters
+    .map((item) => {
+      const record = asRecord(item)
+      const name = asText(record?.name)
+      if (!name) return null
+      return {
+        name,
+        screen_position: asText(record?.slot),
+        posture: '',
+        facing: '',
+      }
+    })
+    .filter((item): item is { name: string; screen_position: string; posture: string; facing: string } => !!item)
+}
+
+function buildUnifiedPhotographyPlan(rule: PhotographyRule, panel: AnyObj) {
+  const sceneSummary = asText(rule.scene_summary) || asText(rule.composition)
+  const lighting = normalizeLighting(rule.lighting)
+  const characters = (() => {
+    const fromRules = normalizePhotographyCharacters(rule.characters)
+    if (fromRules.length > 0) return fromRules
+    return fallbackPhotographyCharactersFromPanel(panel)
+  })()
+  const depthOfField = asText(rule.depth_of_field)
+  const colorTone = asText(rule.color_tone) || asText(rule.color_palette)
+  const composition = asText(rule.composition) || sceneSummary
+  const atmosphere = asText(rule.atmosphere)
+  const technicalNotes = asText(rule.technical_notes)
+
+  return {
+    panel_number: rule.panel_number,
+    scene_summary: sceneSummary,
+    lighting,
+    characters,
+    depth_of_field: depthOfField,
+    color_tone: colorTone,
+    // 兼容历史字段，避免旧调用链回归
+    composition,
+    colorPalette: asText(rule.color_palette) || colorTone,
+    atmosphere,
+    technicalNotes,
+  }
+}
+
 async function runStoryboardPhasesForClip(params: {
   clip: {
     id: string
@@ -312,13 +396,7 @@ async function runStoryboardPhasesForClip(params: {
       ...panel,
       ...(rules
         ? {
-          photographyPlan: {
-            composition: rules.composition,
-            lighting: rules.lighting,
-            colorPalette: rules.color_palette,
-            atmosphere: rules.atmosphere,
-            technicalNotes: rules.technical_notes,
-          },
+          photographyPlan: buildUnifiedPhotographyPlan(rules, panel as AnyObj),
         }
         : {}),
       ...(acting?.characters ? { actingNotes: acting.characters } : {}),

@@ -10,6 +10,7 @@ import { withTaskUiPayload } from '@/lib/task/ui-payload'
 import { getProjectModelConfig } from '@/lib/config-service'
 import { resolveProjectModelCapabilityGenerationOptions } from '@/lib/config-service'
 import { resolveModelSelection } from '@/lib/api-config'
+import { createScopedLogger } from '@/lib/logging/core'
 
 const DEFAULT_CANDIDATE_COUNT = 1
 
@@ -18,6 +19,7 @@ export const POST = apiHandler(async (
   context: { params: Promise<{ projectId: string }> },
 ) => {
   const { projectId } = await context.params
+  const requestId = getRequestId(request)
 
   const authResult = await requireProjectAuthLight(projectId)
   if (isErrorResponse(authResult)) return authResult
@@ -57,13 +59,31 @@ export const POST = apiHandler(async (
     candidateCount,
     imageModel: projectModelConfig.storyboardModel,
     ...(Object.keys(capabilityOptions).length > 0 ? { generationOptions: capabilityOptions } : {})}
+  const logger = createScopedLogger({
+    module: 'api.novel-promotion.regenerate-panel-image',
+    action: 'submit_task',
+    requestId,
+    projectId,
+    userId: session.user.id,
+  })
+  logger.info({
+    audit: true,
+    message: 'regenerate panel image request params',
+    details: {
+      panelId,
+      count,
+      candidateCount,
+      imageModel: projectModelConfig.storyboardModel,
+      billingPayload,
+    },
+  })
 
   const hasOutputAtStart = await hasPanelImageOutput(panelId)
 
   const result = await submitTask({
     userId: session.user.id,
     locale,
-    requestId: getRequestId(request),
+    requestId,
     projectId,
     type: TASK_TYPE.IMAGE_PANEL,
     targetType: 'NovelPromotionPanel',

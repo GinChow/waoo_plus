@@ -1,4 +1,5 @@
 import sharp from 'sharp'
+import { appendFile } from 'node:fs/promises'
 import { type Job } from 'bullmq'
 import { createScopedLogger } from '@/lib/logging/core'
 import { withLogContext } from '@/lib/logging/context'
@@ -21,6 +22,7 @@ import { prisma } from '@/lib/prisma'
 
 const DEFAULT_POLL_TIMEOUT_MS = Number.parseInt(process.env.WORKER_EXTERNAL_TIMEOUT_MS || String(20 * 60 * 1000), 10)
 const DEFAULT_POLL_INTERVAL_MS = Number.parseInt(process.env.WORKER_EXTERNAL_POLL_MS || '3000', 10)
+const PANEL_IMAGE_OUTBOUND_DEBUG_FILE = '/tmp/wao-panel-image-outbound-requests.ndjson'
 
 /**
  * 查询 DB 中任务是否已有 externalId（服务重启后续接轮询用，避免重复提交外部 API）
@@ -81,6 +83,11 @@ function normalizeExternalId(result: {
   const externalId = typeof result.externalId === 'string' ? result.externalId.trim() : ''
   if (externalId) return externalId
   throw new Error(`ASYNC_EXTERNAL_ID_MISSING: async ${mediaType} task returned without standard externalId`)
+}
+
+async function appendPanelImageOutboundDebugRecord(record: Record<string, unknown>) {
+  const line = `${JSON.stringify(record)}\n`
+  await appendFile(PANEL_IMAGE_OUTBOUND_DEBUG_FILE, line, 'utf8')
 }
 
 export async function waitExternalResult(
@@ -234,6 +241,51 @@ export async function resolveImageSourceFromGeneration(
       capabilityOptions,
       optionKeys: Object.keys(params.options || {}),
     },
+  })
+  const mergedOptions = {
+    ...(params.options || {}),
+    ...capabilityOptions,
+  }
+  const logReferenceImages = Array.isArray(mergedOptions.referenceImages)
+    ? mergedOptions.referenceImages.map((item) => {
+      if (typeof item !== 'string') return '[non-string-image-ref]'
+      if (item.startsWith('data:')) return `[data-url omitted length=${item.length}]`
+      return item.length > 180 ? `${item.slice(0, 180)}...[length=${item.length}]` : item
+    })
+    : []
+  logger.info({
+    audit: true,
+    message: 'panel image outbound request params',
+    details: {
+      model: params.modelId,
+      prompt: params.prompt,
+      promptLength: params.prompt.length,
+      options: {
+        ...mergedOptions,
+        referenceImages: logReferenceImages,
+      },
+    },
+  })
+  void appendPanelImageOutboundDebugRecord({
+    ts: new Date().toISOString(),
+    taskId: job.data.taskId,
+    projectId: job.data.projectId,
+    userId: params.userId,
+    model: params.modelId,
+    prompt: params.prompt,
+    promptLength: params.prompt.length,
+    options: {
+      ...mergedOptions,
+      referenceImages: logReferenceImages,
+    },
+  }).catch((error) => {
+    logger.warn({
+      message: 'write panel image outbound debug file failed',
+      details: {
+        file: PANEL_IMAGE_OUTBOUND_DEBUG_FILE,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    })
   })
 
   const result = await withLogContext(
