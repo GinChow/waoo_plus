@@ -69,7 +69,7 @@ export const PROMPT_CATALOG: Record<PromptId, PromptCatalogEntry> = {
     ],
   },
   [PROMPT_IDS.NP_AGENT_STORYBOARD_PLAN]: {
-    pathStem: 'novel-promotion/agent_storyboard_plan',
+    pathStem: 'novel-promotion/agent_storyboard_plan_v2',
     variableKeys: [
       'characters_lib_name',
       'locations_lib_name',
