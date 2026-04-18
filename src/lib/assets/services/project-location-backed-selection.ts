@@ -41,15 +41,6 @@ export async function confirmProjectLocationBackedSelection(assetId: string): Pr
   }
 
   const imagesToDelete = location.images.filter((image) => image.id !== selectedImage.id)
-  for (const image of imagesToDelete) {
-    if (!image.imageUrl) continue
-    const storageKey = await resolveStorageKeyFromMediaValue(image.imageUrl)
-    if (!storageKey) continue
-    try {
-      await deleteObject(storageKey)
-    } catch {
-    }
-  }
 
   await prisma.$transaction(async (tx) => {
     await tx.locationImage.deleteMany({
@@ -70,6 +61,17 @@ export async function confirmProjectLocationBackedSelection(assetId: string): Pr
       data: { selectedImageId: selectedImage.id },
     })
   })
+
+  // 删除对象存储中的旧图不阻塞确认返回，失败留给后续补偿清理。
+  void Promise.allSettled(imagesToDelete.map(async (image) => {
+    if (!image.imageUrl) return
+    const storageKey = await resolveStorageKeyFromMediaValue(image.imageUrl)
+    if (!storageKey) return
+    try {
+      await deleteObject(storageKey)
+    } catch {
+    }
+  }))
 
   return { success: true }
 }

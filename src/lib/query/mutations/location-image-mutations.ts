@@ -310,7 +310,11 @@ export function useSelectProjectLocationImage(projectId: string) {
     const queryClient = useQueryClient()
     const latestRequestIdByTargetRef = useRef<Record<string, number>>({})
     const invalidateProjectAssets = () =>
-        invalidateQueryTemplates(queryClient, [queryKeys.projectAssets.all(projectId)])
+        invalidateQueryTemplates(queryClient, [
+            queryKeys.assets.all('project', projectId),
+            queryKeys.projectAssets.all(projectId),
+            queryKeys.projectData(projectId),
+        ])
 
     return useMutation({
         mutationFn: async ({
@@ -366,10 +370,8 @@ export function useSelectProjectLocationImage(projectId: string) {
             queryClient.setQueryData(queryKeys.projectAssets.all(projectId), context.previousAssets)
             queryClient.setQueryData(queryKeys.projectData(projectId), context.previousProject)
         },
-        onSettled: (_data, _error, variables) => {
-            if (variables.confirm) {
-                void invalidateProjectAssets()
-            }
+        onSettled: () => {
+            void invalidateProjectAssets()
         },
     })
 }

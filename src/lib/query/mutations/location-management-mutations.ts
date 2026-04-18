@@ -1,8 +1,9 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { logError as _ulogError } from '@/lib/logging/core'
 import type { Project } from '@/types/project'
 import { queryKeys } from '../keys'
 import type { ProjectAssetsData } from '../hooks/useProjectAssets'
+import type { AssetSummary } from '@/lib/assets/contracts'
 import type { LocationAvailableSlot } from '@/lib/location-available-slots'
 import { resolveTaskResponse } from '@/lib/task/client'
 import { apiFetch } from '@/lib/api-fetch'
@@ -301,7 +302,49 @@ export function useConfirmProjectLocationSelection(
 ) {
     const queryClient = useQueryClient()
     const invalidateProjectAssets = () =>
-        invalidateQueryTemplates(queryClient, [queryKeys.projectAssets.all(projectId)])
+        invalidateQueryTemplates(queryClient, [
+            queryKeys.assets.all('project', projectId),
+            queryKeys.projectAssets.all(projectId),
+            queryKeys.projectData(projectId),
+        ])
+
+    type ConfirmSelectionContext = {
+        previousUnifiedAssets: Array<[QueryKey, AssetSummary[] | undefined]>
+    }
+
+    const applyConfirmSelectionToUnifiedAssets = (
+        previous: AssetSummary[] | undefined,
+        locationId: string,
+    ): AssetSummary[] | undefined => {
+        if (!previous) return previous
+        return previous.map((asset) => {
+            if (asset.id !== locationId) return asset
+            if (asset.kind !== 'location' && asset.kind !== 'prop') return asset
+            const selectedVariant = asset.selectedVariantId
+                ? asset.variants.find((variant) => variant.id === asset.selectedVariantId)
+                : asset.variants.find((variant) => variant.renders.some((render) => render.isSelected))
+            if (!selectedVariant) return asset
+
+            return {
+                ...asset,
+                selectedVariantId: selectedVariant.id,
+                variants: [{
+                    ...selectedVariant,
+                    index: 0,
+                    selectionState: {
+                        selectedRenderIndex: 0,
+                    },
+                    renders: selectedVariant.renders.length > 0
+                        ? [{
+                            ...selectedVariant.renders[0],
+                            isSelected: true,
+                        }]
+                        : [],
+                }],
+            }
+        })
+    }
+
     return useMutation({
         mutationFn: async ({ locationId }: { locationId: string }) =>
             await requestJsonWithError(
@@ -318,6 +361,24 @@ export function useConfirmProjectLocationSelection(
                 },
                 '确认选择失败',
             ),
+        onMutate: async ({ locationId }): Promise<ConfirmSelectionContext> => {
+            const queryPrefix = queryKeys.assets.all('project', projectId)
+            await queryClient.cancelQueries({ queryKey: queryPrefix })
+            const previousUnifiedAssets = queryClient.getQueriesData<AssetSummary[]>({
+                queryKey: queryPrefix,
+            })
+            queryClient.setQueriesData<AssetSummary[] | undefined>(
+                { queryKey: queryPrefix },
+                (previous) => applyConfirmSelectionToUnifiedAssets(previous, locationId),
+            )
+            return { previousUnifiedAssets }
+        },
+        onError: (_error, _variables, context) => {
+            if (!context) return
+            for (const [queryKey, data] of context.previousUnifiedAssets) {
+                queryClient.setQueryData(queryKey, data)
+            }
+        },
         onSettled: invalidateProjectAssets,
     })
 }
