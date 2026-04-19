@@ -28,9 +28,13 @@ export default function AIDataModal({
   shotType: initialShotType,
   cameraMove: initialCameraMove,
   description: initialDescription,
+  sceneType,
+  sourceText,
+  duration,
   location,
   characters,
   videoPrompt: initialVideoPrompt,
+  firstFrameImagePrompt: initialFirstFrameImagePrompt,
   photographyRules: initialPhotographyRules,
   actingNotes: initialActingNotes,
   videoRatio,
@@ -48,6 +52,8 @@ export default function AIDataModal({
     setDescription,
     videoPrompt,
     setVideoPrompt,
+    firstFrameImagePrompt,
+    setFirstFrameImagePrompt,
     photographyRules,
     actingNotes,
     updatePhotographyField,
@@ -61,6 +67,7 @@ export default function AIDataModal({
     initialCameraMove,
     initialDescription,
     initialVideoPrompt,
+    initialFirstFrameImagePrompt,
     initialPhotographyRules,
     initialActingNotes,
   })
@@ -75,10 +82,16 @@ export default function AIDataModal({
     shot: {
       shot_type: shotType,
       camera_move: cameraMove,
+      shot_purpose: photographyRules?.shot_purpose || null,
       description,
       location,
+      scene_type: sceneType || photographyRules?.scene_type || null,
       characters,
+      source_text: sourceText || photographyRules?.source_text || null,
+      duration_base: photographyRules?.duration_base ?? null,
+      duration: duration ?? photographyRules?.duration ?? null,
       prompt_text: `A ${videoRatio} shot: ${description}. ${videoPrompt}`,
+      first_frame_image_prompt: firstFrameImagePrompt || null,
     },
     ...(photographyRules ? { photography_rules: photographyRules } : {}),
     ...(actingNotes.length > 0 ? { acting_notes: actingNotes } : {}),
@@ -133,6 +146,7 @@ export default function AIDataModal({
             location={location}
             characters={characters}
             videoPrompt={videoPrompt}
+            firstFrameImagePrompt={firstFrameImagePrompt}
             photographyRules={photographyRules}
             actingNotes={actingNotes}
             activeCharIdx={activeCharIdx}
@@ -141,6 +155,7 @@ export default function AIDataModal({
             onCameraMoveChange={setCameraMove}
             onDescriptionChange={setDescription}
             onVideoPromptChange={setVideoPrompt}
+            onFirstFrameImagePromptChange={setFirstFrameImagePrompt}
             onPhotographyFieldChange={updatePhotographyField}
             onPhotographyCharacterChange={updatePhotographyCharacter}
             onActingCharacterChange={updateActingCharacter}

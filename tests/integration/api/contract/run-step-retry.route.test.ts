@@ -10,7 +10,9 @@ const getRunByIdMock = vi.hoisted(() => vi.fn())
 const getRunSnapshotMock = vi.hoisted(() => vi.fn())
 const retryFailedStepMock = vi.hoisted(() => vi.fn())
 const submitTaskMock = vi.hoisted(() => vi.fn())
-const resolveRequiredTaskLocaleMock = vi.hoisted(() => vi.fn(() => 'zh'))
+const resolveRequiredTaskLocaleMock = vi.hoisted(
+  () => vi.fn<(request: unknown, body?: unknown) => string>(() => 'zh'),
+)
 
 vi.mock('@/lib/api-auth', () => {
   const unauthorized = () => new Response(

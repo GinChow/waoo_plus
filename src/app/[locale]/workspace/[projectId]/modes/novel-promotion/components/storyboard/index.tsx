@@ -277,9 +277,13 @@ export default function StoryboardStage({
             shotType={modalRuntime.aiDataRuntime.panelData.shotType}
             cameraMove={modalRuntime.aiDataRuntime.panelData.cameraMove}
             description={modalRuntime.aiDataRuntime.panelData.description}
+            sceneType={modalRuntime.aiDataRuntime.panelData.sceneType}
+            sourceText={modalRuntime.aiDataRuntime.panelData.sourceText}
+            duration={modalRuntime.aiDataRuntime.panelData.duration}
             location={modalRuntime.aiDataRuntime.panelData.location}
             characters={modalRuntime.aiDataRuntime.characters}
             videoPrompt={modalRuntime.aiDataRuntime.panelData.videoPrompt}
+            firstFrameImagePrompt={modalRuntime.aiDataRuntime.panelData.firstLastFramePrompt || null}
             photographyRules={modalRuntime.aiDataRuntime.photographyRules}
             actingNotes={modalRuntime.aiDataRuntime.actingNotes}
             videoRatio={modalRuntime.videoRatio}

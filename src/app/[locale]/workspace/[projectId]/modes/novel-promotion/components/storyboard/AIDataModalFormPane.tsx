@@ -20,6 +20,7 @@ interface AIDataModalFormPaneProps {
   location: string | null
   characters: AIDataCharacter[]
   videoPrompt: string
+  firstFrameImagePrompt: string
   photographyRules: PhotographyRules | null
   actingNotes: ActingCharacter[]
   activeCharIdx: number
@@ -28,6 +29,7 @@ interface AIDataModalFormPaneProps {
   onCameraMoveChange: (value: string) => void
   onDescriptionChange: (value: string) => void
   onVideoPromptChange: (value: string) => void
+  onFirstFrameImagePromptChange: (value: string) => void
   onPhotographyFieldChange: (path: string, value: string) => void
   onPhotographyCharacterChange: (index: number, field: keyof PhotographyCharacter, value: string) => void
   onActingCharacterChange: (index: number, field: keyof ActingCharacter, value: string) => void
@@ -136,6 +138,7 @@ export default function AIDataModalFormPane({
   location,
   characters,
   videoPrompt,
+  firstFrameImagePrompt,
   photographyRules,
   actingNotes,
   activeCharIdx,
@@ -144,6 +147,7 @@ export default function AIDataModalFormPane({
   onCameraMoveChange,
   onDescriptionChange,
   onVideoPromptChange,
+  onFirstFrameImagePromptChange,
   onPhotographyFieldChange,
   onPhotographyCharacterChange,
   onActingCharacterChange,
@@ -349,6 +353,13 @@ export default function AIDataModalFormPane({
           placeholder={t('panel.videoPromptPlaceholder')}
           className="bg-[var(--glass-tone-warning-bg)]"
         />
+        <FL>{t('aiData.imagePrompt')}</FL>
+        <AutoGrowTextarea
+          density="compact"
+          rows={3}
+          value={firstFrameImagePrompt}
+          onChange={e => onFirstFrameImagePromptChange(e.target.value)}
+        />
       </CollapseSection>
 
       {/* ⑤ 摄影环境 — 折叠 */}
@@ -361,6 +372,24 @@ export default function AIDataModalFormPane({
               value={photographyRules.scene_summary}
               onChange={e => onPhotographyFieldChange('scene_summary', e.target.value)}
             />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <FL>{t('aiData.cameraAngle')}</FL>
+              <GlassInput
+                density="compact"
+                value={photographyRules.camera_angle ?? ''}
+                onChange={e => onPhotographyFieldChange('camera_angle', e.target.value)}
+              />
+            </div>
+            <div>
+              <FL>{t('aiData.viewpointConstraint')}</FL>
+              <GlassInput
+                density="compact"
+                value={photographyRules.viewpoint_constraint ?? ''}
+                onChange={e => onPhotographyFieldChange('viewpoint_constraint', e.target.value)}
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -397,6 +426,23 @@ export default function AIDataModalFormPane({
                 onChange={e => onPhotographyFieldChange('color_tone', e.target.value)}
               />
             </div>
+          </div>
+          <div>
+            <FL>{t('aiData.focusPriority')}</FL>
+            <GlassInput
+              density="compact"
+              value={photographyRules.focus_priority ?? ''}
+              onChange={e => onPhotographyFieldChange('focus_priority', e.target.value)}
+            />
+          </div>
+          <div>
+            <FL>{t('aiData.compositionNote')}</FL>
+            <AutoGrowTextarea
+              density="compact"
+              rows={2}
+              value={photographyRules.composition_note ?? ''}
+              onChange={e => onPhotographyFieldChange('composition_note', e.target.value)}
+            />
           </div>
         </CollapseSection>
       )}

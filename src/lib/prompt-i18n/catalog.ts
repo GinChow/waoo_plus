@@ -23,7 +23,7 @@ export const PROMPT_CATALOG: Record<PromptId, PromptCatalogEntry> = {
     variableKeys: ['character_profiles'],
   },
   [PROMPT_IDS.NP_AGENT_CINEMATOGRAPHER]: {
-    pathStem: 'novel-promotion/agent_cinematographer',
+    pathStem: 'novel-promotion/agent_cinematographer_v2',
     variableKeys: ['panels_json', 'panel_count', 'locations_description', 'characters_info', 'props_description'],
   },
   [PROMPT_IDS.NP_AGENT_CLIP]: {
@@ -54,7 +54,7 @@ export const PROMPT_CATALOG: Record<PromptId, PromptCatalogEntry> = {
     ],
   },
   [PROMPT_IDS.NP_AGENT_STORYBOARD_DETAIL]: {
-    pathStem: 'novel-promotion/agent_storyboard_detail',
+    pathStem: 'novel-promotion/agent_storyboard_detail_v2',
     variableKeys: ['panels_json', 'characters_age_gender', 'locations_description', 'props_description'],
   },
   [PROMPT_IDS.NP_AGENT_STORYBOARD_INSERT]: {
@@ -69,7 +69,7 @@ export const PROMPT_CATALOG: Record<PromptId, PromptCatalogEntry> = {
     ],
   },
   [PROMPT_IDS.NP_AGENT_STORYBOARD_PLAN]: {
-    pathStem: 'novel-promotion/agent_storyboard_plan_v2',
+    pathStem: 'novel-promotion/agent_storyboard_plan_v3',
     variableKeys: [
       'characters_lib_name',
       'locations_lib_name',

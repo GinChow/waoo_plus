@@ -245,6 +245,15 @@ function asText(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
+function readTextByKeys(record: Record<string, unknown> | null, keys: string[]): string {
+  if (!record) return ''
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   return value as Record<string, unknown>
@@ -271,12 +280,16 @@ function normalizePhotographyCharacters(value: unknown) {
       const record = asRecord(item)
       return {
         name: asText(record?.name),
-        screen_position: asText(record?.screen_position),
-        posture: asText(record?.posture),
-        facing: asText(record?.facing),
+        screen_position: readTextByKeys(record, ['screen_position', 'screenPosition', 'position', 'slot']),
+        posture: readTextByKeys(record, ['posture', 'pose', 'body_pose', 'bodyPose']),
+        facing: readTextByKeys(record, ['facing', 'look_direction', 'lookDirection', 'direction']),
       }
     })
     .filter((item) => item.name)
+}
+
+function normalizeName(name: string): string {
+  return name.trim().toLowerCase()
 }
 
 function fallbackPhotographyCharactersFromPanel(panel: AnyObj) {
@@ -301,22 +314,49 @@ function buildUnifiedPhotographyPlan(rule: PhotographyRule, panel: AnyObj) {
   const lighting = normalizeLighting(rule.lighting)
   const characters = (() => {
     const fromRules = normalizePhotographyCharacters(rule.characters)
-    if (fromRules.length > 0) return fromRules
-    return fallbackPhotographyCharactersFromPanel(panel)
+    const fallback = fallbackPhotographyCharactersFromPanel(panel)
+    if (fromRules.length === 0) return fallback
+
+    const fallbackByName = new Map(fallback.map((item) => [normalizeName(item.name), item]))
+    const merged = fromRules.map((item) => {
+      const fb = fallbackByName.get(normalizeName(item.name))
+      return {
+        ...item,
+        screen_position: item.screen_position || fb?.screen_position || '',
+        posture: item.posture || '',
+        facing: item.facing || '',
+      }
+    })
+    const existing = new Set(merged.map((item) => normalizeName(item.name)))
+    const missing = fallback.filter((item) => !existing.has(normalizeName(item.name)))
+    return [...merged, ...missing]
   })()
   const depthOfField = asText(rule.depth_of_field)
   const colorTone = asText(rule.color_tone) || asText(rule.color_palette)
-  const composition = asText(rule.composition) || sceneSummary
+  const cameraAngle = asText(rule.camera_angle)
+  const viewpointConstraint = asText(rule.viewpoint_constraint)
+  const focusPriority = asText(rule.focus_priority)
+  const compositionNote = asText(rule.composition_note)
+  const composition = asText(rule.composition) || compositionNote || sceneSummary
   const atmosphere = asText(rule.atmosphere)
   const technicalNotes = asText(rule.technical_notes)
 
   return {
     panel_number: rule.panel_number,
+    shot_purpose: asText(panel.shot_purpose),
+    scene_type: asText(panel.scene_type),
+    source_text: asText(panel.source_text),
+    duration_base: typeof panel.duration_base === 'number' ? panel.duration_base : null,
+    duration: typeof panel.duration === 'number' ? panel.duration : null,
     scene_summary: sceneSummary,
     lighting,
+    camera_angle: cameraAngle,
+    viewpoint_constraint: viewpointConstraint,
     characters,
     depth_of_field: depthOfField,
     color_tone: colorTone,
+    focus_priority: focusPriority,
+    composition_note: compositionNote,
     // 兼容历史字段，避免旧调用链回归
     composition,
     colorPalette: asText(rule.color_palette) || colorTone,
@@ -354,7 +394,7 @@ async function runStoryboardPhasesForClip(params: {
     params.projectName,
     params.locale,
   )
-  const [phase2, phase2Acting, phase3] = await Promise.all([
+  const [phase2, phase2Acting] = await Promise.all([
     executePhase2(
       params.clip,
       phase1.planPanels || [],
@@ -373,17 +413,18 @@ async function runStoryboardPhasesForClip(params: {
       params.projectName,
       params.locale,
     ),
-    executePhase3(
-      params.clip,
-      phase1.planPanels || [],
-      [],
-      params.novelPromotionData,
-      session,
-      params.projectId,
-      params.projectName,
-      params.locale,
-    ),
   ])
+  const phase3 = await executePhase3(
+    params.clip,
+    phase1.planPanels || [],
+    phase2.photographyRules || [],
+    phase2Acting.actingDirections || [],
+    params.novelPromotionData,
+    session,
+    params.projectId,
+    params.projectName,
+    params.locale,
+  )
 
   const photographyRules: PhotographyRule[] = phase2.photographyRules || []
   const actingDirections: ActingDirection[] = phase2Acting.actingDirections || []
@@ -496,6 +537,8 @@ async function handleRegenerateStoryboardTextTask(job: Job<TaskJobData>) {
           srtEnd,
           duration: panel.duration || null,
           videoPrompt: panel.video_prompt || null,
+          firstLastFramePrompt:
+            typeof panel.first_frame_image_prompt === 'string' ? panel.first_frame_image_prompt : null,
           sceneType: typeof panel.scene_type === 'string' ? panel.scene_type : null,
           srtSegment: panel.source_text || null,
           photographyRules: panel.photographyPlan ? JSON.stringify(panel.photographyPlan) : null,
@@ -664,6 +707,8 @@ async function handleInsertPanelTask(job: Job<TaskJobData>) {
   const generatedCameraMove = typeof generatedPanel.camera_move === 'string' ? generatedPanel.camera_move : null
   const generatedDescription = typeof generatedPanel.description === 'string' ? generatedPanel.description : null
   const generatedVideoPrompt = typeof generatedPanel.video_prompt === 'string' ? generatedPanel.video_prompt : null
+  const generatedFirstFrameImagePrompt =
+    typeof generatedPanel.first_frame_image_prompt === 'string' ? generatedPanel.first_frame_image_prompt : null
   const generatedLocation = typeof generatedPanel.location === 'string' ? generatedPanel.location : null
   const generatedSrtSegment = typeof generatedPanel.source_text === 'string' ? generatedPanel.source_text : null
   const generatedDuration = typeof generatedPanel.duration === 'number' ? generatedPanel.duration : null
@@ -705,6 +750,7 @@ async function handleInsertPanelTask(job: Job<TaskJobData>) {
         cameraMove: generatedCameraMove || prevPanel.cameraMove,
         description: generatedDescription || userInput,
         videoPrompt: generatedVideoPrompt || generatedDescription || userInput,
+        firstLastFramePrompt: generatedFirstFrameImagePrompt,
         location: generatedLocation || prevPanel.location,
         characters: generatedPanel.characters ? JSON.stringify(generatedPanel.characters) : prevPanel.characters,
         props: generatedPanel.props ? JSON.stringify(generatedPanel.props) : readNullableText(prevPanel as unknown as Record<string, unknown>, 'props'),

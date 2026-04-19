@@ -93,6 +93,7 @@ export function usePanelCrudActions({
           srtEnd: snapshot.srtEnd,
           duration: snapshot.duration,
           videoPrompt: snapshot.videoPrompt,
+          firstLastFramePrompt: snapshot.firstLastFramePrompt,
           photographyRules: snapshot.photographyRules,
           actingNotes: snapshot.actingNotes,
         })
@@ -132,6 +133,7 @@ export function usePanelCrudActions({
         srtEnd: snapshot.srtEnd,
         duration: snapshot.duration,
         videoPrompt: snapshot.videoPrompt,
+        firstLastFramePrompt: snapshot.firstLastFramePrompt,
         photographyRules: snapshot.photographyRules,
         actingNotes: snapshot.actingNotes,
       })

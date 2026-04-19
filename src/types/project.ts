@@ -167,6 +167,7 @@ export interface NovelPromotionPanel {
   shotType: string | null
   cameraMove: string | null
   description: string | null
+  sceneType?: string | null
   location: string | null
   characters: string | null
   props: string | null

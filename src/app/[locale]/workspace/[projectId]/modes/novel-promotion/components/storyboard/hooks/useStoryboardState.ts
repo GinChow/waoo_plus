@@ -20,11 +20,13 @@ export interface StoryboardPanel {
   shot_type: string
   camera_move: string | null
   description: string
+  scene_type?: string
   characters: { name: string; appearance: string; slot?: string }[]
   location?: string
   srt_range?: string
   duration?: number
   video_prompt?: string
+  first_frame_image_prompt?: string
   source_text?: string
   candidateImages?: string
   imageUrl?: string | null
@@ -136,11 +138,13 @@ export function useStoryboardState({
         shot_type: p.shotType ?? '',
         camera_move: p.cameraMove,
         description: p.description ?? '',
+        scene_type: p.sceneType || undefined,
         location: p.location || undefined,
         characters,
         srt_range: p.srtStart && p.srtEnd ? `${p.srtStart}-${p.srtEnd}` : undefined,
         duration: p.duration ?? undefined,
         video_prompt: p.videoPrompt || undefined,
+        first_frame_image_prompt: p.firstLastFramePrompt || undefined,
         source_text: p.srtSegment || undefined,
         candidateImages: p.candidateImages || undefined,
         imageUrl: p.imageUrl,
@@ -162,12 +166,14 @@ export function useStoryboardState({
       shotType: panel.shot_type,
       cameraMove: panel.camera_move,
       description: panel.description,
+      sceneType: panel.scene_type || null,
       location: panel.location || null,
       characters: panel.characters || [],
       srtStart: null,
       srtEnd: null,
       duration: panel.duration || null,
       videoPrompt: panel.video_prompt || null,
+      firstLastFramePrompt: panel.first_frame_image_prompt || null,
       photographyRules: panel.photographyRules ?? null,
       actingNotes: panel.actingNotes ?? null,
       sourceText: panel.source_text

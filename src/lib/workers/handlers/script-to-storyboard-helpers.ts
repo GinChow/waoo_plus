@@ -192,7 +192,10 @@ export async function persistStoryboardsAndPanels(params: {
             cameraMove: panel.camera_move || '固定',
             description: panel.description || null,
             videoPrompt: panel.video_prompt || null,
+            firstLastFramePrompt:
+              typeof panel.first_frame_image_prompt === 'string' ? panel.first_frame_image_prompt : null,
             location: panel.location || null,
+            sceneType: panel.scene_type || null,
             characters: panel.characters ? JSON.stringify(panel.characters) : null,
             props: panel.props ? JSON.stringify(panel.props) : null,
             srtSegment: panel.source_text || null,
@@ -286,7 +289,10 @@ export async function persistStoryboardOutputs(params: {
             cameraMove: panel.camera_move || '固定',
             description: panel.description || null,
             videoPrompt: panel.video_prompt || null,
+            firstLastFramePrompt:
+              typeof panel.first_frame_image_prompt === 'string' ? panel.first_frame_image_prompt : null,
             location: panel.location || null,
+            sceneType: panel.scene_type || null,
             characters: panel.characters ? JSON.stringify(panel.characters) : null,
             props: panel.props ? JSON.stringify(panel.props) : null,
             srtSegment: panel.source_text || null,

@@ -81,6 +81,7 @@ export function useStoryboardAiDataRuntime({
     cameraMove: string | null
     description: string | null
     videoPrompt: string | null
+    firstFrameImagePrompt: string | null
     photographyRules: unknown
     actingNotes: unknown
   }) => {
@@ -95,6 +96,7 @@ export function useStoryboardAiDataRuntime({
       cameraMove: data.cameraMove,
       description: data.description,
       videoPrompt: data.videoPrompt,
+      firstLastFramePrompt: data.firstFrameImagePrompt,
       photographyRules: serializedPhotographyRules,
       actingNotes: serializedActingNotes,
     }
@@ -104,6 +106,7 @@ export function useStoryboardAiDataRuntime({
       cameraMove: data.cameraMove,
       description: data.description,
       videoPrompt: data.videoPrompt,
+      firstLastFramePrompt: data.firstFrameImagePrompt,
       photographyRules: serializedPhotographyRules,
       actingNotes: serializedActingNotes,
     })

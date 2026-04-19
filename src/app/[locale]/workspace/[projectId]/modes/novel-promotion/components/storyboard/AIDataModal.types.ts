@@ -23,6 +23,15 @@ export interface PhotographyRules {
   characters: PhotographyCharacter[]
   depth_of_field: string
   color_tone: string
+  camera_angle?: string
+  viewpoint_constraint?: string
+  focus_priority?: string
+  composition_note?: string
+  shot_purpose?: string
+  scene_type?: string
+  source_text?: string
+  duration_base?: number
+  duration?: number
 }
 
 export interface ActingCharacter {
@@ -40,6 +49,7 @@ export interface AIDataSavePayload {
   cameraMove: string | null
   description: string | null
   videoPrompt: string | null
+  firstFrameImagePrompt: string | null
   photographyRules: PhotographyRules | null
   actingNotes: ActingCharacter[] | null
 }
@@ -52,9 +62,13 @@ export interface AIDataModalProps {
   shotType: string | null
   cameraMove: string | null
   description: string | null
+  sceneType?: string | null
+  sourceText?: string | null
+  duration?: number | null
   location: string | null
   characters: AIDataCharacter[]
   videoPrompt: string | null
+  firstFrameImagePrompt: string | null
   photographyRules: PhotographyRules | null
   actingNotes: ActingNotes | ActingCharacter[] | null
   videoRatio: string

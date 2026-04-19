@@ -161,15 +161,24 @@ function normalizePhotographyCharacters(value: unknown) {
     const record = asRecord(item)
     return {
       name: asText(record?.name),
-      screen_position: asText(record?.screen_position),
-      posture: asText(record?.posture),
-      facing: asText(record?.facing),
+      screen_position: readTextByKeys(record, ['screen_position', 'screenPosition', 'position', 'slot']),
+      posture: readTextByKeys(record, ['posture', 'pose', 'body_pose', 'bodyPose']),
+      facing: readTextByKeys(record, ['facing', 'look_direction', 'lookDirection', 'direction']),
     }
   })
 }
 
 function normalizeName(name: string): string {
   return name.trim().toLowerCase()
+}
+
+function readTextByKeys(record: Record<string, unknown> | null, keys: string[]): string {
+  if (!record) return ''
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
 }
 
 function parsePanelCharacters(value: unknown): Array<{ name: string; appearance?: string; slot?: string }> {
@@ -243,28 +252,102 @@ function buildUnifiedPhotographyPlan(rule: PhotographyRule, panel: StoryboardPan
   const lighting = normalizeLighting(rule.lighting)
   const characters = (() => {
     const fromRules = normalizePhotographyCharacters(rule.characters).filter((item) => item.name)
-    if (fromRules.length > 0) return fromRules
-    return fallbackPhotographyCharactersFromPanel(panel)
+    const fallback = fallbackPhotographyCharactersFromPanel(panel)
+    if (fromRules.length === 0) return fallback
+
+    const fallbackByName = new Map(fallback.map((item) => [normalizeName(item.name), item]))
+    const merged = fromRules.map((item) => {
+      const fb = fallbackByName.get(normalizeName(item.name))
+      return {
+        ...item,
+        screen_position: item.screen_position || fb?.screen_position || '',
+        posture: item.posture || '',
+        facing: item.facing || '',
+      }
+    })
+    const existing = new Set(merged.map((item) => normalizeName(item.name)))
+    const missing = fallback.filter((item) => !existing.has(normalizeName(item.name)))
+    return [...merged, ...missing]
   })()
   const depthOfField = asText(rule.depth_of_field)
   const colorTone = asText(rule.color_tone) || asText(rule.color_palette)
-  const composition = asText(rule.composition) || sceneSummary
+  const cameraAngle = asText(rule.camera_angle)
+  const viewpointConstraint = asText(rule.viewpoint_constraint)
+  const focusPriority = asText(rule.focus_priority)
+  const compositionNote = asText(rule.composition_note)
+  const composition = asText(rule.composition) || compositionNote || sceneSummary
   const atmosphere = asText(rule.atmosphere)
   const technicalNotes = asText(rule.technical_notes)
 
   return {
     panel_number: rule.panel_number,
+    shot_purpose: asText(panel.shot_purpose),
+    scene_type: asText(panel.scene_type),
+    source_text: asText(panel.source_text),
+    duration_base: typeof panel.duration_base === 'number' ? panel.duration_base : null,
+    duration: typeof panel.duration === 'number' ? panel.duration : null,
     scene_summary: sceneSummary,
     lighting,
+    camera_angle: cameraAngle,
+    viewpoint_constraint: viewpointConstraint,
     characters,
     depth_of_field: depthOfField,
     color_tone: colorTone,
+    focus_priority: focusPriority,
+    composition_note: compositionNote,
     // 兼容历史字段，避免旧调用链回归
     composition,
     colorPalette: asText(rule.color_palette) || colorTone,
     atmosphere,
     technicalNotes,
   }
+}
+
+function findPanelByNumberOrIndex<T extends { panel_number?: number }>(
+  rows: T[],
+  panelNumber: number | undefined,
+  index: number,
+) {
+  if (typeof panelNumber === 'number') {
+    const byNumber = rows.find((row) => row.panel_number === panelNumber)
+    if (byNumber) return byNumber
+  }
+  return rows[index]
+}
+
+function reconcilePhase3Panels(params: {
+  phase3Panels: StoryboardPanel[]
+  planPanels: StoryboardPanel[]
+  photographyRules: PhotographyRule[]
+  actingDirections: ActingDirection[]
+}) {
+  const { phase3Panels, planPanels, photographyRules, actingDirections } = params
+  return planPanels.map((planPanel, index) => {
+    const rawPhase3 = findPanelByNumberOrIndex(phase3Panels, planPanel.panel_number, index)
+    const matchedRule = findPanelByNumberOrIndex(photographyRules, planPanel.panel_number, index)
+    const matchedActing = findPanelByNumberOrIndex(actingDirections, planPanel.panel_number, index)
+    if (!matchedRule) {
+      throw new Error(`Missing cinematography rule for panel_number=${String(planPanel.panel_number)} at index=${index}`)
+    }
+    if (!matchedActing) {
+      throw new Error(`Missing acting direction for panel_number=${String(planPanel.panel_number)} at index=${index}`)
+    }
+    const merged = {
+      ...planPanel,
+      ...matchedRule,
+      characters: planPanel.characters,
+      ...(rawPhase3 || {}),
+      photography_rules: matchedRule,
+      acting_notes: matchedActing,
+    } as StoryboardPanel
+    if (merged.duration_base == null && planPanel.duration_base != null) {
+      merged.duration_base = planPanel.duration_base
+    }
+    if (merged.duration == null && typeof merged.duration_base === 'number') {
+      merged.duration = merged.duration_base
+    }
+    return merged
+  })
 }
 
 function extractArtifactRows<T extends JsonRecord>(payload: unknown, key: string): T[] {
@@ -625,30 +708,51 @@ export async function runScriptToStoryboardAtomicRetry(params: {
     phase2ActingByClipId[params.clip.id] = phase2Acting
   } else {
     const planPanels = requireRows(phase1Panels, 'storyboard.clip.phase1')
+    const cinematographyRules = requireRows(phase2Cinematography, 'storyboard.clip.phase2.cine')
+    const actingDirectionRows = requireRows(phase2Acting, 'storyboard.clip.phase2.acting')
+    const phase3PanelsInput = planPanels.map((panel, index) => {
+      const matchedRule = cinematographyRules.find((rule) => rule.panel_number === panel.panel_number) || cinematographyRules[index]
+      const matchedActing = actingDirectionRows.find((item) => item.panel_number === panel.panel_number) || actingDirectionRows[index]
+      if (!matchedRule) {
+        throw new Error(`Missing cinematography rule for panel_number=${String(panel.panel_number)} at index=${index}`)
+      }
+      if (!matchedActing) {
+        throw new Error(`Missing acting direction for panel_number=${String(panel.panel_number)} at index=${index}`)
+      }
+      return {
+        ...panel,
+        ...matchedRule,
+        characters: panel.characters,
+        photography_rules: matchedRule,
+        acting_notes: matchedActing,
+      }
+    })
     const phase3Prompt = params.promptTemplates.phase3DetailTemplate
-      .replace('{panels_json}', JSON.stringify(planPanels, null, 2))
+      .replace('{panels_json}', JSON.stringify(phase3PanelsInput, null, 2))
       .replace('{characters_age_gender}', filteredFullDescription)
       .replace('{locations_description}', filteredLocationsDescription)
       .replace('{props_description}', filteredPropsDescription)
-    phase3Panels = await runStepWithRetry({
+    const rawPhase3Panels = await runStepWithRetry({
       runStep: params.runStep,
       baseMeta,
       prompt: phase3Prompt,
       action: 'storyboard_phase3_detail',
       maxOutputTokens: 2600,
-      parse: (text) => {
-        const parsed = parseJsonArray<StoryboardPanel>(text, `phase3:${formatClipId(params.clip)}`)
-        const filtered = parsed.filter(
-          (panel) => panel.description && panel.description !== '无' && panel.location !== '无',
-        )
-        if (filtered.length === 0) {
-          throw new Error(`Phase 3 returned empty valid panels for clip ${formatClipId(params.clip)}`)
-        }
-        return filtered
-      },
+      parse: (text) => parseJsonArray<StoryboardPanel>(text, `phase3:${formatClipId(params.clip)}`),
       retryStepAttempt: params.retryStepAttempt,
       maxStepAttempts,
     })
+    phase3Panels = reconcilePhase3Panels({
+      phase3Panels: rawPhase3Panels,
+      planPanels,
+      photographyRules: cinematographyRules,
+      actingDirections: actingDirectionRows,
+    }).filter(
+      (panel) => panel.description && panel.description !== '无' && panel.location !== '无',
+    )
+    if (phase3Panels.length === 0) {
+      throw new Error(`Phase 3 returned empty valid panels for clip ${formatClipId(params.clip)}`)
+    }
     const normalizedPhase3Panels = hydrateFinalPanelCharactersWithPlanSlots({
       finalPanels: phase3Panels,
       planPanels,

@@ -11,6 +11,7 @@ describe('useAIDataModalState optimistic sync helpers', () => {
       initialCameraMove: 'Push in',
       initialDescription: 'user typing draft',
       initialVideoPrompt: 'prompt-a',
+      initialFirstFrameImagePrompt: 'frame-a',
       initialPhotographyRules: null,
       initialActingNotes: null,
     })
@@ -20,6 +21,7 @@ describe('useAIDataModalState optimistic sync helpers', () => {
       initialCameraMove: 'Pan left',
       initialDescription: 'server-updated-desc',
       initialVideoPrompt: 'prompt-b',
+      initialFirstFrameImagePrompt: 'frame-b',
       initialPhotographyRules: null,
       initialActingNotes: null,
     })
@@ -42,6 +44,7 @@ describe('useAIDataModalState optimistic sync helpers', () => {
       initialCameraMove: 'B',
       initialDescription: 'C',
       initialVideoPrompt: 'D',
+      initialFirstFrameImagePrompt: 'E',
       initialPhotographyRules: {
         scene_summary: 'local scene',
         lighting: {
@@ -68,6 +71,7 @@ describe('useAIDataModalState optimistic sync helpers', () => {
       initialCameraMove: 'B2',
       initialDescription: 'C2',
       initialVideoPrompt: 'D2',
+      initialFirstFrameImagePrompt: 'E2',
       initialPhotographyRules: {
         scene_summary: 'server scene',
         lighting: {

@@ -34,6 +34,7 @@ describe('AIDataModal', () => {
           },
         ],
         videoPrompt: 'dramatic court scene',
+        firstFrameImagePrompt: '皇帝立于大殿中央的首帧静态画面',
         photographyRules: null,
         actingNotes: null,
         videoRatio: '16:9',

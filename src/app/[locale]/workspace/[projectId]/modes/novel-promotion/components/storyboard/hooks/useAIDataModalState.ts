@@ -16,6 +16,7 @@ interface UseAIDataModalStateParams {
   initialCameraMove: string | null
   initialDescription: string | null
   initialVideoPrompt: string | null
+  initialFirstFrameImagePrompt: string | null
   initialPhotographyRules: PhotographyRules | null
   initialActingNotes: ActingNotes | ActingCharacter[] | null
 }
@@ -25,6 +26,7 @@ export type DirtyField =
   | 'cameraMove'
   | 'description'
   | 'videoPrompt'
+  | 'firstFrameImagePrompt'
   | 'photographyRules'
   | 'actingNotes'
 
@@ -33,6 +35,7 @@ export interface AIDataModalDraftState {
   cameraMove: string
   description: string
   videoPrompt: string
+  firstFrameImagePrompt: string
   photographyRules: PhotographyRules | null
   actingNotes: ActingCharacter[]
 }
@@ -45,7 +48,14 @@ function clonePhotographyRules(rules: PhotographyRules | null): PhotographyRules
   if (!rules) return null
   return {
     ...rules,
+    scene_summary: rules.scene_summary || '',
     lighting: rules.lighting ? { ...rules.lighting } : { direction: '', quality: '' },
+    depth_of_field: rules.depth_of_field || '',
+    color_tone: rules.color_tone || '',
+    camera_angle: rules.camera_angle || '',
+    viewpoint_constraint: rules.viewpoint_constraint || '',
+    focus_priority: rules.focus_priority || '',
+    composition_note: rules.composition_note || '',
     characters: Array.isArray(rules.characters) ? rules.characters.map((character) => ({ ...character })) : [],
   }
 }
@@ -60,6 +70,7 @@ export function createAIDataModalDraftState(params: {
   initialCameraMove: string | null
   initialDescription: string | null
   initialVideoPrompt: string | null
+  initialFirstFrameImagePrompt: string | null
   initialPhotographyRules: PhotographyRules | null
   initialActingNotes: ActingNotes | ActingCharacter[] | null
 }): AIDataModalDraftState {
@@ -68,6 +79,7 @@ export function createAIDataModalDraftState(params: {
     cameraMove: normalizeText(params.initialCameraMove),
     description: normalizeText(params.initialDescription),
     videoPrompt: normalizeText(params.initialVideoPrompt),
+    firstFrameImagePrompt: normalizeText(params.initialFirstFrameImagePrompt),
     photographyRules: clonePhotographyRules(params.initialPhotographyRules),
     actingNotes: normalizeActingNotes(params.initialActingNotes),
   }
@@ -83,6 +95,9 @@ export function mergeAIDataModalDraftStateByDirty(
     cameraMove: dirtyFields.has('cameraMove') ? previous.cameraMove : incoming.cameraMove,
     description: dirtyFields.has('description') ? previous.description : incoming.description,
     videoPrompt: dirtyFields.has('videoPrompt') ? previous.videoPrompt : incoming.videoPrompt,
+    firstFrameImagePrompt: dirtyFields.has('firstFrameImagePrompt')
+      ? previous.firstFrameImagePrompt
+      : incoming.firstFrameImagePrompt,
     photographyRules: dirtyFields.has('photographyRules') ? previous.photographyRules : incoming.photographyRules,
     actingNotes: dirtyFields.has('actingNotes') ? previous.actingNotes : incoming.actingNotes,
   }
@@ -95,6 +110,7 @@ export function useAIDataModalState({
   initialCameraMove,
   initialDescription,
   initialVideoPrompt,
+  initialFirstFrameImagePrompt,
   initialPhotographyRules,
   initialActingNotes,
 }: UseAIDataModalStateParams) {
@@ -103,6 +119,7 @@ export function useAIDataModalState({
     initialCameraMove,
     initialDescription,
     initialVideoPrompt,
+    initialFirstFrameImagePrompt,
     initialPhotographyRules,
     initialActingNotes,
   })
@@ -110,6 +127,7 @@ export function useAIDataModalState({
   const [cameraMove, setCameraMoveState] = useState(initialDraftState.cameraMove)
   const [description, setDescriptionState] = useState(initialDraftState.description)
   const [videoPrompt, setVideoPromptState] = useState(initialDraftState.videoPrompt)
+  const [firstFrameImagePrompt, setFirstFrameImagePromptState] = useState(initialDraftState.firstFrameImagePrompt)
   const [photographyRules, setPhotographyRulesState] = useState<PhotographyRules | null>(initialDraftState.photographyRules)
   const [actingNotes, setActingNotesState] = useState<ActingCharacter[]>(initialDraftState.actingNotes)
   const [dirtyFields, setDirtyFields] = useState<Set<DirtyField>>(new Set())
@@ -123,10 +141,11 @@ export function useAIDataModalState({
       cameraMove,
       description,
       videoPrompt,
+      firstFrameImagePrompt,
       photographyRules,
       actingNotes,
     }
-  }, [actingNotes, cameraMove, description, photographyRules, shotType, videoPrompt])
+  }, [actingNotes, cameraMove, description, firstFrameImagePrompt, photographyRules, shotType, videoPrompt])
 
   const hydrateFromInitial = useCallback(() => {
     const nextDraft = createAIDataModalDraftState({
@@ -134,6 +153,7 @@ export function useAIDataModalState({
       initialCameraMove,
       initialDescription,
       initialVideoPrompt,
+      initialFirstFrameImagePrompt,
       initialPhotographyRules,
       initialActingNotes,
     })
@@ -142,6 +162,7 @@ export function useAIDataModalState({
     setCameraMoveState(nextDraft.cameraMove)
     setDescriptionState(nextDraft.description)
     setVideoPromptState(nextDraft.videoPrompt)
+    setFirstFrameImagePromptState(nextDraft.firstFrameImagePrompt)
     setPhotographyRulesState(nextDraft.photographyRules)
     setActingNotesState(nextDraft.actingNotes)
     setDirtyFields(new Set())
@@ -149,6 +170,7 @@ export function useAIDataModalState({
     initialActingNotes,
     initialCameraMove,
     initialDescription,
+    initialFirstFrameImagePrompt,
     initialPhotographyRules,
     initialShotType,
     initialVideoPrompt,
@@ -174,6 +196,7 @@ export function useAIDataModalState({
       initialCameraMove,
       initialDescription,
       initialVideoPrompt,
+      initialFirstFrameImagePrompt,
       initialPhotographyRules,
       initialActingNotes,
     })
@@ -188,6 +211,7 @@ export function useAIDataModalState({
     setCameraMoveState(mergedDraft.cameraMove)
     setDescriptionState(mergedDraft.description)
     setVideoPromptState(mergedDraft.videoPrompt)
+    setFirstFrameImagePromptState(mergedDraft.firstFrameImagePrompt)
     setPhotographyRulesState(mergedDraft.photographyRules)
     setActingNotesState(mergedDraft.actingNotes)
   }, [
@@ -196,6 +220,7 @@ export function useAIDataModalState({
     initialActingNotes,
     initialCameraMove,
     initialDescription,
+    initialFirstFrameImagePrompt,
     initialPhotographyRules,
     initialShotType,
     initialVideoPrompt,
@@ -231,6 +256,11 @@ export function useAIDataModalState({
     setVideoPromptState(value)
   }, [markDirty])
 
+  const setFirstFrameImagePrompt = useCallback((value: string) => {
+    markDirty('firstFrameImagePrompt')
+    setFirstFrameImagePromptState(value)
+  }, [markDirty])
+
   const updatePhotographyField = (path: string, value: string) => {
     if (!photographyRules) return
     const nextRules = clonePhotographyRules(photographyRules)
@@ -239,7 +269,15 @@ export function useAIDataModalState({
 
     if (parts.length === 1) {
       const field = parts[0]
-      if (field === 'scene_summary' || field === 'depth_of_field' || field === 'color_tone') {
+      if (
+        field === 'scene_summary'
+        || field === 'depth_of_field'
+        || field === 'color_tone'
+        || field === 'camera_angle'
+        || field === 'viewpoint_constraint'
+        || field === 'focus_priority'
+        || field === 'composition_note'
+      ) {
         nextRules[field] = value
       }
     } else if (parts.length === 2) {
@@ -275,9 +313,10 @@ export function useAIDataModalState({
     cameraMove: cameraMove || null,
     description: description || null,
     videoPrompt: videoPrompt || null,
+    firstFrameImagePrompt: firstFrameImagePrompt || null,
     photographyRules,
     actingNotes: actingNotes.length > 0 ? actingNotes : null,
-  }), [actingNotes, cameraMove, description, photographyRules, shotType, videoPrompt])
+  }), [actingNotes, cameraMove, description, firstFrameImagePrompt, photographyRules, shotType, videoPrompt])
 
   return {
     shotType,
@@ -288,6 +327,8 @@ export function useAIDataModalState({
     setDescription,
     videoPrompt,
     setVideoPrompt,
+    firstFrameImagePrompt,
+    setFirstFrameImagePrompt,
     photographyRules,
     actingNotes,
     updatePhotographyField,

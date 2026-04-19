@@ -77,6 +77,7 @@ type NovelPromotionAssetData = {
 
 export type StoryboardPanel = JsonRecord & {
     panel_number?: number
+    shot_purpose?: string
     description?: string
     location?: string
     source_text?: string
@@ -87,6 +88,8 @@ export type StoryboardPanel = JsonRecord & {
     shot_type?: string
     camera_move?: string
     video_prompt?: string
+    first_frame_image_prompt?: string
+    duration_base?: number
     duration?: number
     photographyPlan?: JsonRecord
     actingNotes?: unknown
@@ -111,6 +114,10 @@ export type PhotographyRule = JsonRecord & {
     color_palette?: string
     atmosphere?: string
     technical_notes?: string
+    camera_angle?: string
+    viewpoint_constraint?: string
+    focus_priority?: string
+    composition_note?: string
 }
 
 export type ActingDirection = JsonRecord & {
@@ -251,6 +258,76 @@ function parseJsonResponse<T extends JsonRecord>(responseText: string, clipId: s
     }
 
     return normalized
+}
+
+function buildPhase3PanelsInput(
+    planPanels: StoryboardPanel[],
+    photographyRules: PhotographyRule[],
+    actingDirections: ActingDirection[],
+): Array<StoryboardPanel & { photography_rules: PhotographyRule; acting_notes: ActingDirection }> {
+    return planPanels.map((panel, index) => {
+        const matchedRule = photographyRules.find((rule) => rule.panel_number === panel.panel_number) || photographyRules[index]
+        const matchedActing = actingDirections.find((item) => item.panel_number === panel.panel_number) || actingDirections[index]
+        if (!matchedRule) {
+            throw new Error(`Phase 3: 缺少摄影规则 panel_number=${String(panel.panel_number)} index=${index}`)
+        }
+        if (!matchedActing) {
+            throw new Error(`Phase 3: 缺少演技指导 panel_number=${String(panel.panel_number)} index=${index}`)
+        }
+        return {
+            ...panel,
+            ...matchedRule,
+            characters: panel.characters,
+            photography_rules: matchedRule,
+            acting_notes: matchedActing,
+        }
+    })
+}
+
+function findPanelByNumberOrIndex<T extends { panel_number?: number }>(
+    rows: T[],
+    panelNumber: number | undefined,
+    index: number,
+): T | undefined {
+    if (typeof panelNumber === 'number') {
+        const byNumber = rows.find((row) => row.panel_number === panelNumber)
+        if (byNumber) return byNumber
+    }
+    return rows[index]
+}
+
+function reconcilePhase3Panels(
+    phase3Panels: StoryboardPanel[],
+    planPanels: StoryboardPanel[],
+    photographyRules: PhotographyRule[],
+    actingDirections: ActingDirection[],
+): StoryboardPanel[] {
+    return planPanels.map((planPanel, index) => {
+        const rawPhase3 = findPanelByNumberOrIndex(phase3Panels, planPanel.panel_number, index)
+        const matchedRule = findPanelByNumberOrIndex(photographyRules, planPanel.panel_number, index)
+        const matchedActing = findPanelByNumberOrIndex(actingDirections, planPanel.panel_number, index)
+        if (!matchedRule) {
+            throw new Error(`Phase 3: 缺少摄影规则 panel_number=${String(planPanel.panel_number)} index=${index}`)
+        }
+        if (!matchedActing) {
+            throw new Error(`Phase 3: 缺少演技指导 panel_number=${String(planPanel.panel_number)} index=${index}`)
+        }
+        const merged = {
+            ...planPanel,
+            ...matchedRule,
+            characters: planPanel.characters,
+            ...(rawPhase3 || {}),
+            photography_rules: matchedRule,
+            acting_notes: matchedActing,
+        } as StoryboardPanel
+        if (merged.duration_base == null && planPanel.duration_base != null) {
+            merged.duration_base = planPanel.duration_base
+        }
+        if (merged.duration == null && typeof merged.duration_base === 'number') {
+            merged.duration = merged.duration_base
+        }
+        return merged
+    })
 }
 
 // ========== Phase 1: 基础分镜规划 ==========
@@ -589,6 +666,7 @@ export async function executePhase3(
     clip: ClipAsset,
     planPanels: StoryboardPanel[],
     photographyRules: PhotographyRule[],
+    actingDirections: ActingDirection[],
     novelPromotionData: NovelPromotionAssetData,
     session: SessionAsset,
     projectId: string,
@@ -623,9 +701,11 @@ export async function executePhase3(
         clipProps,
     })).propsDescriptionText
 
+    const mergedPanelsForPhase3 = buildPhase3PanelsInput(planPanels, photographyRules, actingDirections)
+
     // 构建提示词
     const detailPrompt = detailPromptTemplate
-        .replace('{panels_json}', JSON.stringify(planPanels, null, 2))
+        .replace('{panels_json}', JSON.stringify(mergedPanelsForPhase3, null, 2))
         .replace('{characters_age_gender}', filteredFullDescription)  // 改用完整描述
         .replace('{locations_description}', filteredLocationsDescription)
         .replace('{props_description}', filteredPropsDescription)
@@ -637,7 +717,6 @@ export async function executePhase3(
         model: novelPromotionData.analysisModel
     })
 
-    void photographyRules
     let finalPanels: StoryboardPanel[] = []
 
     // 失败后重试一次
@@ -663,7 +742,8 @@ export async function executePhase3(
                 throw new Error(`Phase 3: 无响应 clip ${clipId}`)
             }
 
-            finalPanels = parseJsonResponse<StoryboardPanel>(detailResponseText, clipId, 3)
+            const rawPanels = parseJsonResponse<StoryboardPanel>(detailResponseText, clipId, 3)
+            finalPanels = reconcilePhase3Panels(rawPanels, planPanels, photographyRules, actingDirections)
 
             // 记录第三阶段完整输出（过滤前）
             logAIAnalysis(session.user.id, session.user.name, projectId, projectName, {
