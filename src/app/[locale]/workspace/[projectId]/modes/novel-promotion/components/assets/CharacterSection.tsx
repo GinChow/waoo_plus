@@ -49,6 +49,8 @@ interface CharacterSectionProps {
     onVoiceDesign: (characterId: string, characterName: string) => void
     onVoiceSelectFromHub: (characterId: string) => void  // 🆕 从资产中心选择音色
     onCopyFromGlobal: (characterId: string) => void  // 🆕 从资产中心复制
+    onUploadToGlobal?: (characterId: string) => void  // 🆕 上传到资产中心
+    uploadingCharacterId?: string | null
     // 辅助函数
     getAppearances: (character: Character) => CharacterAppearance[]
     /** 分集筛选：仅显示指定 ID 的角色，null 表示显示全部 */
@@ -91,6 +93,8 @@ export default function CharacterSection({
     onVoiceDesign,
     onVoiceSelectFromHub,
     onCopyFromGlobal,
+    onUploadToGlobal,
+    uploadingCharacterId = null,
     getAppearances,
     filterIds = null,
     // 🔥 V7：待确认角色
@@ -296,6 +300,16 @@ export default function CharacterSection({
                                         <AppIcon name="arrowDownCircle" className="w-4 h-4" />
                                         {t("character.copyFromGlobal")}
                                     </button>
+                                    {onUploadToGlobal && (
+                                        <button
+                                            onClick={() => onUploadToGlobal(character.id)}
+                                            disabled={uploadingCharacterId === character.id}
+                                            className="text-xs text-[var(--glass-tone-success-fg)] hover:text-[var(--glass-tone-success-fg)] flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--glass-tone-success-bg)] transition-colors disabled:opacity-60"
+                                        >
+                                            <AppIcon name="upload" className="w-4 h-4" />
+                                            {uploadingCharacterId === character.id ? t('common.loading') : t('character.uploadToGlobal')}
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => onDeleteCharacter(character.id)}
                                         className="text-xs text-[var(--glass-tone-danger-fg)] hover:text-[var(--glass-tone-danger-fg)] flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--glass-tone-danger-bg)] transition-colors"

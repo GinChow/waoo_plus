@@ -721,8 +721,6 @@ export async function runScriptToStoryboardAtomicRetry(params: {
       }
       return {
         ...panel,
-        ...matchedRule,
-        characters: panel.characters,
         photography_rules: matchedRule,
         acting_notes: matchedActing,
       }

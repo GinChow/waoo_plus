@@ -109,6 +109,7 @@ export {
     useCreateProjectCharacterAppearance,
     useAnalyzeProjectGlobalAssets,
     useCopyProjectAssetFromGlobal,
+    useUploadProjectAssetToGlobal,
     useAiModifyProjectShotPrompt,
     useUpdateProjectConfig,
     useUpdateProjectEpisodeField,

@@ -15,7 +15,11 @@ import { PRIMARY_APPEARANCE_INDEX, isArtStyleValue, removeLocationPromptSuffix, 
 import { decodeImageUrlsFromDb, encodeImageUrls } from '@/lib/contracts/image-urls-contract'
 import { deleteObject } from '@/lib/storage'
 import { resolveStorageKeyFromMediaValue } from '@/lib/media/service'
-import { createProjectCharacterLabeledCopies, createProjectLocationLabeledCopies } from '@/lib/image-label'
+import {
+  createProjectCharacterLabeledCopies,
+  createProjectLocationLabeledCopies,
+  createUnlabeledCopyForGlobalUpload,
+} from '@/lib/image-label'
 import type { AssetKind, AssetScope } from '@/lib/assets/contracts'
 import {
   normalizeLocationAvailableSlots,
@@ -68,6 +72,15 @@ type AssetCopyInput = {
   kind: AssetKind
   targetId: string
   globalAssetId: string
+  access: {
+    userId: string
+    projectId: string
+  }
+}
+
+type AssetUploadToGlobalInput = {
+  kind: Extract<AssetKind, 'character' | 'location'>
+  targetId: string
   access: {
     userId: string
     projectId: string
@@ -807,6 +820,190 @@ export async function copyAssetFromGlobal(input: AssetCopyInput) {
     return copyVoiceFromGlobal(input)
   }
   throw new ApiError('INVALID_PARAMS')
+}
+
+export async function uploadProjectAssetToGlobal(input: AssetUploadToGlobalInput) {
+  if (input.kind === 'character') {
+    return uploadProjectCharacterToGlobal(input)
+  }
+  return uploadProjectLocationToGlobal(input)
+}
+
+async function uploadProjectCharacterToGlobal(input: AssetUploadToGlobalInput) {
+  const projectCharacter = await prisma.novelPromotionCharacter.findFirst({
+    where: {
+      id: input.targetId,
+      novelPromotionProject: {
+        projectId: input.access.projectId,
+      },
+    },
+    include: {
+      appearances: {
+        orderBy: { appearanceIndex: 'asc' },
+      },
+    },
+  })
+
+  if (!projectCharacter) {
+    throw new ApiError('NOT_FOUND')
+  }
+
+  const appearancesWithImage = projectCharacter.appearances.filter((appearance) => {
+    const imageUrls = decodeImageUrlsFromDb(appearance.imageUrls, 'characterAppearance.imageUrls')
+    return !!appearance.imageUrl || imageUrls.some((url) => url.trim().length > 0)
+  })
+
+  if (appearancesWithImage.length === 0) {
+    throw new ApiError('INVALID_PARAMS', {
+      code: 'ASSET_NO_RENDER',
+      message: 'Character has no generated images',
+    })
+  }
+
+  const createdCharacter = await prisma.globalCharacter.create({
+    data: {
+      userId: input.access.userId,
+      name: projectCharacter.name,
+      aliases: projectCharacter.aliases,
+      profileData: projectCharacter.profileData,
+      profileConfirmed: projectCharacter.profileConfirmed,
+      voiceId: projectCharacter.voiceId,
+      voiceType: projectCharacter.voiceType,
+      customVoiceUrl: projectCharacter.customVoiceUrl,
+      customVoiceMediaId: projectCharacter.customVoiceMediaId,
+    },
+  })
+
+  const normalizedImageCache = new Map<string, Promise<string>>()
+  const normalizeForGlobalUpload = async (value: string | null | undefined): Promise<string | null> => {
+    const source = typeof value === 'string' ? value.trim() : ''
+    if (!source) return null
+    const cached = normalizedImageCache.get(source)
+    if (cached) return cached
+    const pending = createUnlabeledCopyForGlobalUpload(source)
+    normalizedImageCache.set(source, pending)
+    return pending
+  }
+
+  for (const appearance of appearancesWithImage) {
+    const normalizedImageUrls = await Promise.all(
+      decodeImageUrlsFromDb(appearance.imageUrls, 'characterAppearance.imageUrls')
+        .map((url) => url.trim())
+        .filter((url) => url.length > 0)
+        .map(async (url) => (await normalizeForGlobalUpload(url)) || url),
+    )
+    const normalizedMainImageUrl = await normalizeForGlobalUpload(appearance.imageUrl)
+    const selectedIndex = appearance.selectedIndex !== null
+      && appearance.selectedIndex !== undefined
+      && normalizedImageUrls[appearance.selectedIndex]
+      ? appearance.selectedIndex
+      : null
+    const resolvedImageUrl = normalizedMainImageUrl
+      || (selectedIndex !== null ? normalizedImageUrls[selectedIndex] : null)
+      || normalizedImageUrls[0]
+      || null
+
+    await prisma.globalCharacterAppearance.create({
+      data: {
+        characterId: createdCharacter.id,
+        appearanceIndex: appearance.appearanceIndex,
+        changeReason: appearance.changeReason || 'default',
+        description: appearance.description,
+        descriptions: appearance.descriptions,
+        imageUrl: resolvedImageUrl,
+        imageMediaId: resolvedImageUrl && resolvedImageUrl === appearance.imageUrl ? appearance.imageMediaId : null,
+        imageUrls: encodeImageUrls(normalizedImageUrls),
+        previousImageUrl: null,
+        previousImageUrls: encodeImageUrls([]),
+        previousDescription: null,
+        previousDescriptions: null,
+        selectedIndex,
+      },
+    })
+  }
+
+  return {
+    success: true,
+    kind: 'character' as const,
+    globalAssetId: createdCharacter.id,
+  }
+}
+
+async function uploadProjectLocationToGlobal(input: AssetUploadToGlobalInput) {
+  const projectLocation = await prisma.novelPromotionLocation.findFirst({
+    where: {
+      id: input.targetId,
+      assetKind: 'location',
+      novelPromotionProject: {
+        projectId: input.access.projectId,
+      },
+    },
+    include: {
+      images: {
+        orderBy: { imageIndex: 'asc' },
+      },
+    },
+  })
+
+  if (!projectLocation) {
+    throw new ApiError('NOT_FOUND')
+  }
+
+  const imagesWithOutput = projectLocation.images
+    .filter((image) => !!image.imageUrl)
+    .sort((left, right) => left.imageIndex - right.imageIndex)
+
+  if (imagesWithOutput.length === 0) {
+    throw new ApiError('INVALID_PARAMS', {
+      code: 'ASSET_NO_RENDER',
+      message: 'Location has no generated images',
+    })
+  }
+
+  const selectedSource = projectLocation.selectedImageId
+    ? imagesWithOutput.find((image) => image.id === projectLocation.selectedImageId)
+    : imagesWithOutput[0]
+
+  const createdLocation = await prisma.globalLocation.create({
+    data: {
+      userId: input.access.userId,
+      name: projectLocation.name,
+      summary: projectLocation.summary,
+      assetKind: 'location',
+    },
+  })
+
+  const normalizedImageCache = new Map<string, Promise<string>>()
+  const normalizeForGlobalUpload = async (value: string | null | undefined): Promise<string | null> => {
+    const source = typeof value === 'string' ? value.trim() : ''
+    if (!source) return null
+    const cached = normalizedImageCache.get(source)
+    if (cached) return cached
+    const pending = createUnlabeledCopyForGlobalUpload(source)
+    normalizedImageCache.set(source, pending)
+    return pending
+  }
+
+  for (const image of imagesWithOutput) {
+    const normalizedImageUrl = await normalizeForGlobalUpload(image.imageUrl)
+    await prisma.globalLocationImage.create({
+      data: {
+        locationId: createdLocation.id,
+        imageIndex: image.imageIndex,
+        description: image.description,
+        availableSlots: image.availableSlots,
+        imageUrl: normalizedImageUrl || image.imageUrl,
+        imageMediaId: normalizedImageUrl && normalizedImageUrl === image.imageUrl ? image.imageMediaId : null,
+        isSelected: selectedSource?.id === image.id,
+      },
+    })
+  }
+
+  return {
+    success: true,
+    kind: 'location' as const,
+    globalAssetId: createdLocation.id,
+  }
 }
 
 async function copyCharacterFromGlobal(input: AssetCopyInput) {

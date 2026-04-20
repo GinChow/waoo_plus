@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { isAbortError } from '@/lib/error-utils'
-import { useCopyProjectAssetFromGlobal } from '@/lib/query/hooks'
+import { useCopyProjectAssetFromGlobal, useUploadProjectAssetToGlobal } from '@/lib/query/hooks'
 
 type ToastType = 'success' | 'warning' | 'error'
 
@@ -25,8 +25,10 @@ const getErrorMessage = (error: unknown) => error instanceof Error ? error.messa
 export function useAssetsCopyFromHub({ projectId, onRefresh, showToast }: UseAssetsCopyFromHubParams) {
   const t = useTranslations('assets')
   const copyFromGlobalAsset = useCopyProjectAssetFromGlobal(projectId)
+  const uploadToGlobalAsset = useUploadProjectAssetToGlobal(projectId)
   const [copyFromGlobalTarget, setCopyFromGlobalTarget] = useState<GlobalCopyTarget | null>(null)
   const [isGlobalCopyInFlight, setIsGlobalCopyInFlight] = useState(false)
+  const [uploadingToGlobalTarget, setUploadingToGlobalTarget] = useState<GlobalCopyTarget | null>(null)
 
   const handleCopyFromGlobal = useCallback((characterId: string) => {
     setCopyFromGlobalTarget({ type: 'character', targetId: characterId })
@@ -47,6 +49,40 @@ export function useAssetsCopyFromHub({ projectId, onRefresh, showToast }: UseAss
   const handleCloseCopyPicker = useCallback(() => {
     setCopyFromGlobalTarget(null)
   }, [])
+
+  const handleUploadCharacterToGlobal = useCallback(async (characterId: string) => {
+    setUploadingToGlobalTarget({ type: 'character', targetId: characterId })
+    try {
+      await uploadToGlobalAsset.mutateAsync({
+        type: 'character',
+        targetId: characterId,
+      })
+      showToast(t('assetLibrary.uploadSuccessCharacter'), 'success')
+    } catch (error: unknown) {
+      if (!isAbortError(error)) {
+        showToast(t('assetLibrary.uploadFailed', { error: getErrorMessage(error) }), 'error')
+      }
+    } finally {
+      setUploadingToGlobalTarget(null)
+    }
+  }, [showToast, t, uploadToGlobalAsset])
+
+  const handleUploadLocationToGlobal = useCallback(async (locationId: string) => {
+    setUploadingToGlobalTarget({ type: 'location', targetId: locationId })
+    try {
+      await uploadToGlobalAsset.mutateAsync({
+        type: 'location',
+        targetId: locationId,
+      })
+      showToast(t('assetLibrary.uploadSuccessLocation'), 'success')
+    } catch (error: unknown) {
+      if (!isAbortError(error)) {
+        showToast(t('assetLibrary.uploadFailed', { error: getErrorMessage(error) }), 'error')
+      }
+    } finally {
+      setUploadingToGlobalTarget(null)
+    }
+  }, [showToast, t, uploadToGlobalAsset])
 
   const handleConfirmCopyFromGlobal = useCallback(async (globalAssetId: string) => {
     if (!copyFromGlobalTarget) return
@@ -81,9 +117,13 @@ export function useAssetsCopyFromHub({ projectId, onRefresh, showToast }: UseAss
   return {
     copyFromGlobalTarget,
     isGlobalCopyInFlight,
+    isGlobalUploadInFlight: uploadToGlobalAsset.isPending,
+    uploadingToGlobalTarget,
     handleCopyFromGlobal,
     handleCopyLocationFromGlobal,
     handleCopyPropFromGlobal,
+    handleUploadCharacterToGlobal,
+    handleUploadLocationToGlobal,
     handleVoiceSelectFromHub,
     handleConfirmCopyFromGlobal,
     handleCloseCopyPicker,

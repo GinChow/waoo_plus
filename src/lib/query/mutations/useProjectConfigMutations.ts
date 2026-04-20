@@ -3,6 +3,10 @@ import type { Project } from '@/types/project'
 import { resolveTaskResponse } from '@/lib/task/client'
 import { queryKeys } from '../keys'
 import {
+  invalidateGlobalCharacters,
+  invalidateGlobalLocations,
+} from './asset-hub-mutations-shared'
+import {
   invalidateQueryTemplates,
   requestJsonWithError,
   requestTaskResponseWithError,
@@ -73,6 +77,41 @@ export function useCopyProjectAssetFromGlobal(projectId: string) {
             }, 'Failed to copy from global')
         },
         onSuccess: invalidateProjectAssets,
+    })
+}
+
+/**
+ * 上传项目资产到资产中心
+ */
+
+export function useUploadProjectAssetToGlobal(projectId: string) {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: async ({
+            type,
+            targetId,
+        }: {
+            type: 'character' | 'location'
+            targetId: string
+        }) => {
+            return await requestJsonWithError(`/api/assets/${targetId}/upload-to-global`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    kind: type,
+                    projectId,
+                }),
+            }, 'Failed to upload to global')
+        },
+        onSuccess: (_data, variables) => {
+            if (variables.type === 'character') {
+                void invalidateGlobalCharacters(queryClient)
+            } else {
+                void invalidateGlobalLocations(queryClient)
+            }
+            void invalidateQueryTemplates(queryClient, [queryKeys.assets.all('global')])
+        },
     })
 }
 

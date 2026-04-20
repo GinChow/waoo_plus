@@ -391,8 +391,6 @@ function buildPhase3PanelsInput(params: {
     }
     return {
       ...panel,
-      ...matchedRule,
-      characters: panel.characters,
       photography_rules: matchedRule,
       acting_notes: matchedActing,
     }

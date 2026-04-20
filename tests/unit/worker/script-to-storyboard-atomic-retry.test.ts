@@ -133,7 +133,13 @@ describe('script-to-storyboard atomic retry', () => {
     expect(result.phase2CinematographyByClipId).toEqual({})
     expect(result.phase2ActingByClipId).toEqual({})
     expect(result.phase3PanelsByClipId['clip-1']).toEqual([
-      { panel_number: 1, description: 'phase3-new', location: 'Office', source_text: 'src', characters: [] },
+      expect.objectContaining({
+        panel_number: 1,
+        description: 'phase3-new',
+        location: 'Office',
+        source_text: 'src',
+        characters: [],
+      }),
     ])
     expect(result.clipPanels).toHaveLength(1)
     expect(result.clipPanels[0]?.finalPanels[0]).toEqual(expect.objectContaining({

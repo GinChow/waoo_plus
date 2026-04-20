@@ -15,6 +15,9 @@ function parseStringArray(value: unknown): string[] {
 }
 
 async function resolveAppearanceImageArray(raw: unknown, fieldName: string): Promise<{ urls: string[]; medias: MediaRef[] }> {
+  if ((raw === null || raw === undefined) && fieldName.endsWith('previousImageUrls')) {
+    return { urls: [], medias: [] }
+  }
   const values = decodeImageUrlsFromDb(raw as string | null | undefined, fieldName)
   const refs = await Promise.all(values.map((value) => resolveMediaRefFromLegacyValue(value)))
   return {

@@ -233,9 +233,12 @@ export default function AssetsStage({
   const {
     copyFromGlobalTarget,
     isGlobalCopyInFlight,
+    uploadingToGlobalTarget,
     handleCopyFromGlobal,
     handleCopyLocationFromGlobal,
     handleCopyPropFromGlobal,
+    handleUploadCharacterToGlobal,
+    handleUploadLocationToGlobal,
     handleVoiceSelectFromHub,
     handleConfirmCopyFromGlobal,
     handleCloseCopyPicker,
@@ -452,6 +455,8 @@ export default function AssetsStage({
             onVoiceDesign={handleOpenVoiceDesign}
             onVoiceSelectFromHub={handleVoiceSelectFromHub}
             onCopyFromGlobal={handleCopyFromGlobal}
+            onUploadToGlobal={handleUploadCharacterToGlobal}
+            uploadingCharacterId={uploadingToGlobalTarget?.type === 'character' ? uploadingToGlobalTarget.targetId : null}
             getAppearances={getAppearances}
             filterIds={episodeAssetIds?.charIds ?? null}
             // 🔥 V7：待确认角色档案内嵌到 CharacterSection
@@ -486,6 +491,8 @@ export default function AssetsStage({
             onImageClick={setPreviewImage}
             onImageEdit={(locId, imgIdx) => handleOpenLocationImageEdit(locId, imgIdx, 'location')}
             onCopyFromGlobal={handleCopyLocationFromGlobal}
+            onUploadToGlobal={handleUploadLocationToGlobal}
+            uploadingLocationId={uploadingToGlobalTarget?.type === 'location' ? uploadingToGlobalTarget.targetId : null}
             filterIds={episodeAssetIds?.locIds ?? null}
           />
       )}

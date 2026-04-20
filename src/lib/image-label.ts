@@ -44,6 +44,105 @@ async function createLabeledImageBuffer(sourceBuffer: Buffer, labelText: string)
     .toBuffer()
 }
 
+function detectTopBlackLabelHeight(
+  rgbBuffer: Buffer,
+  width: number,
+  height: number,
+  channels: number,
+): number {
+  if (width <= 0 || height <= 0 || channels < 3) return 0
+
+  const maxRows = Math.min(Math.floor(height * 0.25), 96)
+  const minRows = Math.max(8, Math.floor(height * 0.015))
+  if (maxRows < minRows) return 0
+
+  let barStarted = false
+  let lastBarRow = -1
+  let gapRows = 0
+
+  for (let y = 0; y < maxRows; y += 1) {
+    let darkCount = 0
+    let brightCount = 0
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * channels
+      const r = rgbBuffer[offset] || 0
+      const g = rgbBuffer[offset + 1] || 0
+      const b = rgbBuffer[offset + 2] || 0
+      if (r < 30 && g < 30 && b < 30) darkCount += 1
+      if (r > 220 && g > 220 && b > 220) brightCount += 1
+    }
+
+    const darkRatio = darkCount / width
+    const brightRatio = brightCount / width
+    const isBarRow = darkRatio >= 0.82 || (darkRatio >= 0.72 && brightRatio <= 0.12)
+
+    if (isBarRow) {
+      barStarted = true
+      lastBarRow = y
+      gapRows = 0
+      continue
+    }
+
+    if (!barStarted) break
+    gapRows += 1
+    if (gapRows > 2) break
+  }
+
+  const detectedRows = lastBarRow + 1
+  if (detectedRows < minRows) return 0
+  return detectedRows
+}
+
+async function createUnlabeledImageBuffer(sourceBuffer: Buffer): Promise<Buffer | null> {
+  const meta = await sharp(sourceBuffer).metadata()
+  const width = meta.width || 0
+  const height = meta.height || 0
+  if (width <= 0 || height <= 0) return null
+
+  const probe = await sharp(sourceBuffer)
+    .resize({
+      width: Math.min(256, width),
+      height: Math.min(256, height),
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+
+  const probeBarHeight = detectTopBlackLabelHeight(
+    probe.data,
+    probe.info.width,
+    probe.info.height,
+    probe.info.channels,
+  )
+  if (probeBarHeight <= 0) return null
+
+  const cropTop = Math.round((probeBarHeight / probe.info.height) * height)
+  if (cropTop <= 0 || cropTop >= height - 1) return null
+  if (cropTop > Math.floor(height * 0.25)) return null
+
+  return await sharp(sourceBuffer)
+    .extract({ left: 0, top: cropTop, width, height: height - cropTop })
+    .jpeg({ quality: 92, mozjpeg: true })
+    .toBuffer()
+}
+
+export async function createUnlabeledCopyForGlobalUpload(imageUrl: string): Promise<string> {
+  try {
+    const sourceBuffer = await downloadImageBuffer(imageUrl)
+    const unlabeledBuffer = await createUnlabeledImageBuffer(sourceBuffer)
+    if (!unlabeledBuffer) return imageUrl
+
+    const newKey = generateUniqueKey('global-upload-origin', 'jpg')
+    await uploadObject(unlabeledBuffer, newKey)
+    return newKey
+  } catch (error) {
+    _ulogError('Failed to create unlabeled copy for global upload:', error)
+    return imageUrl
+  }
+}
+
 export async function updateImageLabel(
   imageUrl: string,
   newLabelText: string,
@@ -105,7 +204,8 @@ export async function createProjectCharacterLabeledCopies(
           if (!imageUrl) return ''
           try {
             const sourceBuffer = await downloadImageBuffer(imageUrl)
-            const processed = await createLabeledImageBuffer(sourceBuffer, labelText)
+            const normalizedBuffer = await createUnlabeledImageBuffer(sourceBuffer)
+            const processed = await createLabeledImageBuffer(normalizedBuffer || sourceBuffer, labelText)
             const newKey = generateUniqueKey('project-char-copy', 'jpg')
             await uploadObject(processed, newKey)
             return newKey
@@ -143,7 +243,8 @@ export async function createProjectLocationLabeledCopies(
 
     try {
       const sourceBuffer = await downloadImageBuffer(image.imageUrl)
-      const processed = await createLabeledImageBuffer(sourceBuffer, locationName)
+      const normalizedBuffer = await createUnlabeledImageBuffer(sourceBuffer)
+      const processed = await createLabeledImageBuffer(normalizedBuffer || sourceBuffer, locationName)
       const newKey = generateUniqueKey('project-location-copy', 'jpg')
       await uploadObject(processed, newKey)
       results.push({ imageUrl: newKey })

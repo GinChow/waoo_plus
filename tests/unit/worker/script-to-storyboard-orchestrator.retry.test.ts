@@ -403,4 +403,116 @@ describe('script-to-storyboard orchestrator retry', () => {
     expect(clip2Phase2Started).toBe(true)
     expect(clip1Phase1ResolvedAfterClip2Phase2).toBe(true)
   })
+
+  it('builds phase3 input without duplicating cinematography fields at top level', async () => {
+    let capturedPhase3Prompt = ''
+    const runStep = vi.fn(async (_meta, prompt, action: string) => {
+      if (action === 'storyboard_phase1_plan') {
+        return {
+          text: JSON.stringify([{
+            panel_number: 2,
+            shot_purpose: 'action_progress',
+            scene_type: 'action',
+            description: '樵夫失足坠落',
+            source_text: '樵夫脚下一空跌落',
+            location: '山林竹箐边_清晨浓雾',
+            characters: [{ name: '樵夫', appearance: '初始形象' }],
+            duration_base: 2,
+          }]),
+          reasoning: '',
+        }
+      }
+      if (action === 'storyboard_phase2_cinematography') {
+        return {
+          text: JSON.stringify([{
+            panel_number: 2,
+            lighting: {
+              quality: '柔和漫射光',
+              direction: '前侧散射光',
+            },
+            color_tone: '冷色调',
+            camera_angle: '轻微高机位',
+            depth_of_field: '中等景深',
+            focus_priority: '樵夫失足下坠',
+            composition_note: '强调坠落方向',
+            viewpoint_constraint: '客观观察',
+            characters: [{
+              name: '樵夫',
+              facing: '朝前下方',
+              posture: '身体失衡下坠',
+              screen_position: '画面中部',
+            }],
+          }]),
+          reasoning: '',
+        }
+      }
+      if (action === 'storyboard_phase2_acting') {
+        return {
+          text: JSON.stringify([{
+            panel_number: 2,
+            characters: [{
+              name: '樵夫',
+              acting: '瞳孔收紧，四肢乱抓',
+            }],
+          }]),
+          reasoning: '',
+        }
+      }
+      if (action === 'storyboard_phase3_detail') {
+        capturedPhase3Prompt = prompt
+        return {
+          text: JSON.stringify([{
+            panel_number: 2,
+            shot_purpose: 'action_progress',
+            scene_type: 'action',
+            description: '樵夫失足坠落',
+            source_text: '樵夫脚下一空跌落',
+            location: '山林竹箐边_清晨浓雾',
+            characters: [{ name: '樵夫', appearance: '初始形象' }],
+            duration_base: 2,
+          }]),
+          reasoning: '',
+        }
+      }
+      throw new Error(`unexpected action: ${action}`)
+    })
+
+    await runScriptToStoryboardOrchestrator({
+      clips: [
+        {
+          id: 'clip-1',
+          content: '走到竹箐边，脚下一空，整个人摔了下去。',
+          characters: JSON.stringify([{ name: '樵夫' }]),
+          location: '山林竹箐边_清晨浓雾',
+          screenplay: null,
+        },
+      ],
+      novelPromotionData: {
+        characters: [{ name: '樵夫', appearances: [] }],
+        locations: [{ name: '山林竹箐边_清晨浓雾', images: [] }],
+      },
+      promptTemplates: {
+        phase1PlanTemplate: '{clip_content}',
+        phase2CinematographyTemplate: '{panels_json}',
+        phase2ActingTemplate: '{panels_json}',
+        phase3DetailTemplate: '{panels_json}',
+      },
+      runStep,
+    })
+
+    expect(capturedPhase3Prompt).toBeTruthy()
+    const phase3Panels = JSON.parse(capturedPhase3Prompt) as Array<Record<string, unknown>>
+    expect(Array.isArray(phase3Panels)).toBe(true)
+    expect(phase3Panels).toHaveLength(1)
+    const panel = phase3Panels[0]
+    expect(panel.photography_rules).toBeTruthy()
+    expect(panel.acting_notes).toBeTruthy()
+    expect(panel.lighting).toBeUndefined()
+    expect(panel.color_tone).toBeUndefined()
+    expect(panel.camera_angle).toBeUndefined()
+    expect(panel.depth_of_field).toBeUndefined()
+    expect(panel.focus_priority).toBeUndefined()
+    expect(panel.composition_note).toBeUndefined()
+    expect(panel.viewpoint_constraint).toBeUndefined()
+  })
 })

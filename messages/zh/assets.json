@@ -58,7 +58,8 @@
         "characterCount": "{count} 个角色",
         "updateFailed": "更新描述失败",
         "addFailed": "添加角色失败",
-        "copyFromGlobal": "从资产中心导入"
+        "copyFromGlobal": "从资产中心导入",
+        "uploadToGlobal": "上传到资产中心"
     },
     "location": {
         "add": "添加场景",
@@ -73,7 +74,8 @@
         "generateImage": "生成图片",
         "regenerateImage": "重新生成",
         "updateFailed": "更新描述失败",
-        "addFailed": "添加场景失败"
+        "addFailed": "添加场景失败",
+        "uploadToGlobal": "上传到资产中心"
     },
     "prop": {
         "add": "添加道具",
@@ -291,6 +293,9 @@
         "copySuccessProp": "道具图片复制成功",
         "copySuccessVoice": "音色复制成功",
         "copyFailed": "复制失败: {error}",
+        "uploadSuccessCharacter": "角色已上传到资产中心",
+        "uploadSuccessLocation": "场景已上传到资产中心",
+        "uploadFailed": "上传到资产中心失败: {error}",
         "downloadEmpty": "当前没有可下载的图片资产",
         "downloadFailed": "打包下载失败"
     },

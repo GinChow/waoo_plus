@@ -36,6 +36,8 @@ interface LocationCardProps {
   onSelectImage?: (locationId: string, imageIndex: number | null) => void
   onImageEdit?: (locationId: string, imageIndex: number) => void  // 新增：图片编辑
   onCopyFromGlobal?: () => void
+  onUploadToGlobal?: () => void
+  isUploadingToGlobal?: boolean
   activeTaskKeys?: Set<string>
   onClearTaskKey?: (key: string) => void
   projectId: string
@@ -54,6 +56,8 @@ export default function LocationCard({
   onSelectImage,
   onImageEdit,
   onCopyFromGlobal,
+  onUploadToGlobal,
+  isUploadingToGlobal = false,
   activeTaskKeys = new Set(),
   projectId,
   onConfirmSelection
@@ -224,6 +228,16 @@ export default function LocationCard({
             <AppIcon name="undo" className="w-4 h-4 text-[var(--glass-tone-warning-fg)]" />
           </button>
         )}
+        {onUploadToGlobal && (
+          <button
+            onClick={onUploadToGlobal}
+            disabled={isUploadingToGlobal}
+            className="w-6 h-6 rounded hover:bg-[var(--glass-tone-success-bg)] flex items-center justify-center transition-colors disabled:opacity-50"
+            title={t('location.uploadToGlobal')}
+          >
+            <AppIcon name="upload" className="w-4 h-4 text-[var(--glass-tone-success-fg)]" />
+          </button>
+        )}
         <button
           onClick={onDelete}
           className="w-6 h-6 rounded hover:bg-[var(--glass-tone-danger-bg)] flex items-center justify-center transition-colors"
@@ -345,6 +359,16 @@ export default function LocationCard({
           title={t('character.copyFromGlobal')}
         >
           <AppIcon name="arrowDownCircle" className="w-3.5 h-3.5 text-[var(--glass-tone-info-fg)]" />
+        </button>
+      )}
+      {onUploadToGlobal && (
+          <button
+            onClick={onUploadToGlobal}
+            disabled={isUploadingToGlobal}
+          className="flex-shrink-0 w-5 h-5 rounded hover:bg-[var(--glass-tone-success-bg)] flex items-center justify-center transition-colors disabled:opacity-50"
+          title={t('location.uploadToGlobal')}
+        >
+          <AppIcon name="upload" className="w-3.5 h-3.5 text-[var(--glass-tone-success-fg)]" />
         </button>
       )}
         <button
