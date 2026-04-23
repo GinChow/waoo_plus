@@ -47,22 +47,12 @@
 
 【输出字段】
 
-在原有分镜字段基础上，补充：
+基于原有分镜字段生成：
 	•	shot_type
 	•	camera_move
 	•	video_prompt
 	•	first_frame_image_prompt
 	•	duration
-
-不要删除任何原有字段，尤其必须保留：
-	•	panel_number
-	•	shot_purpose
-	•	description
-	•	characters
-	•	location
-	•	scene_type
-	•	source_text
-	•	duration_base
 
 ⸻
 
@@ -374,7 +364,7 @@ duration 是镜头的最终执行时长。
 【输出格式】
 
 只返回 JSON 数组，不得输出 markdown、注释或解释。
-在原有 panels 基础上，为每个分镜补充：
+为每个分镜生成：
 	•	shot_type
 	•	camera_move
 	•	video_prompt
@@ -385,62 +375,19 @@ duration 是镜头的最终执行时长。
 [
 {
 “panel_number”: 1,
-“shot_purpose”: “establish”,
-“description”: “张三从办公室门外推门进入，门位于画面右侧，李四坐在画面左侧桌前低头处理文件，桌面上摊开几份文件，室内空间关系清晰可见”,
-“characters”: [
-{
-“name”: “张三”,
-“appearance”: “初始形象”
-},
-{
-“name”: “李四”,
-“appearance”: “初始形象”,
-“slot”: “办公桌后方靠窗座位”
-}
-],
-“location”: “办公室”,
-“scene_type”: “daily”,
-“source_text”: “张三推开办公室的门走进来，看见李四还坐在桌前处理文件”,
-“duration”: 4,
-“lighting”: {
-“direction”: “环境主光从画面左后方窗边照入，门口区域辅以室内散射光”,
-“quality”: “柔和自然光，整体反差适中”
-},
-“depth_of_field”: “中等景深（T4.0），门口来者与桌前人物都保持可辨识清晰度，空间关系清楚”,
-“color_tone”: “中性色调，偏写实办公环境”,
-“focus_priority”: “张三与李四都需清晰可见，但优先保证空间关系完整”,
-“composition_note”: “构图需同时交代门口入口与桌前工作区域，保留办公桌作为中景层次”,
 “shot_type”: “平视全景”,
 “camera_move”: “极轻微推进”,
 “video_prompt”: “中年男子从画面右侧门口推门走入，年轻男子坐在画面左侧办公桌前低头处理文件，桌面文件摊开形成中景层次，办公室空间完整可见，平视全景，镜头极轻微推进，柔和自然光从窗边照入，中性色调写实呈现”,
-“first_frame_image_prompt”: “中年男子站在画面右侧门口刚推开门，年轻男子坐在画面左侧办公桌前低头处理文件，桌面文件摊开形成中景层次，办公室空间关系清晰可见，平视全景，柔和自然光从窗边照入，中等景深，中性色调写实办公环境”
+“first_frame_image_prompt”: “中年男子站在画面右侧门口刚推开门，年轻男子坐在画面左侧办公桌前低头处理文件，桌面文件摊开形成中景层次，办公室空间关系清晰可见，平视全景，柔和自然光从窗边照入，中等景深，中性色调写实办公环境”,
+“duration”: 4
 },
 {
 “panel_number”: 2,
-“shot_purpose”: “dialogue_speaking”,
-“description”: “张三停在门口附近，面向室内的李四皱起眉头开口说话，李四不在主要画面范围内”,
-“characters”: [
-{
-“name”: “张三”,
-“appearance”: “初始形象”
-}
-],
-“location”: “办公室”,
-“scene_type”: “daily”,
-“source_text”: “张三皱了皱眉，说：「开会了。」”,
-“duration”: 3,
-“lighting”: {
-“direction”: “侧光从画面左后方照到张三脸部，门口区域保留较弱环境补光”,
-“quality”: “偏柔和侧光，面部层次清楚”
-},
-“depth_of_field”: “浅景深（T2.8），张三脸部清晰，背景和室内其他区域轻微虚化”,
-“color_tone”: “中性色调，略压低亮度以突出说话瞬间”,
-“focus_priority”: “张三脸部最清晰，其他人物不应与其形成同等清晰度竞争”,
-“composition_note”: “说话者占主要画面，可保留少量门框或室内前景辅助空间定位”,
 “shot_type”: “平视中近景”,
 “camera_move”: “极轻微推进”,
 “video_prompt”: “中年男子停在门口附近，眉头轻皱，面向室内正在说话，门框留在画面边缘辅助空间定位，背景轻微虚化，平视中近景，镜头极轻微推进，柔和侧光落在脸部，中性色调略压低亮度”,
-“first_frame_image_prompt”: “中年男子停在门口附近，眉头轻皱，面向室内，嘴唇微张欲言，门框留在画面边缘辅助空间定位，平视中近景，柔和侧光落在脸部，浅景深，背景轻微虚化，中性色调略压低亮度”
+“first_frame_image_prompt”: “中年男子停在门口附近，眉头轻皱，面向室内，嘴唇微张欲言，门框留在画面边缘辅助空间定位，平视中近景，柔和侧光落在脸部，浅景深，背景轻微虚化，中性色调略压低亮度”,
+“duration”: 3
 }
 ]
 
@@ -474,16 +421,13 @@ duration 是镜头的最终执行时长。
 
 【严格要求】
 	1.	为每个镜头补充 shot_type、camera_move、video_prompt、first_frame_image_prompt
-	2.	必须保留所有原有字段
-	3.	source_text 必须原样保留
-	4.	duration 以输入为准，不得随意改动
-	5.	dialogue_speaking 镜头必须在 video_prompt 中明确写「正在说话」
-	6.	video_prompt 与 first_frame_image_prompt 都必须使用年龄段 + 性别，不得使用角色名
-	7.	first_frame_image_prompt 必须是镜头开始时刻的静态首帧，不得写成整个镜头过程描述
-	8.	镜头语言必须服从 scene_type，但不能推翻 narrative facts
-	9.	镜头语言必须兼容摄影约束
-	10.	first_frame_image_prompt 必须能作为视频生成的稳定首帧起点
-	11.	只返回 JSON 数组
+	2.	dialogue_speaking 镜头必须在 video_prompt 中明确写「正在说话」
+	3.	video_prompt 与 first_frame_image_prompt 都必须使用年龄段 + 性别，不得使用角色名
+	4.	first_frame_image_prompt 必须是镜头开始时刻的静态首帧，不得写成整个镜头过程描述
+	5.	镜头语言必须服从 scene_type，但不能推翻 narrative facts
+	6.	镜头语言必须兼容摄影约束
+	7.	first_frame_image_prompt 必须能作为视频生成的稳定首帧起点
+	8.	只返回 JSON 数组
 
 
 

@@ -515,4 +515,92 @@ describe('script-to-storyboard orchestrator retry', () => {
     expect(panel.composition_note).toBeUndefined()
     expect(panel.viewpoint_constraint).toBeUndefined()
   })
+
+  it('merges phase3 minimal fields into phase1 and phase2 panels', async () => {
+    const runStep = vi.fn(async (_meta, _prompt, action: string) => {
+      if (action === 'storyboard_phase1_plan') {
+        return {
+          text: JSON.stringify([{
+            panel_number: 1,
+            description: 'phase1描述',
+            source_text: 'phase1原文',
+            location: '场景A',
+            scene_type: 'dialogue',
+            characters: [{ name: '角色A', slot: '左侧' }],
+            duration_base: 3,
+          }]),
+          reasoning: '',
+        }
+      }
+      if (action === 'storyboard_phase2_cinematography') {
+        return {
+          text: JSON.stringify([{
+            panel_number: 1,
+            composition: '居中构图',
+            lighting: '顶光',
+            characters: [{ name: '角色A', screen_position: '左侧' }],
+          }]),
+          reasoning: '',
+        }
+      }
+      if (action === 'storyboard_phase2_acting') {
+        return {
+          text: JSON.stringify([{
+            panel_number: 1,
+            characters: [{ name: '角色A', acting: '平静说话' }],
+          }]),
+          reasoning: '',
+        }
+      }
+      if (action === 'storyboard_phase3_detail') {
+        return {
+          text: JSON.stringify([{
+            shot_type: '平视中景',
+            camera_move: '固定',
+            video_prompt: '角色A在场景A平静交谈',
+            first_frame_image_prompt: '室内，角色A位于画面左侧，平视中景',
+            duration: 2.5,
+          }]),
+          reasoning: '',
+        }
+      }
+      throw new Error(`unexpected action: ${action}`)
+    })
+
+    const result = await runScriptToStoryboardOrchestrator({
+      clips: [
+        {
+          id: 'clip-1',
+          content: '文本',
+          characters: JSON.stringify([{ name: '角色A' }]),
+          location: '场景A',
+          screenplay: null,
+        },
+      ],
+      novelPromotionData: {
+        characters: [{ name: '角色A', appearances: [] }],
+        locations: [{ name: '场景A', images: [] }],
+      },
+      promptTemplates: {
+        phase1PlanTemplate: '{clip_content}',
+        phase2CinematographyTemplate: '{panels_json}',
+        phase2ActingTemplate: '{panels_json}',
+        phase3DetailTemplate: '{panels_json}',
+      },
+      runStep,
+    })
+
+    const panel = result.clipPanels[0]?.finalPanels[0]
+    expect(panel).toBeTruthy()
+    expect(panel.description).toBe('phase1描述')
+    expect(panel.source_text).toBe('phase1原文')
+    expect(panel.location).toBe('场景A')
+    expect(panel.shot_type).toBe('平视中景')
+    expect(panel.camera_move).toBe('固定')
+    expect(panel.video_prompt).toBe('角色A在场景A平静交谈')
+    expect(panel.first_frame_image_prompt).toBe('室内，角色A位于画面左侧，平视中景')
+    expect(panel.duration).toBe(2.5)
+    expect(panel.photographyPlan).toBeTruthy()
+    expect(panel.actingNotes).toBeTruthy()
+  })
 })

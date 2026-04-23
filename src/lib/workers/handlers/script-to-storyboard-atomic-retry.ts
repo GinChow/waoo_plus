@@ -315,6 +315,28 @@ function findPanelByNumberOrIndex<T extends { panel_number?: number }>(
   return rows[index]
 }
 
+function normalizePhase3Duration(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value.trim())
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
+
+function pickPhase3DetailFields(panel: StoryboardPanel | undefined): Partial<StoryboardPanel> {
+  if (!panel) return {}
+  const duration = normalizePhase3Duration(panel.duration)
+  return {
+    shot_type: typeof panel.shot_type === 'string' ? panel.shot_type : undefined,
+    camera_move: typeof panel.camera_move === 'string' ? panel.camera_move : undefined,
+    video_prompt: typeof panel.video_prompt === 'string' ? panel.video_prompt : undefined,
+    first_frame_image_prompt:
+      typeof panel.first_frame_image_prompt === 'string' ? panel.first_frame_image_prompt : undefined,
+    duration: duration ?? undefined,
+  }
+}
+
 function reconcilePhase3Panels(params: {
   phase3Panels: StoryboardPanel[]
   planPanels: StoryboardPanel[]
@@ -332,11 +354,11 @@ function reconcilePhase3Panels(params: {
     if (!matchedActing) {
       throw new Error(`Missing acting direction for panel_number=${String(planPanel.panel_number)} at index=${index}`)
     }
+    const phase3Detail = pickPhase3DetailFields(rawPhase3)
     const merged = {
       ...planPanel,
-      ...matchedRule,
       characters: planPanel.characters,
-      ...(rawPhase3 || {}),
+      ...phase3Detail,
       photography_rules: matchedRule,
       acting_notes: matchedActing,
     } as StoryboardPanel
@@ -745,9 +767,7 @@ export async function runScriptToStoryboardAtomicRetry(params: {
       planPanels,
       photographyRules: cinematographyRules,
       actingDirections: actingDirectionRows,
-    }).filter(
-      (panel) => panel.description && panel.description !== '无' && panel.location !== '无',
-    )
+    })
     if (phase3Panels.length === 0) {
       throw new Error(`Phase 3 returned empty valid panels for clip ${formatClipId(params.clip)}`)
     }
