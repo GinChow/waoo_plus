@@ -396,8 +396,6 @@ export function useVideoStageRuntime({
     resetFlCustomPrompt,
     handleGenerateFirstLastFrame,
     getDefaultFlPrompt,
-    getNextPanel,
-    isLinkedAsLastFrame,
   } = useVideoFirstLastFrameFlow({
     allPanels,
     linkedPanels,
@@ -472,6 +470,18 @@ export function useVideoStageRuntime({
     })
   ), [allPanels, isSubmittingVideoBatch, submittingVideoPanelKeys])
 
+  const projectedCoarseGroups = useMemo(() => {
+    const groups = new Map<string, typeof projectedPanels>()
+    for (const panel of projectedPanels) {
+      const groupNumber = panel.parentGroupNumber ?? 1
+      const key = `${panel.storyboardId}:${groupNumber}`
+      const current = groups.get(key) || []
+      current.push(panel)
+      groups.set(key, current)
+    }
+    return Array.from(groups.values())
+  }, [projectedPanels])
+
   const runningCount = projectedPanels.filter((panel) => panel.videoTaskRunning || panel.lipSyncTaskRunning).length
   const failedCount = allPanels.filter((panel) => !!panel.videoErrorMessage || !!panel.lipSyncErrorMessage).length
   const isAnyTaskRunning = runningCount > 0 || isSubmittingVideoBatch
@@ -510,6 +520,8 @@ export function useVideoStageRuntime({
   return (
     <div className="space-y-6 pb-20">
       <VideoToolbar
+        totalCoarseShots={projectedCoarseGroups.length}
+        totalFineShots={projectedPanels.length}
         totalPanels={projectedPanels.length}
         runningCount={runningCount}
         videosWithUrl={videosWithUrl}
@@ -566,8 +578,6 @@ export function useVideoStageRuntime({
         onGenerateFirstLastFrame={handleGenerateFirstLastFrame}
         onPreviewImage={setPreviewImage}
         onToggleLipSyncVideo={toggleLipSyncVideo}
-        getNextPanel={getNextPanel}
-        isLinkedAsLastFrame={isLinkedAsLastFrame}
         getDefaultFlPrompt={getDefaultFlPrompt}
         getLocalPrompt={getLocalPrompt}
         updateLocalPrompt={updateLocalPrompt}

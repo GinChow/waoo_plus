@@ -1,6 +1,7 @@
 import { safeParseJsonArray } from '@/lib/json-repair'
 import { buildCharactersIntroduction } from '@/lib/constants'
 import { normalizeAnyError } from '@/lib/errors/normalize'
+import { TaskTerminatedError } from '@/lib/task/errors'
 import type {
   ScriptToStoryboardPromptTemplates,
   ScriptToStoryboardStepMeta,
@@ -14,7 +15,6 @@ import {
   formatClipId,
   getFilteredAppearanceList,
   getFilteredFullDescription,
-  getFilteredLocationsDescription,
   type LocationAsset,
   type PropAsset,
   type PhotographyRule,
@@ -33,6 +33,10 @@ type StoryboardClipInput = {
   location: string | null
   props?: string | null
   screenplay: string | null
+}
+
+type CoarseStoryboardGroup = JsonRecord & {
+  group_number?: number
 }
 
 export type StoryboardRetryPhase = 'phase1' | 'phase2_cinematography' | 'phase2_acting' | 'phase3_detail'
@@ -117,6 +121,16 @@ function parseJsonArray<T extends JsonRecord>(responseText: string, label: strin
 }
 
 function shouldRetryStepError(error: unknown, message: string, retryable: boolean) {
+  if (error instanceof TaskTerminatedError) return false
+  if (error instanceof Error && error.name === 'TaskTerminatedError') return false
+  const lowerTerminated = message.toLowerCase()
+  if (
+    lowerTerminated.includes('task terminated')
+    || lowerTerminated.includes('terminated during')
+    || lowerTerminated.includes('lease lost')
+  ) {
+    return false
+  }
   if (retryable) return true
   const lowerMessage = message.toLowerCase()
   return lowerMessage.includes('json') || lowerMessage.includes('parse')
@@ -126,6 +140,31 @@ function computeRetryDelayMs(attempt: number) {
   const base = Math.min(1_000 * Math.pow(2, Math.max(0, attempt - 1)), MAX_RETRY_DELAY_MS)
   const jitter = Math.floor(Math.random() * 300)
   return base + jitter
+}
+
+function resolveGuidanceProgressTitle(params: {
+  locale?: 'zh' | 'en'
+  kind: 'cinematography' | 'acting'
+  current: number
+  total: number
+}) {
+  const total = Math.max(1, Math.floor(params.total))
+  const current = Math.min(total, Math.max(1, Math.floor(params.current)))
+  const base = params.kind === 'cinematography'
+    ? (params.locale === 'en' ? 'Generate cinematography rules' : '摄影规则生成')
+    : (params.locale === 'en' ? 'Generate acting direction' : '演技指导生成')
+  return `${base} ${current}/${total}`
+}
+
+function resolveDetailProgressTitle(params: {
+  locale?: 'zh' | 'en'
+  current: number
+  total: number
+}) {
+  const total = Math.max(1, Math.floor(params.total))
+  const current = Math.min(total, Math.max(1, Math.floor(params.current)))
+  const base = params.locale === 'en' ? 'Refine storyboard details' : '分镜细节补全'
+  return `${base} ${current}/${total}`
 }
 
 function wait(ms: number) {
@@ -372,10 +411,117 @@ function reconcilePhase3Panels(params: {
   })
 }
 
+function buildAdjacentCoarseGroupsContext(groups: CoarseStoryboardGroup[], index: number): string {
+  const previous = index > 0 ? groups[index - 1] : null
+  const next = index < groups.length - 1 ? groups[index + 1] : null
+  return JSON.stringify(
+    {
+      previous_group: previous,
+      next_group: next,
+    },
+    null,
+    2,
+  )
+}
+
+function summarizePanelForContext(panel: StoryboardPanel) {
+  return {
+    panel_number: panel.panel_number,
+    shot_purpose: panel.shot_purpose,
+    description: panel.description,
+    source_text: panel.source_text,
+    location: panel.location,
+    scene_type: panel.scene_type,
+  }
+}
+
+function buildAdjacentFineGroupContext(groups: StoryboardPanel[][], index: number): string {
+  const previousPanels = index > 0 ? groups[index - 1] : null
+  const nextPanels = index < groups.length - 1 ? groups[index + 1] : null
+  return JSON.stringify(
+    {
+      previous_group: previousPanels?.map(summarizePanelForContext) || null,
+      next_group: nextPanels?.map(summarizePanelForContext) || null,
+    },
+    null,
+    2,
+  )
+}
+
+function buildFinePanelsWithCinematography(params: {
+  finePanels: StoryboardPanel[]
+  photographyRules: PhotographyRule[]
+  actingDirections: ActingDirection[]
+}) {
+  const { finePanels, photographyRules, actingDirections } = params
+  return finePanels.map((panel, index) => {
+    const matchedRule = findPanelByNumberOrIndex(photographyRules, panel.panel_number, index)
+    const matchedActing = findPanelByNumberOrIndex(actingDirections, panel.panel_number, index)
+    if (!matchedRule) {
+      throw new Error(`Missing cinematography rule for panel_number=${String(panel.panel_number)} at index=${index}`)
+    }
+    if (!matchedActing) {
+      throw new Error(`Missing acting direction for panel_number=${String(panel.panel_number)} at index=${index}`)
+    }
+    return {
+      ...panel,
+      lighting: matchedRule.lighting,
+      camera_angle: matchedRule.camera_angle,
+      viewpoint_constraint: matchedRule.viewpoint_constraint,
+      depth_of_field: matchedRule.depth_of_field,
+      color_tone: matchedRule.color_tone || matchedRule.color_palette,
+      focus_priority: matchedRule.focus_priority,
+      composition_note: matchedRule.composition_note,
+      acting_notes: matchedActing,
+    }
+  })
+}
+
+function assignSequentialPanelNumbers(panels: StoryboardPanel[]) {
+  return panels.map((panel, index) => ({
+    ...panel,
+    panel_number: index + 1,
+  }))
+}
+
+function derivePhotographyRulesFromGuidancePanels(panels: StoryboardPanel[]): PhotographyRule[] {
+  return panels.map((panel) => ({
+    panel_number: panel.panel_number,
+    lighting: panel.lighting as PhotographyRule['lighting'],
+    camera_angle: asText((panel as JsonRecord).camera_angle),
+    viewpoint_constraint: asText((panel as JsonRecord).viewpoint_constraint),
+    depth_of_field: asText((panel as JsonRecord).depth_of_field),
+    color_tone: asText((panel as JsonRecord).color_tone),
+    focus_priority: asText((panel as JsonRecord).focus_priority),
+    composition_note: asText((panel as JsonRecord).composition_note),
+  }))
+}
+
+function deriveActingDirectionsFromGuidancePanels(panels: StoryboardPanel[]): ActingDirection[] {
+  return panels.map((panel) => ({
+    panel_number: panel.panel_number,
+    characters: (panel as JsonRecord).acting_notes,
+  }))
+}
+
 function extractArtifactRows<T extends JsonRecord>(payload: unknown, key: string): T[] {
   const record = asObject(payload)
   if (!record) return []
   return asObjectArray(record[key]) as T[]
+}
+
+function extractArtifactPanelGroups(payload: unknown, key: string): StoryboardPanel[][] {
+  const record = asObject(payload)
+  if (!record || !Array.isArray(record[key])) return []
+  return (record[key] as unknown[]).reduce<StoryboardPanel[][]>((acc, item) => {
+    const row = asObject(item)
+    if (!row) return acc
+    const panels = asObjectArray(row.panels) as StoryboardPanel[]
+    if (panels.length > 0) {
+      acc.push(panels)
+    }
+    return acc
+  }, [])
 }
 
 async function readArtifactRows<T extends JsonRecord>(params: {
@@ -393,6 +539,23 @@ async function readArtifactRows<T extends JsonRecord>(params: {
   const artifact = rows[0]
   if (!artifact) return []
   return extractArtifactRows<T>(artifact.payload, params.key)
+}
+
+async function readArtifactPanelGroups(params: {
+  runId: string
+  clipId: string
+  artifactType: string
+  key: string
+}) {
+  const rows = await listArtifacts({
+    runId: params.runId,
+    artifactType: params.artifactType,
+    refId: params.clipId,
+    limit: 1,
+  })
+  const artifact = rows[0]
+  if (!artifact) return []
+  return extractArtifactPanelGroups(artifact.payload, params.key)
 }
 
 function getStepNumbers(params: {
@@ -450,7 +613,7 @@ function buildStepMeta(params: {
   if (params.target.phase === 'phase2_cinematography') {
     return {
       stepId: stepKey,
-      stepTitle: 'progress.streamStep.cinematographyRules',
+      stepTitle: 'progress.streamStep.storyboardGroupSplit',
       stepIndex: stepNumbers.stepIndex,
       stepTotal: stepNumbers.stepTotal,
       dependsOn: [`clip_${params.target.clipId}_phase1`],
@@ -543,7 +706,7 @@ function mergePanelsWithRules(params: {
   })
 }
 
-function requireRows<T extends JsonRecord>(rows: T[], label: string) {
+function requireRows<T>(rows: T[], label: string) {
   if (rows.length === 0) {
     throw new Error(`missing dependency artifact: ${label}`)
   }
@@ -590,12 +753,8 @@ export async function runScriptToStoryboardAtomicRetry(params: {
   const clipCharacters = parseClipCharacters(params.clip.characters)
   const clipLocation = params.clip.location || null
   const clipProps = parseClipProps(params.clip.props ?? null)
+  const filteredAppearanceList = getFilteredAppearanceList(params.novelPromotionData.characters || [], clipCharacters)
   const filteredFullDescription = getFilteredFullDescription(params.novelPromotionData.characters || [], clipCharacters)
-  const filteredLocationsDescription = getFilteredLocationsDescription(
-    params.novelPromotionData.locations || [],
-    clipLocation,
-    params.locale ?? 'zh',
-  )
   const filteredPropsDescription = compileAssetPromptFragments(buildPromptAssetContext({
     characters: [],
     locations: [],
@@ -616,23 +775,43 @@ export async function runScriptToStoryboardAtomicRetry(params: {
   const phase3PanelsByClipId: Record<string, StoryboardPanel[]> = {}
   const clipPanels: ClipPanelsResult[] = []
 
-  let phase1Panels = await readArtifactRows<StoryboardPanel>({
+  let phase1Groups = await readArtifactRows<CoarseStoryboardGroup>({
     runId: params.runId,
     clipId: params.retryTarget.clipId,
     artifactType: 'storyboard.clip.phase1',
     key: 'panels',
   })
-  let phase2Cinematography = await readArtifactRows<PhotographyRule>({
+  let finePanelGroups = await readArtifactPanelGroups({
     runId: params.runId,
     clipId: params.retryTarget.clipId,
     artifactType: 'storyboard.clip.phase2.cine',
+    key: 'fine_groups',
+  })
+  let phase2Rules = await readArtifactRows<PhotographyRule>({
+    runId: params.runId,
+    clipId: params.retryTarget.clipId,
+    artifactType: 'storyboard.clip.phase2.acting',
     key: 'rules',
   })
+  if (phase2Rules.length === 0) {
+    phase2Rules = await readArtifactRows<PhotographyRule>({
+      runId: params.runId,
+      clipId: params.retryTarget.clipId,
+      artifactType: 'storyboard.clip.phase2.cine',
+      key: 'rules',
+    })
+  }
   let phase2Acting = await readArtifactRows<ActingDirection>({
     runId: params.runId,
     clipId: params.retryTarget.clipId,
     artifactType: 'storyboard.clip.phase2.acting',
     key: 'directions',
+  })
+  let fineGroupsWithGuidance = await readArtifactPanelGroups({
+    runId: params.runId,
+    clipId: params.retryTarget.clipId,
+    artifactType: 'storyboard.clip.phase2.acting',
+    key: 'fine_groups_with_guidance',
   })
   let phase3Panels = await readArtifactRows<StoryboardPanel>({
     runId: params.runId,
@@ -640,16 +819,28 @@ export async function runScriptToStoryboardAtomicRetry(params: {
     artifactType: 'storyboard.clip.phase3',
     key: 'panels',
   })
+  if (finePanelGroups.length === 0 && phase1Groups.length > 0) {
+    finePanelGroups = [phase1Groups as StoryboardPanel[]]
+  }
+  if (fineGroupsWithGuidance.length === 0 && finePanelGroups.length > 0 && phase2Rules.length > 0 && phase2Acting.length > 0) {
+    fineGroupsWithGuidance = [
+      buildFinePanelsWithCinematography({
+        finePanels: finePanelGroups[0] || [],
+        photographyRules: phase2Rules,
+        actingDirections: phase2Acting,
+      }),
+    ]
+  }
+  const charactersLibName = (params.novelPromotionData.characters || []).map((item) => item.name).join(', ') || '无'
+  const locationsLibName = (params.novelPromotionData.locations || []).map((item) => item.name).join(', ') || '无'
+  const charactersIntroduction = buildCharactersIntroduction(params.novelPromotionData.characters || [])
+  const phase2GroupSplitTemplate = params.promptTemplates.phase2GroupSplitTemplate || '{coarse_storyboard_group}'
 
   if (params.retryTarget.phase === 'phase1') {
     const clipContent = typeof params.clip.content === 'string' ? params.clip.content.trim() : ''
     if (!clipContent) {
       throw new Error(`Clip ${formatClipId(params.clip)} content is empty`)
     }
-    const filteredAppearanceList = getFilteredAppearanceList(params.novelPromotionData.characters || [], clipCharacters)
-    const charactersLibName = (params.novelPromotionData.characters || []).map((item) => item.name).join(', ') || '无'
-    const locationsLibName = (params.novelPromotionData.locations || []).map((item) => item.name).join(', ') || '无'
-    const charactersIntroduction = buildCharactersIntroduction(params.novelPromotionData.characters || [])
     const clipJson = JSON.stringify(
       {
         id: params.clip.id,
@@ -675,115 +866,198 @@ export async function runScriptToStoryboardAtomicRetry(params: {
     } else {
       phase1Prompt = phase1Prompt.replace('{clip_content}', clipContent)
     }
-    phase1Panels = await runStepWithRetry({
+    phase1Groups = await runStepWithRetry({
       runStep: params.runStep,
       baseMeta,
       prompt: phase1Prompt,
       action: 'storyboard_phase1_plan',
       maxOutputTokens: 2600,
       parse: (text) => {
-        const panels = parseJsonArray<StoryboardPanel>(text, `phase1:${formatClipId(params.clip)}`)
+        const panels = parseJsonArray<CoarseStoryboardGroup>(text, `phase1:${formatClipId(params.clip)}`)
         if (panels.length === 0) {
-          throw new Error(`Phase 1 returned empty panels for clip ${formatClipId(params.clip)}`)
+          throw new Error(`Phase 1 returned empty coarse groups for clip ${formatClipId(params.clip)}`)
         }
         return panels
       },
       retryStepAttempt: params.retryStepAttempt,
       maxStepAttempts,
     })
-    phase1PanelsByClipId[params.clip.id] = phase1Panels
+    phase1PanelsByClipId[params.clip.id] = phase1Groups as StoryboardPanel[]
   } else if (params.retryTarget.phase === 'phase2_cinematography') {
-    const planPanels = requireRows(phase1Panels, 'storyboard.clip.phase1')
-    const phase2Prompt = params.promptTemplates.phase2CinematographyTemplate
-      .replace('{panels_json}', JSON.stringify(planPanels, null, 2))
-      .replace(/\{panel_count\}/g, String(planPanels.length))
-      .replace('{locations_description}', filteredLocationsDescription)
-      .replace('{characters_info}', filteredFullDescription)
-      .replace('{props_description}', filteredPropsDescription)
-    phase2Cinematography = await runStepWithRetry({
-      runStep: params.runStep,
-      baseMeta,
-      prompt: phase2Prompt,
-      action: 'storyboard_phase2_cinematography',
-      maxOutputTokens: 2400,
-      parse: (text) => parseJsonArray<PhotographyRule>(text, `phase2:${formatClipId(params.clip)}`),
-      retryStepAttempt: params.retryStepAttempt,
-      maxStepAttempts,
-    })
-    phase2CinematographyByClipId[params.clip.id] = phase2Cinematography
+    const coarseGroups = requireRows(phase1Groups, 'storyboard.clip.phase1')
+    finePanelGroups = []
+    for (let groupIndex = 0; groupIndex < coarseGroups.length; groupIndex += 1) {
+      const coarseGroup = coarseGroups[groupIndex]
+      const splitPrompt = phase2GroupSplitTemplate
+        .replace('{characters_lib_name}', charactersLibName)
+        .replace('{locations_lib_name}', locationsLibName)
+        .replace('{characters_introduction}', charactersIntroduction)
+        .replace('{characters_appearance_list}', filteredAppearanceList)
+        .replace('{characters_full_description}', filteredFullDescription)
+        .replace('{props_description}', filteredPropsDescription)
+        .replace('{coarse_storyboard_group}', JSON.stringify(coarseGroup, null, 2))
+        .replace('{adjacent_groups_context}', buildAdjacentCoarseGroupsContext(coarseGroups, groupIndex))
+      const finePanels = await runStepWithRetry({
+        runStep: params.runStep,
+        baseMeta,
+        prompt: splitPrompt,
+        action: 'storyboard_phase2_cinematography',
+        maxOutputTokens: 2600,
+        parse: (text) => parseJsonArray<StoryboardPanel>(text, `phase2-split:${formatClipId(params.clip)}:group-${groupIndex + 1}`),
+        retryStepAttempt: params.retryStepAttempt,
+        maxStepAttempts,
+      })
+      finePanelGroups.push(finePanels.map((panel, panelIndex) => ({
+        ...panel,
+        panel_number: typeof panel.panel_number === 'number' ? panel.panel_number : panelIndex + 1,
+      })))
+    }
   } else if (params.retryTarget.phase === 'phase2_acting') {
-    const planPanels = requireRows(phase1Panels, 'storyboard.clip.phase1')
-    const phase2ActingPrompt = params.promptTemplates.phase2ActingTemplate
-      .replace('{panels_json}', JSON.stringify(planPanels, null, 2))
-      .replace(/\{panel_count\}/g, String(planPanels.length))
-      .replace('{characters_info}', filteredFullDescription)
-    phase2Acting = await runStepWithRetry({
-      runStep: params.runStep,
-      baseMeta,
-      prompt: phase2ActingPrompt,
-      action: 'storyboard_phase2_acting',
-      maxOutputTokens: 2400,
-      parse: (text) => parseJsonArray<ActingDirection>(text, `phase2-acting:${formatClipId(params.clip)}`),
-      retryStepAttempt: params.retryStepAttempt,
-      maxStepAttempts,
-    })
+    const groupedFinePanels = requireRows(finePanelGroups, 'storyboard.clip.phase2.cine')
+    fineGroupsWithGuidance = []
+    phase2Rules = []
+    phase2Acting = []
+    for (let groupIndex = 0; groupIndex < groupedFinePanels.length; groupIndex += 1) {
+      const finePanels = groupedFinePanels[groupIndex]
+      const adjacentContext = buildAdjacentFineGroupContext(groupedFinePanels, groupIndex)
+      const cinematographyMeta: ScriptToStoryboardStepMeta = {
+        ...baseMeta,
+        stepId: `clip_${params.retryTarget.clipId}_phase3_cinematography`,
+        stepAttempt: groupIndex + 1,
+        stepTitle: resolveGuidanceProgressTitle({
+          locale: params.locale,
+          kind: 'cinematography',
+          current: groupIndex + 1,
+          total: groupedFinePanels.length,
+        }),
+      }
+      const actingMeta: ScriptToStoryboardStepMeta = {
+        ...baseMeta,
+        stepAttempt: groupIndex + 1,
+        stepTitle: resolveGuidanceProgressTitle({
+          locale: params.locale,
+          kind: 'acting',
+          current: groupIndex + 1,
+          total: groupedFinePanels.length,
+        }),
+      }
+      const cinematographyPrompt = params.promptTemplates.phase2CinematographyTemplate
+        .replace('{characters_lib_name}', charactersLibName)
+        .replace('{locations_lib_name}', locationsLibName)
+        .replace('{characters_introduction}', charactersIntroduction)
+        .replace('{characters_appearance_list}', filteredAppearanceList)
+        .replace('{characters_full_description}', filteredFullDescription)
+        .replace('{props_description}', filteredPropsDescription)
+        .replace('{fine_storyboard_group}', JSON.stringify(finePanels, null, 2))
+        .replace('{adjacent_context}', adjacentContext)
+      const actingPrompt = params.promptTemplates.phase2ActingTemplate
+        .replace('{panels_json}', JSON.stringify(finePanels, null, 2))
+        .replace(/\{panel_count\}/g, String(finePanels.length))
+        .replace('{characters_info}', filteredFullDescription)
+        .replace('{adjacent_context}', adjacentContext)
+      const [photographyRules, actingDirections] = await Promise.all([
+        runStepWithRetry({
+          runStep: params.runStep,
+          baseMeta: cinematographyMeta,
+          prompt: cinematographyPrompt,
+          action: 'storyboard_phase2_cinematography',
+          maxOutputTokens: 2400,
+          parse: (text) => parseJsonArray<PhotographyRule>(text, `phase3-cine:${formatClipId(params.clip)}:group-${groupIndex + 1}`),
+          retryStepAttempt: cinematographyMeta.stepAttempt || 1,
+          maxStepAttempts,
+        }),
+        runStepWithRetry({
+          runStep: params.runStep,
+          baseMeta: actingMeta,
+          prompt: actingPrompt,
+          action: 'storyboard_phase2_acting',
+          maxOutputTokens: 2400,
+          parse: (text) => parseJsonArray<ActingDirection>(text, `phase3-acting:${formatClipId(params.clip)}:group-${groupIndex + 1}`),
+          retryStepAttempt: actingMeta.stepAttempt || 1,
+          maxStepAttempts,
+        }),
+      ])
+      phase2Rules.push(...photographyRules)
+      phase2Acting.push(...actingDirections)
+      fineGroupsWithGuidance.push(buildFinePanelsWithCinematography({
+        finePanels,
+        photographyRules,
+        actingDirections,
+      }))
+    }
+    phase2CinematographyByClipId[params.clip.id] = phase2Rules
     phase2ActingByClipId[params.clip.id] = phase2Acting
   } else {
-    const planPanels = requireRows(phase1Panels, 'storyboard.clip.phase1')
-    const cinematographyRules = requireRows(phase2Cinematography, 'storyboard.clip.phase2.cine')
-    const actingDirectionRows = requireRows(phase2Acting, 'storyboard.clip.phase2.acting')
-    const phase3PanelsInput = planPanels.map((panel, index) => {
-      const matchedRule = cinematographyRules.find((rule) => rule.panel_number === panel.panel_number) || cinematographyRules[index]
-      const matchedActing = actingDirectionRows.find((item) => item.panel_number === panel.panel_number) || actingDirectionRows[index]
-      if (!matchedRule) {
-        throw new Error(`Missing cinematography rule for panel_number=${String(panel.panel_number)} at index=${index}`)
+    const groupedFinePanels = requireRows(finePanelGroups, 'storyboard.clip.phase2.cine')
+    const groupedGuidancePanels = requireRows(fineGroupsWithGuidance, 'storyboard.clip.phase2.acting')
+    const finalPanelsByGroup: StoryboardPanel[][] = []
+    phase2Rules = []
+    phase2Acting = []
+    for (let groupIndex = 0; groupIndex < groupedFinePanels.length; groupIndex += 1) {
+      const finePanels = groupedFinePanels[groupIndex] || []
+      const guidancePanels = groupedGuidancePanels[groupIndex] || []
+      const photographyRules = derivePhotographyRulesFromGuidancePanels(guidancePanels)
+      const actingDirections = deriveActingDirectionsFromGuidancePanels(guidancePanels)
+      phase2Rules.push(...photographyRules)
+      phase2Acting.push(...actingDirections)
+      const detailMeta: ScriptToStoryboardStepMeta = {
+        ...baseMeta,
+        stepAttempt: groupIndex + 1,
+        stepTitle: resolveDetailProgressTitle({
+          locale: params.locale,
+          current: groupIndex + 1,
+          total: groupedFinePanels.length,
+        }),
       }
-      if (!matchedActing) {
-        throw new Error(`Missing acting direction for panel_number=${String(panel.panel_number)} at index=${index}`)
-      }
-      return {
-        ...panel,
-        photography_rules: matchedRule,
-        acting_notes: matchedActing,
-      }
-    })
-    const phase3Prompt = params.promptTemplates.phase3DetailTemplate
-      .replace('{panels_json}', JSON.stringify(phase3PanelsInput, null, 2))
-      .replace('{characters_age_gender}', filteredFullDescription)
-      .replace('{locations_description}', filteredLocationsDescription)
-      .replace('{props_description}', filteredPropsDescription)
-    const rawPhase3Panels = await runStepWithRetry({
-      runStep: params.runStep,
-      baseMeta,
-      prompt: phase3Prompt,
-      action: 'storyboard_phase3_detail',
-      maxOutputTokens: 2600,
-      parse: (text) => parseJsonArray<StoryboardPanel>(text, `phase3:${formatClipId(params.clip)}`),
-      retryStepAttempt: params.retryStepAttempt,
-      maxStepAttempts,
-    })
-    phase3Panels = reconcilePhase3Panels({
-      phase3Panels: rawPhase3Panels,
-      planPanels,
-      photographyRules: cinematographyRules,
-      actingDirections: actingDirectionRows,
-    })
-    if (phase3Panels.length === 0) {
-      throw new Error(`Phase 3 returned empty valid panels for clip ${formatClipId(params.clip)}`)
+      const detailPrompt = params.promptTemplates.phase3DetailTemplate
+        .replace('{characters_lib_name}', charactersLibName)
+        .replace('{locations_lib_name}', locationsLibName)
+        .replace('{characters_introduction}', charactersIntroduction)
+        .replace('{characters_appearance_list}', filteredAppearanceList)
+        .replace('{characters_full_description}', filteredFullDescription)
+        .replace('{props_description}', filteredPropsDescription)
+        .replace('{fine_storyboard_group_with_cinematography}', JSON.stringify(guidancePanels, null, 2))
+        .replace('{adjacent_context}', buildAdjacentFineGroupContext(groupedGuidancePanels, groupIndex))
+      const rawDetailedPanels = await runStepWithRetry({
+        runStep: params.runStep,
+        baseMeta: detailMeta,
+        prompt: detailPrompt,
+        action: 'storyboard_phase3_detail',
+        maxOutputTokens: 2600,
+        parse: (text) => parseJsonArray<StoryboardPanel>(text, `phase4:${formatClipId(params.clip)}:group-${groupIndex + 1}`),
+        retryStepAttempt: detailMeta.stepAttempt || 1,
+        maxStepAttempts,
+      })
+      const reconciledPanels = reconcilePhase3Panels({
+        phase3Panels: rawDetailedPanels,
+        planPanels: finePanels,
+        photographyRules,
+        actingDirections,
+      })
+      const normalizedPanels = hydrateFinalPanelCharactersWithPlanSlots({
+        finalPanels: reconciledPanels,
+        planPanels: finePanels,
+      })
+      finalPanelsByGroup.push(mergePanelsWithRules({
+        finalPanels: normalizedPanels,
+        photographyRules,
+        actingDirections,
+      }))
     }
-    const normalizedPhase3Panels = hydrateFinalPanelCharactersWithPlanSlots({
-      finalPanels: phase3Panels,
-      planPanels,
-    })
-    phase3Panels = normalizedPhase3Panels
-    phase3PanelsByClipId[params.clip.id] = normalizedPhase3Panels
+    phase3Panels = assignSequentialPanelNumbers(finalPanelsByGroup.flat())
+    phase2CinematographyByClipId[params.clip.id] = phase2Rules
+    phase2ActingByClipId[params.clip.id] = phase2Acting
+    phase3PanelsByClipId[params.clip.id] = phase3Panels
   }
 
   if (params.retryTarget.phase !== 'phase1') {
+    const basePanels = requireRows(phase3Panels, 'storyboard.clip.phase3')
+    const currentRules = requireRows(phase2Rules, 'storyboard.clip.phase2.acting.rules')
+    const currentActing = requireRows(phase2Acting, 'storyboard.clip.phase2.acting')
     const finalPanels = mergePanelsWithRules({
-      finalPanels: requireRows(phase3Panels, 'storyboard.clip.phase3'),
-      photographyRules: requireRows(phase2Cinematography, 'storyboard.clip.phase2.cine'),
-      actingDirections: requireRows(phase2Acting, 'storyboard.clip.phase2.acting'),
+      finalPanels: basePanels,
+      photographyRules: currentRules,
+      actingDirections: currentActing,
     })
     clipPanels.push({
       clipId: params.clip.id,

@@ -1,7 +1,7 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import ScreenplayDisplay from './ScreenplayDisplay'
 import { StoryboardPanel } from './hooks/useStoryboardState'
 import StoryboardGroupHeader from './StoryboardGroupHeader'
@@ -15,6 +15,7 @@ import StoryboardGroupFailedAlert from './StoryboardGroupFailedAlert'
 import StoryboardGroupDialogs from './StoryboardGroupDialogs'
 import type { StoryboardGroupProps } from './StoryboardGroup.types'
 import { AppIcon } from '@/components/ui/icons'
+import { MediaImageWithLoading } from '@/components/media/MediaImageWithLoading'
 
 export default function StoryboardGroup({
   storyboard,
@@ -73,6 +74,7 @@ export default function StoryboardGroup({
   submittingVariantPanelId,
 }: StoryboardGroupProps) {
   const t = useTranslations('storyboard')
+  const [activeCoarseGroupNumber, setActiveCoarseGroupNumber] = useState<number | null>(null)
 
   const {
     insertModalOpen,
@@ -119,6 +121,24 @@ export default function StoryboardGroup({
 
   const currentRunningCount = textPanels.filter(isPanelTaskRunning).length
   const pendingCount = textPanels.filter((panel) => !panel.imageUrl && !isPanelTaskRunning(panel)).length
+  const coarseGroups = useMemo(() => {
+    const grouped = new Map<number, StoryboardPanel[]>()
+    const sorted = [...textPanels].sort((left, right) => left.panelIndex - right.panelIndex)
+    for (const panel of sorted) {
+      const groupNumber = panel.parent_group_number ?? 1
+      const current = grouped.get(groupNumber) || []
+      current.push(panel)
+      grouped.set(groupNumber, current)
+    }
+    return Array.from(grouped.entries())
+      .sort((left, right) => left[0] - right[0])
+      .map(([groupNumber, panels]) => ({ groupNumber, panels }))
+  }, [textPanels])
+
+  const activeFinePanels = useMemo(() => {
+    if (activeCoarseGroupNumber === null) return []
+    return coarseGroups.find((group) => group.groupNumber === activeCoarseGroupNumber)?.panels || []
+  }, [activeCoarseGroupNumber, coarseGroups])
 
   const groupOverlayState = useMemo(() => {
     if (!isSubmittingStoryboardTask && !isSelectingCandidate) return null
@@ -203,47 +223,116 @@ export default function StoryboardGroup({
         </div>
       )}
 
-      <StoryboardPanelList
-        storyboardId={storyboard.id}
-        textPanels={textPanels}
-        storyboardStartIndex={storyboardStartIndex}
-        videoRatio={videoRatio}
-        isSubmittingStoryboardTextTask={isSubmittingStoryboardTextTask}
-        savingPanels={savingPanels}
-        deletingPanelIds={deletingPanelIds}
-        saveStateByPanel={saveStateByPanel}
-        hasUnsavedByPanel={hasUnsavedByPanel}
-        modifyingPanels={modifyingPanels}
-        panelTaskErrorMap={panelTaskErrorMap}
-        isPanelTaskRunning={isPanelTaskRunning}
-        getPanelEditData={getPanelEditData}
-        getPanelCandidates={getPanelCandidates}
-        onPanelUpdate={onPanelUpdate}
-        onPanelDelete={onPanelDelete}
-        onOpenCharacterPicker={onOpenCharacterPicker}
-        onOpenLocationPicker={onOpenLocationPicker}
-        onRemoveCharacter={onRemoveCharacter}
-        onRemoveLocation={onRemoveLocation}
-        onRetryPanelSave={onRetryPanelSave}
-        onRegeneratePanelImage={handleRegeneratePanelImage}
-        onOpenEditModal={onOpenEditModal}
-        onOpenAIDataModal={onOpenAIDataModal}
-        onSelectPanelCandidateIndex={onSelectPanelCandidateIndex}
-        onConfirmPanelCandidate={onConfirmPanelCandidate}
-        onCancelPanelCandidate={onCancelPanelCandidate}
-        onClearPanelTaskError={clearPanelTaskError}
-        onDeletePanelImage={onDeletePanelImage}
-        onUploadPanelImage={onUploadPanelImage}
-        uploadingPanelIds={uploadingPanelIds}
-        onPreviewImage={onPreviewImage}
-        onInsertAfter={handleOpenInsertModal}
-        onVariant={handleOpenVariantModal}
-        isInsertDisabled={(panelId) =>
-          isSubmittingStoryboardTextTask ||
-          insertingAfterPanelId === panelId ||
-          submittingVariantPanelId === panelId
-        }
-      />
+      {activeCoarseGroupNumber === null ? (
+        <div className="space-y-3">
+          <div className="text-xs text-[var(--glass-text-tertiary)]">{t('group.coarseGridPreview')}</div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {coarseGroups.map((coarseGroup) => {
+              const previewImages = coarseGroup.panels
+                .map((panel) => panel.imageUrl)
+                .filter((url): url is string => typeof url === 'string' && url.length > 0)
+                .slice(0, 4)
+              return (
+                <button
+                  key={`${storyboard.id}-coarse-${coarseGroup.groupNumber}`}
+                  type="button"
+                  onClick={() => setActiveCoarseGroupNumber(coarseGroup.groupNumber)}
+                  className="glass-surface-soft p-3 text-left hover:bg-[var(--glass-bg-muted)] transition-colors"
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-[var(--glass-text-primary)]">
+                      {t('group.coarseShotTitle', { number: coarseGroup.groupNumber })}
+                    </span>
+                    <span className="text-xs text-[var(--glass-text-tertiary)]">
+                      {t('group.fineShotCount', { count: coarseGroup.panels.length })}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Array.from({ length: 4 }).map((_, tileIndex) => {
+                      const imageUrl = previewImages[tileIndex]
+                      return (
+                        <div
+                          key={`${storyboard.id}-coarse-${coarseGroup.groupNumber}-tile-${tileIndex}`}
+                          className="h-20 w-full overflow-hidden rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)]"
+                        >
+                          {imageUrl ? (
+                            <MediaImageWithLoading
+                              src={imageUrl}
+                              alt={`shot-${tileIndex + 1}`}
+                              containerClassName="h-full w-full"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-semibold text-[var(--glass-text-primary)]">
+              {t('group.coarseShotTitle', { number: activeCoarseGroupNumber })}
+            </div>
+            <div className="text-xs text-[var(--glass-text-tertiary)]">
+              {t('group.fineShotCount', { count: activeFinePanels.length })}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveCoarseGroupNumber(null)}
+            className="glass-btn-base glass-btn-soft rounded-xl px-3 py-2 text-sm"
+          >
+            <AppIcon name="chevronLeft" className="h-4 w-4" />
+            <span>{t('group.backToCoarseList')}</span>
+          </button>
+          <StoryboardPanelList
+            storyboardId={storyboard.id}
+            textPanels={activeFinePanels}
+            storyboardStartIndex={storyboardStartIndex}
+            videoRatio={videoRatio}
+            isSubmittingStoryboardTextTask={isSubmittingStoryboardTextTask}
+            savingPanels={savingPanels}
+            deletingPanelIds={deletingPanelIds}
+            saveStateByPanel={saveStateByPanel}
+            hasUnsavedByPanel={hasUnsavedByPanel}
+            modifyingPanels={modifyingPanels}
+            panelTaskErrorMap={panelTaskErrorMap}
+            isPanelTaskRunning={isPanelTaskRunning}
+            getPanelEditData={getPanelEditData}
+            getPanelCandidates={getPanelCandidates}
+            onPanelUpdate={onPanelUpdate}
+            onPanelDelete={onPanelDelete}
+            onOpenCharacterPicker={onOpenCharacterPicker}
+            onOpenLocationPicker={onOpenLocationPicker}
+            onRemoveCharacter={onRemoveCharacter}
+            onRemoveLocation={onRemoveLocation}
+            onRetryPanelSave={onRetryPanelSave}
+            onRegeneratePanelImage={handleRegeneratePanelImage}
+            onOpenEditModal={onOpenEditModal}
+            onOpenAIDataModal={onOpenAIDataModal}
+            onSelectPanelCandidateIndex={onSelectPanelCandidateIndex}
+            onConfirmPanelCandidate={onConfirmPanelCandidate}
+            onCancelPanelCandidate={onCancelPanelCandidate}
+            onClearPanelTaskError={clearPanelTaskError}
+            onDeletePanelImage={onDeletePanelImage}
+            onUploadPanelImage={onUploadPanelImage}
+            uploadingPanelIds={uploadingPanelIds}
+            onPreviewImage={onPreviewImage}
+            onInsertAfter={handleOpenInsertModal}
+            onVariant={handleOpenVariantModal}
+            isInsertDisabled={(panelId) =>
+              isSubmittingStoryboardTextTask ||
+              insertingAfterPanelId === panelId ||
+              submittingVariantPanelId === panelId
+            }
+          />
+        </div>
+      )}
 
       <StoryboardGroupDialogs
         insertAfterPanel={insertAfterPanel}

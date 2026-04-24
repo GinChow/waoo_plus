@@ -40,8 +40,11 @@ export function useStoryboardInsertVariantRuntime({
   const [variantModalPanel, setVariantModalPanel] = useState<VariantPanelRuntimeSnapshot | null>(null)
 
   const handleOpenInsertModal = useCallback((panelIndex: number) => {
-    const previousPanel = textPanels[panelIndex]
-    const nextPanel = textPanels[panelIndex + 1] || null
+    const orderedPanels = [...textPanels].sort((left, right) => left.panelIndex - right.panelIndex)
+    const orderedIndex = orderedPanels.findIndex((panel) => panel.panelIndex === panelIndex)
+    if (orderedIndex < 0) return
+    const previousPanel = orderedPanels[orderedIndex]
+    const nextPanel = orderedPanels[orderedIndex + 1] || null
     if (!previousPanel) return
 
     setInsertAfterPanel({
@@ -78,7 +81,7 @@ export function useStoryboardInsertVariantRuntime({
   }, [handleCloseInsertModal, insertAfterPanel, onInsertPanel, storyboardId])
 
   const handleOpenVariantModal = useCallback((panelIndex: number) => {
-    const panel = textPanels[panelIndex]
+    const panel = textPanels.find((item) => item.panelIndex === panelIndex)
     if (!panel) return
     setVariantModalPanel({
       id: panel.id,

@@ -23,6 +23,19 @@ export type PersistedStoryboard = {
   }>
 }
 
+function buildParentGroupMappingCompact(panels: StoryboardPanel[]): string {
+  const mapping: Array<[number, number]> = []
+  for (let index = 0; index < panels.length; index += 1) {
+    const panel = panels[index]
+    const panelNumber = typeof panel.panel_number === 'number' ? panel.panel_number : (index + 1)
+    const parentGroupNumber = typeof (panel as { parent_group_number?: unknown }).parent_group_number === 'number'
+      ? (panel as { parent_group_number: number }).parent_group_number
+      : 1
+    mapping.push([panelNumber, parentGroupNumber])
+  }
+  return JSON.stringify(mapping)
+}
+
 export function parseEffort(value: unknown): 'minimal' | 'low' | 'medium' | 'high' | null {
   if (value === 'minimal' || value === 'low' || value === 'medium' || value === 'high') return value
   return null
@@ -154,11 +167,13 @@ export async function persistStoryboardsAndPanels(params: {
           clipId: clipEntry.clipId,
           episodeId,
           panelCount: clipEntry.finalPanels.length,
+          storyboardTextJson: buildParentGroupMappingCompact(clipEntry.finalPanels),
         },
         update: {
           panelCount: clipEntry.finalPanels.length,
           episodeId,
           lastError: null,
+          storyboardTextJson: buildParentGroupMappingCompact(clipEntry.finalPanels),
         },
         select: { id: true, clipId: true },
       })
@@ -242,11 +257,13 @@ export async function persistStoryboardOutputs(params: {
           clipId: clipEntry.clipId,
           episodeId: params.episodeId,
           panelCount: clipEntry.finalPanels.length,
+          storyboardTextJson: buildParentGroupMappingCompact(clipEntry.finalPanels),
         },
         update: {
           panelCount: clipEntry.finalPanels.length,
           episodeId: params.episodeId,
           lastError: null,
+          storyboardTextJson: buildParentGroupMappingCompact(clipEntry.finalPanels),
         },
         select: { id: true, clipId: true },
       })

@@ -47,7 +47,11 @@
         "generateMissingImages": "生成该片段所有未有图片的镜头",
         "segment": "片段",
         "addAtStart": "在开头添加新分镜组",
-        "insertHere": "在此插入新分镜组"
+        "insertHere": "在此插入新分镜组",
+        "coarseGridPreview": "粗镜头宫格预览",
+        "coarseShotTitle": "粗镜头 {number}",
+        "fineShotCount": "细镜头 {count} 个",
+        "backToCoarseList": "返回粗镜头列表"
     },
     "header": {
         "title": "分镜编辑",

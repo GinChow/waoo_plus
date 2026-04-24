@@ -77,6 +77,8 @@
     "showPending": "待生成",
     "showFailed": "失败",
     "totalShots": "共 {count} 个镜头",
+    "totalCoarseShots": "共 {count} 个粗镜头，",
+    "totalFineShots": "{count} 个细镜头",
     "generatingShots": "{count} 个生成中",
     "completedShots": "{count} 个已生成",
     "failedShots": "{count} 个失败",
@@ -113,6 +115,15 @@
     },
     "downloadFailed": "下载失败",
     "unknownError": "未知错误"
+  },
+  "render": {
+    "coarseShot": "粗镜头 {number}",
+    "fineShotCount": "细镜头 {count} 个",
+    "backToCoarseList": "返回粗镜头列表",
+    "groupRunning": "该组生成中",
+    "groupFailed": "该组存在失败项",
+    "groupCompleted": "该组已完成",
+    "groupPending": "该组待生成"
   },
   "firstLastFrame": {
     "title": "首尾帧设置",

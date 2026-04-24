@@ -147,10 +147,11 @@ export async function handleScriptToStoryboardTask(job: Job<TaskJobData>) {
   const reasoningEffort = requestedReasoningEffort
     || (isReasoningEffort(capabilityReasoningEffort) ? capabilityReasoningEffort : 'high')
 
-  const phase1PlanTemplate = getPromptTemplate(PROMPT_IDS.NP_AGENT_STORYBOARD_PLAN, job.data.locale)
-  const phase2CinematographyTemplate = getPromptTemplate(PROMPT_IDS.NP_AGENT_CINEMATOGRAPHER, job.data.locale)
-  const phase2ActingTemplate = getPromptTemplate(PROMPT_IDS.NP_AGENT_ACTING_DIRECTION, job.data.locale)
-  const phase3DetailTemplate = getPromptTemplate(PROMPT_IDS.NP_AGENT_STORYBOARD_DETAIL, job.data.locale)
+  const phase1PlanTemplate = getPromptTemplate(PROMPT_IDS.NP_AGENT_STORYBOARD_PLAN_V4, job.data.locale)
+  const phase2GroupSplitTemplate = getPromptTemplate(PROMPT_IDS.NP_AGENT_STORYBOARD_GROUP_SPLIT, job.data.locale)
+  const phase2CinematographyTemplate = getPromptTemplate(PROMPT_IDS.NP_AGENT_CINEMATOGRAPHER_V3, job.data.locale)
+  const phase2ActingTemplate = getPromptTemplate(PROMPT_IDS.NP_AGENT_ACTING_DIRECTION_V2, job.data.locale)
+  const phase3DetailTemplate = getPromptTemplate(PROMPT_IDS.NP_AGENT_STORYBOARD_DETAIL_V3, job.data.locale)
   const payloadMeta = typeof payload.meta === 'object' && payload.meta !== null
     ? (payload.meta as AnyObj)
     : {}
@@ -302,6 +303,7 @@ export async function handleScriptToStoryboardTask(job: Job<TaskJobData>) {
                   },
                   promptTemplates: {
                     phase1PlanTemplate,
+                    phase2GroupSplitTemplate,
                     phase2CinematographyTemplate,
                     phase2ActingTemplate,
                     phase3DetailTemplate,
@@ -344,6 +346,7 @@ export async function handleScriptToStoryboardTask(job: Job<TaskJobData>) {
                   },
                   promptTemplates: {
                     phase1PlanTemplate,
+                    phase2GroupSplitTemplate,
                     phase2CinematographyTemplate,
                     phase2ActingTemplate,
                     phase3DetailTemplate,

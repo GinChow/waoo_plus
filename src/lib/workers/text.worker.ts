@@ -48,6 +48,21 @@ function readNullableText(value: Record<string, unknown>, key: string): string |
 
 type AnyObj = Record<string, unknown>
 type JsonRecord = Record<string, unknown>
+type CompactStoryboardPanel = {
+  panel_number?: number
+  parent_group_number?: number
+}
+
+function buildParentGroupMappingCompact(panels: CompactStoryboardPanel[]): string {
+  const mapping: Array<[number, number]> = []
+  for (let index = 0; index < panels.length; index += 1) {
+    const panel = panels[index]
+    const panelNumber = typeof panel.panel_number === 'number' ? panel.panel_number : (index + 1)
+    const parentGroupNumber = typeof panel.parent_group_number === 'number' ? panel.parent_group_number : 1
+    mapping.push([panelNumber, parentGroupNumber])
+  }
+  return JSON.stringify(mapping)
+}
 
 type WorkerLLMStreamContext = {
   streamRunId: string
@@ -514,7 +529,11 @@ async function handleRegenerateStoryboardTextTask(job: Job<TaskJobData>) {
     await tx.novelPromotionPanel.deleteMany({ where: { storyboardId } })
     await tx.novelPromotionStoryboard.update({
       where: { id: storyboardId },
-      data: { panelCount: finalPanels.length, updatedAt: new Date() },
+      data: {
+        panelCount: finalPanels.length,
+        storyboardTextJson: buildParentGroupMappingCompact(finalPanels),
+        updatedAt: new Date(),
+      },
     })
 
     for (let i = 0; i < finalPanels.length; i++) {

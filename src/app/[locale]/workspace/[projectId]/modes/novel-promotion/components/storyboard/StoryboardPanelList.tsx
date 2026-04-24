@@ -90,7 +90,7 @@ export default function StoryboardPanelList({
     <div className={`grid gap-4 ${isVertical ? 'grid-cols-5' : 'grid-cols-3'} ${isSubmittingStoryboardTextTask ? 'opacity-50 pointer-events-none' : ''}`}>
       {textPanels.map((panel, index) => {
         const imageUrl = displayImages[index]
-        const globalPanelNumber = storyboardStartIndex + index + 1
+        const globalPanelNumber = storyboardStartIndex + panel.panelIndex + 1
         const isPanelModifying =
           modifyingPanels.has(panel.id) ||
           Boolean(
@@ -137,8 +137,8 @@ export default function StoryboardPanelList({
               onRemoveCharacter={(characterIndex) => onRemoveCharacter(panel, characterIndex)}
               onRemoveLocation={() => onRemoveLocation(panel)}
               onRegeneratePanelImage={onRegeneratePanelImage}
-              onOpenEditModal={() => onOpenEditModal(index)}
-              onOpenAIDataModal={() => onOpenAIDataModal(index)}
+              onOpenEditModal={() => onOpenEditModal(panel.panelIndex)}
+              onOpenAIDataModal={() => onOpenAIDataModal(panel.panelIndex)}
               onSelectCandidateIndex={onSelectPanelCandidateIndex}
               onConfirmCandidate={onConfirmPanelCandidate}
               onCancelCandidate={onCancelPanelCandidate}
@@ -147,8 +147,8 @@ export default function StoryboardPanelList({
               onUploadImage={onUploadPanelImage}
               isUploading={uploadingPanelIds.has(panel.id)}
               onPreviewImage={onPreviewImage}
-              onInsertAfter={() => onInsertAfter(index)}
-              onVariant={() => onVariant(index)}
+              onInsertAfter={() => onInsertAfter(panel.panelIndex)}
+              onVariant={() => onVariant(panel.panelIndex)}
               isInsertDisabled={isInsertDisabled(panel.id)}
             />
           </div>

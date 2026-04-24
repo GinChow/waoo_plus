@@ -100,6 +100,41 @@ describe('script-to-storyboard orchestrator retry', () => {
     expect(callCount).toBe(1)
   })
 
+  it('does not retry terminated step error', async () => {
+    let callCount = 0
+    const runStep = vi.fn(async () => {
+      callCount += 1
+      throw new Error('Run terminated during script_to_storyboard_step:clip-1: lease lost')
+    })
+
+    await expect(
+      runScriptToStoryboardOrchestrator({
+        clips: [
+          {
+            id: 'clip-1',
+            content: '文本',
+            characters: JSON.stringify([{ name: '角色A' }]),
+            location: '场景A',
+            screenplay: null,
+          },
+        ],
+        novelPromotionData: {
+          characters: [{ name: '角色A', appearances: [] }],
+          locations: [{ name: '场景A', images: [] }],
+        },
+        promptTemplates: {
+          phase1PlanTemplate: '{clip_content} {clip_json} {characters_lib_name} {locations_lib_name} {characters_introduction} {characters_appearance_list} {characters_full_description}',
+          phase2CinematographyTemplate: '{panels_json} {panel_count} {locations_description} {characters_info}',
+          phase2ActingTemplate: '{panels_json} {panel_count} {characters_info}',
+          phase3DetailTemplate: '{panels_json} {characters_age_gender} {locations_description}',
+        },
+        runStep,
+      }),
+    ).rejects.toThrow('lease lost')
+
+    expect(callCount).toBe(1)
+  })
+
   it('respects maxStepAttempts=1 for retryable errors', async () => {
     let callCount = 0
     const runStep = vi.fn(async () => {
@@ -338,7 +373,14 @@ describe('script-to-storyboard orchestrator retry', () => {
         }
       }
 
-      if (action === 'storyboard_phase2_cinematography' && stepId === 'clip_clip-2_phase2_cinematography') {
+      if (
+        action === 'storyboard_phase2_cinematography'
+        && (
+          stepId === 'clip_clip-2_phase2_cinematography'
+          || stepId === 'clip_clip-2_phase3_cinematography'
+          || stepId === 'clip_clip-2_phase2_acting'
+        )
+      ) {
         clip2Phase2Started = true
         releaseClip1Phase1?.()
         return {
@@ -505,15 +547,15 @@ describe('script-to-storyboard orchestrator retry', () => {
     expect(Array.isArray(phase3Panels)).toBe(true)
     expect(phase3Panels).toHaveLength(1)
     const panel = phase3Panels[0]
-    expect(panel.photography_rules).toBeTruthy()
+    expect(panel.photography_rules).toBeUndefined()
     expect(panel.acting_notes).toBeTruthy()
-    expect(panel.lighting).toBeUndefined()
-    expect(panel.color_tone).toBeUndefined()
-    expect(panel.camera_angle).toBeUndefined()
-    expect(panel.depth_of_field).toBeUndefined()
-    expect(panel.focus_priority).toBeUndefined()
-    expect(panel.composition_note).toBeUndefined()
-    expect(panel.viewpoint_constraint).toBeUndefined()
+    expect(panel.lighting).toBeTruthy()
+    expect(panel.color_tone).toBeTruthy()
+    expect(panel.camera_angle).toBeTruthy()
+    expect(panel.depth_of_field).toBeTruthy()
+    expect(panel.focus_priority).toBeTruthy()
+    expect(panel.composition_note).toBeTruthy()
+    expect(panel.viewpoint_constraint).toBeTruthy()
   })
 
   it('merges phase3 minimal fields into phase1 and phase2 panels', async () => {
@@ -602,5 +644,193 @@ describe('script-to-storyboard orchestrator retry', () => {
     expect(panel.duration).toBe(2.5)
     expect(panel.photographyPlan).toBeTruthy()
     expect(panel.actingNotes).toBeTruthy()
+  })
+
+  it('fuses phase3 guidance by fine groups without cross-group mixing', async () => {
+    const artifacts: Array<{
+      stepKey: string
+      artifactType: string
+      payload: Record<string, unknown>
+    }> = []
+
+    const runStep = vi.fn(async (_meta, prompt, action: string) => {
+      if (action === 'storyboard_phase1_plan') {
+        return {
+          text: JSON.stringify([
+            {
+              group_number: 1,
+              description_group: '粗组1',
+              source_text_group: '原文组1',
+            },
+            {
+              group_number: 2,
+              description_group: '粗组2',
+              source_text_group: '原文组2',
+            },
+          ]),
+          reasoning: '',
+        }
+      }
+
+      if (action === 'storyboard_phase2_cinematography' && prompt.startsWith('SPLIT::')) {
+        if (prompt.includes('"group_number": 1')) {
+          return {
+            text: JSON.stringify([
+              {
+                panel_number: 1,
+                description: '细镜头-组1',
+                source_text: '细原文-组1',
+                location: '场景A',
+                scene_type: 'dialogue',
+                characters: [{ name: '角色A' }],
+              },
+            ]),
+            reasoning: '',
+          }
+        }
+        return {
+          text: JSON.stringify([
+            {
+              panel_number: 1,
+              description: '细镜头-组2',
+              source_text: '细原文-组2',
+              location: '场景A',
+              scene_type: 'dialogue',
+              characters: [{ name: '角色A' }],
+            },
+          ]),
+          reasoning: '',
+        }
+      }
+
+      if (action === 'storyboard_phase2_cinematography' && prompt.startsWith('CINE::')) {
+        if (prompt.includes('"parent_group_number": 1')) {
+          return {
+            text: JSON.stringify([{
+              panel_number: 1,
+              lighting: '组1光',
+              camera_angle: '组1机位',
+              depth_of_field: '组1景深',
+              focus_priority: '组1主体',
+              composition_note: '组1构图',
+              viewpoint_constraint: '组1视角',
+              characters: [{ name: '角色A', screen_position: '左侧' }],
+            }]),
+            reasoning: '',
+          }
+        }
+        return {
+          text: JSON.stringify([{
+            panel_number: 1,
+            lighting: '组2光',
+            camera_angle: '组2机位',
+            depth_of_field: '组2景深',
+            focus_priority: '组2主体',
+            composition_note: '组2构图',
+            viewpoint_constraint: '组2视角',
+            characters: [{ name: '角色A', screen_position: '右侧' }],
+          }]),
+          reasoning: '',
+        }
+      }
+
+      if (action === 'storyboard_phase2_acting' && prompt.startsWith('ACT::')) {
+        if (prompt.includes('"parent_group_number": 1')) {
+          return {
+            text: JSON.stringify([{
+              panel_number: 1,
+              characters: [{ name: '角色A', acting: '组1演技' }],
+            }]),
+            reasoning: '',
+          }
+        }
+        return {
+          text: JSON.stringify([{
+            panel_number: 1,
+            characters: [{ name: '角色A', acting: '组2演技' }],
+          }]),
+          reasoning: '',
+        }
+      }
+
+      if (action === 'storyboard_phase3_detail' && prompt.startsWith('DETAIL::')) {
+        if (prompt.includes('"composition_note": "组1构图"')) {
+          return {
+            text: JSON.stringify([{
+              shot_type: '组1景别',
+              camera_move: '组1运镜',
+              video_prompt: '组1视频',
+              first_frame_image_prompt: '组1首帧',
+              duration: 2.1,
+            }]),
+            reasoning: '',
+          }
+        }
+        return {
+          text: JSON.stringify([{
+            shot_type: '组2景别',
+            camera_move: '组2运镜',
+            video_prompt: '组2视频',
+            first_frame_image_prompt: '组2首帧',
+            duration: 2.2,
+          }]),
+          reasoning: '',
+        }
+      }
+
+      throw new Error(`unexpected action: ${action}`)
+    })
+
+    const result = await runScriptToStoryboardOrchestrator({
+      clips: [
+        {
+          id: 'clip-1',
+          content: '文本',
+          characters: JSON.stringify([{ name: '角色A' }]),
+          location: '场景A',
+          screenplay: null,
+        },
+      ],
+      novelPromotionData: {
+        characters: [{ name: '角色A', appearances: [] }],
+        locations: [{ name: '场景A', images: [] }],
+      },
+      promptTemplates: {
+        phase1PlanTemplate: '{clip_content}',
+        phase2GroupSplitTemplate: 'SPLIT::{coarse_storyboard_group}',
+        phase2CinematographyTemplate: 'CINE::{panels_json}',
+        phase2ActingTemplate: 'ACT::{panels_json}',
+        phase3DetailTemplate: 'DETAIL::{panels_json}',
+      },
+      runStep,
+      onArtifact: async (artifact) => {
+        artifacts.push({
+          stepKey: artifact.stepKey,
+          artifactType: artifact.artifactType,
+          payload: artifact.payload,
+        })
+      },
+    })
+
+    const actingArtifact = artifacts.find((item) => item.artifactType === 'storyboard.clip.phase2.acting')
+    expect(actingArtifact).toBeTruthy()
+    const fineGroupsWithGuidance = (actingArtifact?.payload.fine_groups_with_guidance || []) as Array<Record<string, unknown>>
+    expect(fineGroupsWithGuidance).toHaveLength(2)
+
+    const group1Panels = (fineGroupsWithGuidance[0]?.panels || []) as Array<Record<string, unknown>>
+    const group2Panels = (fineGroupsWithGuidance[1]?.panels || []) as Array<Record<string, unknown>>
+    expect(group1Panels[0]?.composition_note).toBe('组1构图')
+    expect(group2Panels[0]?.composition_note).toBe('组2构图')
+    expect((group1Panels[0]?.acting_notes as { characters?: Array<{ acting?: string }> })?.characters?.[0]?.acting).toBe('组1演技')
+    expect((group2Panels[0]?.acting_notes as { characters?: Array<{ acting?: string }> })?.characters?.[0]?.acting).toBe('组2演技')
+
+    const finalPanels = result.clipPanels[0]?.finalPanels || []
+    expect(finalPanels).toHaveLength(2)
+    expect(finalPanels[0]?.video_prompt).toBe('组1视频')
+    expect(finalPanels[1]?.video_prompt).toBe('组2视频')
+    expect(finalPanels[0]?.photographyPlan?.composition_note).toBe('组1构图')
+    expect(finalPanels[1]?.photographyPlan?.composition_note).toBe('组2构图')
+    expect((finalPanels[0]?.actingNotes as Array<{ acting?: string }>)?.[0]?.acting).toBe('组1演技')
+    expect((finalPanels[1]?.actingNotes as Array<{ acting?: string }>)?.[0]?.acting).toBe('组2演技')
   })
 })

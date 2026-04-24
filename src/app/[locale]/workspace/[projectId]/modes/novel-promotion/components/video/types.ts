@@ -17,6 +17,7 @@ export type VideoGenerationMode = 'normal' | 'firstlastframe'
 
 export interface TextPanel {
   panel_number: number
+  parent_group_number?: number
   shot_type: string
   camera_move?: string
   description: string
@@ -63,6 +64,7 @@ export interface Panel {
 export interface Storyboard {
   id: string
   clipId?: string | null
+  storyboardTextJson?: string | null
   panels?: Panel[]
   clip?: {
     start: number
@@ -82,6 +84,7 @@ export interface VideoPanel {
   panelId?: string  // 任务目标ID
   storyboardId: string
   panelIndex: number
+  parentGroupNumber?: number
   textPanel?: TextPanel
   firstLastFramePrompt?: string
   imageUrl?: string

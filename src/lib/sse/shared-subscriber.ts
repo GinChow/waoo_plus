@@ -5,13 +5,18 @@ import { createSubscriber } from '@/lib/redis'
 type MessageHandler = (message: string) => void
 
 class SharedSubscriber {
-  private readonly subscriber: Redis
+  private subscriber: Redis
   private readonly listeners = new Map<string, Map<number, MessageHandler>>()
   private listenerSeq = 1
+  private recovering: Promise<void> | null = null
 
   constructor() {
     this.subscriber = createSubscriber()
-    this.subscriber.on('message', (channel, message) => {
+    this.bindSubscriberEvents(this.subscriber)
+  }
+
+  private bindSubscriberEvents(client: Redis) {
+    client.on('message', (channel, message) => {
       const channelListeners = this.listeners.get(channel)
       if (!channelListeners || channelListeners.size === 0) return
 
@@ -25,9 +30,48 @@ class SharedSubscriber {
       }
     })
 
-    this.subscriber.on('error', (error) => {
+    client.on('error', (error) => {
       _ulogError(`[SSE:shared] redis error: ${error?.message || 'unknown'}`)
     })
+  }
+
+  private shouldRecover(error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    const lower = message.toLowerCase()
+    return lower.includes('subscriber mode') || lower.includes('only subscriber commands may be used')
+  }
+
+  private async recoverSubscriberConnection() {
+    if (this.recovering) {
+      await this.recovering
+      return
+    }
+
+    this.recovering = (async () => {
+      const previous = this.subscriber
+      const replacement = createSubscriber()
+      this.bindSubscriberEvents(replacement)
+      this.subscriber = replacement
+
+      const channels = Array.from(this.listeners.entries())
+        .filter(([, handlers]) => handlers.size > 0)
+        .map(([channel]) => channel)
+      if (channels.length > 0) {
+        await replacement.subscribe(...channels)
+      }
+
+      try {
+        await previous.quit()
+      } catch {
+        previous.disconnect(false)
+      }
+    })()
+
+    try {
+      await this.recovering
+    } finally {
+      this.recovering = null
+    }
   }
 
   async addChannelListener(channel: string, handler: MessageHandler): Promise<() => Promise<void>> {
@@ -39,17 +83,31 @@ class SharedSubscriber {
 
     const listenerId = this.listenerSeq++
     channelListeners.set(listenerId, handler)
-
-    try {
-      if (channelListeners.size === 1) {
-        await this.subscriber.subscribe(channel)
-      }
-    } catch (error) {
-      channelListeners.delete(listenerId)
-      if (channelListeners.size === 0) {
+    const rollbackListener = () => {
+      const latestListeners = this.listeners.get(channel)
+      if (!latestListeners) return
+      latestListeners.delete(listenerId)
+      if (latestListeners.size === 0) {
         this.listeners.delete(channel)
       }
-      throw error
+    }
+
+    if (channelListeners.size === 1) {
+      try {
+        await this.subscriber.subscribe(channel)
+      } catch (error) {
+        if (this.shouldRecover(error)) {
+          try {
+            await this.recoverSubscriberConnection()
+          } catch (recoverError) {
+            rollbackListener()
+            throw recoverError
+          }
+        } else {
+          rollbackListener()
+          throw error
+        }
+      }
     }
 
     return async () => {

@@ -7,6 +7,86 @@ import { apiHandler, ApiError } from '@/lib/api-errors'
 import { attachMediaFieldsToProject } from '@/lib/media/attach'
 import { resolveMediaRefFromLegacyValue } from '@/lib/media/service'
 
+function extractPanelsFromArtifactPayload(payload: unknown): unknown[] {
+  if (!payload || typeof payload !== 'object') return []
+  const record = payload as Record<string, unknown>
+  if (Array.isArray(record.panels)) return record.panels
+  const nested = record.output
+  if (nested && typeof nested === 'object') {
+    const nestedPanels = (nested as Record<string, unknown>).panels
+    if (Array.isArray(nestedPanels)) return nestedPanels
+  }
+  return []
+}
+
+function toCompactParentGroupMappingJson(panels: unknown[]): string | null {
+  const mapping: Array<[number, number]> = []
+  for (let index = 0; index < panels.length; index += 1) {
+    const panel = panels[index]
+    if (!panel || typeof panel !== 'object') continue
+    const row = panel as Record<string, unknown>
+    const panelNumberRaw = row.panel_number
+    const parentGroupRaw = row.parent_group_number
+    if (typeof panelNumberRaw !== 'number' || typeof parentGroupRaw !== 'number') continue
+    mapping.push([panelNumberRaw, parentGroupRaw])
+  }
+  if (mapping.length === 0) return null
+  return JSON.stringify(mapping)
+}
+
+async function backfillStoryboardTextJsonFromArtifacts(params: {
+  projectId: string
+  episodeId: string
+  storyboards: Array<{ id: string; clipId: string; storyboardTextJson: string | null }>
+}) {
+  const missing = params.storyboards.filter((item) => !item.storyboardTextJson)
+  if (missing.length === 0) return
+
+  const latestRun = await prisma.graphRun.findFirst({
+    where: {
+      projectId: params.projectId,
+      workflowType: 'script_to_storyboard_run',
+      targetId: params.episodeId,
+      status: 'completed',
+    },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true },
+  })
+  if (!latestRun) return
+
+  await Promise.all(
+    missing.map(async (storyboard) => {
+      const phase3Artifact = await prisma.graphArtifact.findFirst({
+        where: {
+          runId: latestRun.id,
+          refId: storyboard.clipId,
+          artifactType: 'storyboard.clip.phase3',
+        },
+        select: { payload: true },
+      })
+      const phase2Artifact = phase3Artifact
+        ? null
+        : await prisma.graphArtifact.findFirst({
+          where: {
+            runId: latestRun.id,
+            refId: storyboard.clipId,
+            artifactType: 'storyboard.clip.phase2.cine',
+          },
+          select: { payload: true },
+        })
+
+      const panels = extractPanelsFromArtifactPayload(phase3Artifact?.payload ?? phase2Artifact?.payload)
+      const compactMapping = toCompactParentGroupMappingJson(panels)
+      if (!compactMapping) return
+      await prisma.novelPromotionStoryboard.update({
+        where: { id: storyboard.id },
+        data: { storyboardTextJson: compactMapping },
+      })
+      storyboard.storyboardTextJson = compactMapping
+    }),
+  )
+}
+
 /**
  * GET - 获取单个剧集的完整数据
  */
@@ -46,6 +126,12 @@ export const GET = apiHandler(async (
   if (!episode) {
     throw new ApiError('NOT_FOUND')
   }
+
+  await backfillStoryboardTextJsonFromArtifacts({
+    projectId,
+    episodeId,
+    storyboards: episode.storyboards,
+  })
 
   // 更新最后编辑的剧集ID（异步，不阻塞响应）
   prisma.novelPromotionProject.update({

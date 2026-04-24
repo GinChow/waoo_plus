@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { getPrismaErrorCode } from '@/lib/prisma-error'
 import { selectRecoverableRun } from '@/lib/run-runtime/recovery'
 import { resolveRetryInvalidationStepKeys } from '@/lib/workflow-engine/dependencies'
 import {
@@ -104,6 +105,7 @@ type GraphStepModel = {
 
 type GraphStepAttemptModel = {
   upsert: (args: unknown) => Promise<unknown>
+  updateMany: (args: unknown) => Promise<{ count: number }>
 }
 
 type GraphEventModel = {
@@ -379,7 +381,7 @@ async function upsertArtifactStrict(params: {
   payload: unknown
 }) {
   await ensureGraphArtifactUniqueIndex()
-  return await params.artifactModel.upsert({
+  const args = {
     where: {
       runId_stepKey_artifactType_refId: {
         runId: params.runId,
@@ -400,7 +402,129 @@ async function upsertArtifactStrict(params: {
       versionHash: params.versionHash,
       payload: params.payload,
     },
+  }
+  try {
+    return await params.artifactModel.upsert(args)
+  } catch (error) {
+    if (getPrismaErrorCode(error) !== 'P2002') {
+      throw error
+    }
+    return await params.artifactModel.upsert(args)
+  }
+}
+
+async function upsertGraphStepWithFallback(params: {
+  tx: GraphRuntimeTx
+  runId: string
+  stepKey: string
+  create: Record<string, unknown>
+  update: Record<string, unknown>
+}) {
+  try {
+    await params.tx.graphStep.upsert({
+      where: {
+        runId_stepKey: {
+          runId: params.runId,
+          stepKey: params.stepKey,
+        },
+      },
+      create: params.create,
+      update: params.update,
+    })
+    return
+  } catch (error) {
+    if (getPrismaErrorCode(error) !== 'P2002') {
+      throw error
+    }
+  }
+
+  const result = await params.tx.graphStep.updateMany({
+    where: {
+      runId: params.runId,
+      stepKey: params.stepKey,
+    },
+    data: params.update,
   })
+  if (result.count > 0) return
+
+  try {
+    await params.tx.graphStep.upsert({
+      where: {
+        runId_stepKey: {
+          runId: params.runId,
+          stepKey: params.stepKey,
+        },
+      },
+      create: params.create,
+      update: params.update,
+    })
+    return
+  } catch (error) {
+    if (getPrismaErrorCode(error) === 'P2002') {
+      // 并发事务已创建同一唯一键，视为幂等成功
+      return
+    }
+    throw error
+  }
+}
+
+async function upsertGraphStepAttemptWithFallback(params: {
+  tx: GraphRuntimeTx
+  runId: string
+  stepKey: string
+  attempt: number
+  create: Record<string, unknown>
+  update: Record<string, unknown>
+}) {
+  try {
+    await params.tx.graphStepAttempt.upsert({
+      where: {
+        runId_stepKey_attempt: {
+          runId: params.runId,
+          stepKey: params.stepKey,
+          attempt: params.attempt,
+        },
+      },
+      create: params.create,
+      update: params.update,
+    })
+    return
+  } catch (error) {
+    if (getPrismaErrorCode(error) !== 'P2002') {
+      throw error
+    }
+  }
+
+  const result = await params.tx.graphStepAttempt.updateMany({
+    where: {
+      runId: params.runId,
+      stepKey: params.stepKey,
+      attempt: params.attempt,
+    },
+    data: params.update,
+  })
+  if (result.count > 0) return
+
+  try {
+    await params.tx.graphStepAttempt.upsert({
+      where: {
+        runId_stepKey_attempt: {
+          runId: params.runId,
+          stepKey: params.stepKey,
+          attempt: params.attempt,
+        },
+      },
+      create: params.create,
+      update: params.update,
+    })
+    return
+  } catch (error) {
+    if (getPrismaErrorCode(error) === 'P2002') {
+      // 并发事务已创建同一唯一键，视为幂等成功
+      return
+    }
+    throw error
+  }
 }
 
 function buildStepProjection(input: RunEventInput) {
@@ -584,73 +708,70 @@ async function applyRunProjection(tx: GraphRuntimeTx, input: RunEventInput) {
     },
   })
 
-  await tx.graphStep.upsert({
-    where: {
-      runId_stepKey: {
-        runId: input.runId,
-        stepKey: stepProjection.stepKey,
-      },
-    },
-    create: {
-      runId: input.runId,
-      stepKey: stepProjection.stepKey,
-      stepTitle: stepProjection.stepTitle,
-      status: nextStatus,
-      currentAttempt: stepProjection.attempt,
-      stepIndex: stepProjection.stepIndex,
-      stepTotal: stepProjection.stepTotal,
-      startedAt: now,
-      finishedAt: isStepCompleted || isStepFailed ? now : null,
-      lastErrorCode: isStepFailed ? readString(stepProjection.payload, 'errorCode') : null,
-      lastErrorMessage: isStepFailed
-        ? (readString(stepProjection.payload, 'message') || readString(stepProjection.payload, 'errorMessage'))
-        : null,
-    },
-    update: {
-      stepTitle: stepProjection.stepTitle,
-      status: nextStatus,
-      currentAttempt: stepProjection.attempt,
-      stepIndex: stepProjection.stepIndex,
-      stepTotal: stepProjection.stepTotal,
-      startedAt: undefined,
-      finishedAt: isStepCompleted || isStepFailed ? now : null,
-      lastErrorCode: isStepFailed ? readString(stepProjection.payload, 'errorCode') : null,
-      lastErrorMessage: isStepFailed
-        ? resolveErrorMessage(stepProjection.payload)
-        : null,
-    },
+  const stepCreate = {
+    runId: input.runId,
+    stepKey: stepProjection.stepKey,
+    stepTitle: stepProjection.stepTitle,
+    status: nextStatus,
+    currentAttempt: stepProjection.attempt,
+    stepIndex: stepProjection.stepIndex,
+    stepTotal: stepProjection.stepTotal,
+    startedAt: now,
+    finishedAt: isStepCompleted || isStepFailed ? now : null,
+    lastErrorCode: isStepFailed ? readString(stepProjection.payload, 'errorCode') : null,
+    lastErrorMessage: isStepFailed
+      ? (readString(stepProjection.payload, 'message') || readString(stepProjection.payload, 'errorMessage'))
+      : null,
+  }
+  const stepUpdate = {
+    stepTitle: stepProjection.stepTitle,
+    status: nextStatus,
+    currentAttempt: stepProjection.attempt,
+    stepIndex: stepProjection.stepIndex,
+    stepTotal: stepProjection.stepTotal,
+    finishedAt: isStepCompleted || isStepFailed ? now : null,
+    lastErrorCode: isStepFailed ? readString(stepProjection.payload, 'errorCode') : null,
+    lastErrorMessage: isStepFailed
+      ? resolveErrorMessage(stepProjection.payload)
+      : null,
+  }
+  await upsertGraphStepWithFallback({
+    tx,
+    runId: input.runId,
+    stepKey: stepProjection.stepKey,
+    create: stepCreate,
+    update: stepUpdate,
   })
 
-  await tx.graphStepAttempt.upsert({
-    where: {
-      runId_stepKey_attempt: {
-        runId: input.runId,
-        stepKey: stepProjection.stepKey,
-        attempt: stepProjection.attempt,
-      },
-    },
-    create: {
-      runId: input.runId,
-      stepKey: stepProjection.stepKey,
-      attempt: stepProjection.attempt,
-      status: nextStatus,
-      outputText: isStepCompleted ? readString(stepProjection.payload, 'text') : null,
-      outputReasoning: isStepCompleted ? readString(stepProjection.payload, 'reasoning') : null,
-      errorCode: isStepFailed ? readString(stepProjection.payload, 'errorCode') : null,
-      errorMessage: isStepFailed ? resolveErrorMessage(stepProjection.payload) : null,
-      startedAt: now,
-      finishedAt: isStepCompleted || isStepFailed ? now : null,
-      usageJson: toObject(stepProjection.payload.usage),
-    },
-    update: {
-      status: nextStatus,
-      outputText: isStepCompleted ? readString(stepProjection.payload, 'text') : null,
-      outputReasoning: isStepCompleted ? readString(stepProjection.payload, 'reasoning') : null,
-      errorCode: isStepFailed ? readString(stepProjection.payload, 'errorCode') : null,
-      errorMessage: isStepFailed ? resolveErrorMessage(stepProjection.payload) : null,
-      finishedAt: isStepCompleted || isStepFailed ? now : null,
-      usageJson: toObject(stepProjection.payload.usage),
-    },
+  const stepAttemptCreate = {
+    runId: input.runId,
+    stepKey: stepProjection.stepKey,
+    attempt: stepProjection.attempt,
+    status: nextStatus,
+    outputText: isStepCompleted ? readString(stepProjection.payload, 'text') : null,
+    outputReasoning: isStepCompleted ? readString(stepProjection.payload, 'reasoning') : null,
+    errorCode: isStepFailed ? readString(stepProjection.payload, 'errorCode') : null,
+    errorMessage: isStepFailed ? resolveErrorMessage(stepProjection.payload) : null,
+    startedAt: now,
+    finishedAt: isStepCompleted || isStepFailed ? now : null,
+    usageJson: toObject(stepProjection.payload.usage),
+  }
+  const stepAttemptUpdate = {
+    status: nextStatus,
+    outputText: isStepCompleted ? readString(stepProjection.payload, 'text') : null,
+    outputReasoning: isStepCompleted ? readString(stepProjection.payload, 'reasoning') : null,
+    errorCode: isStepFailed ? readString(stepProjection.payload, 'errorCode') : null,
+    errorMessage: isStepFailed ? resolveErrorMessage(stepProjection.payload) : null,
+    finishedAt: isStepCompleted || isStepFailed ? now : null,
+    usageJson: toObject(stepProjection.payload.usage),
+  }
+  await upsertGraphStepAttemptWithFallback({
+    tx,
+    runId: input.runId,
+    stepKey: stepProjection.stepKey,
+    attempt: stepProjection.attempt,
+    create: stepAttemptCreate,
+    update: stepAttemptUpdate,
   })
 
   const artifactProjection = buildArtifactProjection({

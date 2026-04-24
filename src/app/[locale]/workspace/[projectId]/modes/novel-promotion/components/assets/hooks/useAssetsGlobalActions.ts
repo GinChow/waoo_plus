@@ -206,8 +206,8 @@ export function useAssetsGlobalActions({
 
       try {
         const result = await waitForTaskResult(completion.finishedTaskId, {
-          intervalMs: 100,
-          timeoutMs: 2_000,
+          intervalMs: 400,
+          timeoutMs: 30_000,
         }) as { stats?: { newCharacters?: number; newLocations?: number } }
         await Promise.resolve(onRefresh())
         const message = finishedMode === 'characters'
@@ -224,13 +224,25 @@ export function useAssetsGlobalActions({
             })
         showToast(message, 'success', 5000)
       } catch (error: unknown) {
+        const errorMessage = getErrorMessage(error)
+        if (errorMessage.startsWith('Task timeout:')) {
+          _ulogInfo(`Global analyze finalize timeout, fallback refresh taskId=${completion.finishedTaskId}`)
+          await Promise.resolve(onRefresh())
+          const message = finishedMode === 'characters'
+            ? t('toolbar.globalAnalyzeCharactersSuccess', { characters: 0 })
+            : finishedMode === 'locations'
+              ? t('toolbar.globalAnalyzeLocationsSuccess', { locations: 0 })
+              : t('toolbar.globalAnalyzeSuccess', { characters: 0, locations: 0 })
+          showToast(message, 'success', 5000)
+          return
+        }
         _ulogError('Global analyze finalize error:', error)
         const failedLabel = finishedMode === 'characters'
           ? t('toolbar.globalAnalyzeCharactersFailed')
           : finishedMode === 'locations'
             ? t('toolbar.globalAnalyzeLocationsFailed')
             : t('toolbar.globalAnalyzeFailed')
-        showToast(`${failedLabel}: ${getErrorMessage(error)}`, 'error', 5000)
+        showToast(`${failedLabel}: ${errorMessage}`, 'error', 5000)
       }
     })()
   }, [globalAnalyzeTaskState, onRefresh, showToast, t])

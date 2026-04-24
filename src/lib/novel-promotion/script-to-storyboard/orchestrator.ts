@@ -3,6 +3,7 @@ import { buildCharactersIntroduction } from '@/lib/constants'
 import { normalizeAnyError } from '@/lib/errors/normalize'
 import { createScopedLogger } from '@/lib/logging/core'
 import { mapWithConcurrency } from '@/lib/async/map-with-concurrency'
+import { TaskTerminatedError } from '@/lib/task/errors'
 import {
   type ActingDirection,
   type CharacterAsset,
@@ -14,7 +15,6 @@ import {
   formatClipId,
   getFilteredAppearanceList,
   getFilteredFullDescription,
-  getFilteredLocationsDescription,
 } from '@/lib/storyboard-phases'
 import {
   buildPromptAssetContext,
@@ -57,9 +57,21 @@ type ClipInput = {
 
 export type ScriptToStoryboardPromptTemplates = {
   phase1PlanTemplate: string
+  phase2GroupSplitTemplate?: string
   phase2CinematographyTemplate: string
   phase2ActingTemplate: string
   phase3DetailTemplate: string
+}
+
+type CoarseStoryboardGroup = JsonRecord & {
+  group_number?: number
+}
+
+function isLikelyCoarseStoryboardGroup(value: CoarseStoryboardGroup) {
+  return typeof value.group_number === 'number'
+    || typeof value.group_purpose === 'string'
+    || typeof value.description_group === 'string'
+    || typeof value.duration_group === 'number'
 }
 
 export type ClipStoryboardPanels = {
@@ -177,6 +189,42 @@ function withStepMeta(
     stepTotal,
     ...extra,
   }
+}
+
+function resolveGroupSplitProgressTitle(params: {
+  locale?: 'zh' | 'en'
+  current: number
+  total: number
+}) {
+  const total = Math.max(1, Math.floor(params.total))
+  const current = Math.min(total, Math.max(1, Math.floor(params.current)))
+  const base = params.locale === 'en' ? 'Split fine shots' : '细镜头拆分'
+  return `${base} ${current}/${total}`
+}
+
+function resolveGuidanceProgressTitle(params: {
+  locale?: 'zh' | 'en'
+  kind: 'cinematography' | 'acting'
+  current: number
+  total: number
+}) {
+  const total = Math.max(1, Math.floor(params.total))
+  const current = Math.min(total, Math.max(1, Math.floor(params.current)))
+  const base = params.kind === 'cinematography'
+    ? (params.locale === 'en' ? 'Generate cinematography rules' : '摄影规则生成')
+    : (params.locale === 'en' ? 'Generate acting direction' : '演技指导生成')
+  return `${base} ${current}/${total}`
+}
+
+function resolveDetailProgressTitle(params: {
+  locale?: 'zh' | 'en'
+  current: number
+  total: number
+}) {
+  const total = Math.max(1, Math.floor(params.total))
+  const current = Math.min(total, Math.max(1, Math.floor(params.current)))
+  const base = params.locale === 'en' ? 'Refine storyboard details' : '分镜细节补全'
+  return `${base} ${current}/${total}`
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -374,29 +422,6 @@ function mergePanelsWithRules(params: {
   })
 }
 
-function buildPhase3PanelsInput(params: {
-  planPanels: StoryboardPanel[]
-  photographyRules: PhotographyRule[]
-  actingDirections: ActingDirection[]
-}) {
-  const { planPanels, photographyRules, actingDirections } = params
-  return planPanels.map((panel, index) => {
-    const matchedRule = photographyRules.find((rule) => rule.panel_number === panel.panel_number) || photographyRules[index]
-    const matchedActing = actingDirections.find((item) => item.panel_number === panel.panel_number) || actingDirections[index]
-    if (!matchedRule) {
-      throw new Error(`Missing cinematography rule for panel_number=${String(panel.panel_number)} at index=${index}`)
-    }
-    if (!matchedActing) {
-      throw new Error(`Missing acting direction for panel_number=${String(panel.panel_number)} at index=${index}`)
-    }
-    return {
-      ...panel,
-      photography_rules: matchedRule,
-      acting_notes: matchedActing,
-    }
-  })
-}
-
 function findPanelByNumberOrIndex<T extends { panel_number?: number }>(
   rows: T[],
   panelNumber: number | undefined,
@@ -466,6 +491,79 @@ function reconcilePhase3Panels(params: {
   })
 }
 
+function buildAdjacentCoarseGroupsContext(groups: CoarseStoryboardGroup[], index: number): string {
+  const previous = index > 0 ? groups[index - 1] : null
+  const next = index < groups.length - 1 ? groups[index + 1] : null
+  return JSON.stringify(
+    {
+      previous_group: previous,
+      next_group: next,
+    },
+    null,
+    2,
+  )
+}
+
+function summarizePanelForContext(panel: StoryboardPanel) {
+  return {
+    panel_number: panel.panel_number,
+    shot_purpose: panel.shot_purpose,
+    description: panel.description,
+    source_text: panel.source_text,
+    location: panel.location,
+    scene_type: panel.scene_type,
+  }
+}
+
+function buildAdjacentFineGroupContext(groups: StoryboardPanel[][], index: number): string {
+  const previousPanels = index > 0 ? groups[index - 1] : null
+  const nextPanels = index < groups.length - 1 ? groups[index + 1] : null
+  return JSON.stringify(
+    {
+      previous_group: previousPanels?.map(summarizePanelForContext) || null,
+      next_group: nextPanels?.map(summarizePanelForContext) || null,
+    },
+    null,
+    2,
+  )
+}
+
+function assignSequentialPanelNumbers(panels: StoryboardPanel[]) {
+  return panels.map((panel, index) => ({
+    ...panel,
+    panel_number: index + 1,
+  }))
+}
+
+function buildFinePanelsWithCinematography(params: {
+  finePanels: StoryboardPanel[]
+  photographyRules: PhotographyRule[]
+  actingDirections: ActingDirection[]
+}) {
+  const { finePanels, photographyRules, actingDirections } = params
+  return finePanels.map((panel, index) => {
+    const matchedRule = findPanelByNumberOrIndex(photographyRules, panel.panel_number, index)
+    const matchedActing = findPanelByNumberOrIndex(actingDirections, panel.panel_number, index)
+    if (!matchedRule) {
+      throw new Error(`Missing cinematography rule for panel_number=${String(panel.panel_number)} at index=${index}`)
+    }
+    if (!matchedActing) {
+      throw new Error(`Missing acting direction for panel_number=${String(panel.panel_number)} at index=${index}`)
+    }
+    return {
+      ...panel,
+      lighting: matchedRule.lighting,
+      camera_angle: matchedRule.camera_angle,
+      viewpoint_constraint: matchedRule.viewpoint_constraint,
+      depth_of_field: matchedRule.depth_of_field,
+      color_tone: matchedRule.color_tone || matchedRule.color_palette,
+      focus_priority: matchedRule.focus_priority,
+      composition_note: matchedRule.composition_note,
+      acting_notes: matchedActing,
+    }
+  })
+}
+
 const DEFAULT_MAX_STEP_ATTEMPTS = 3
 const MAX_RETRY_DELAY_MS = 10_000
 
@@ -479,7 +577,17 @@ function computeRetryDelayMs(attempt: number) {
   return base + jitter
 }
 
+function isTerminatedStepError(error: unknown, message: string) {
+  if (error instanceof TaskTerminatedError) return true
+  if (error instanceof Error && error.name === 'TaskTerminatedError') return true
+  const lowerMessage = message.toLowerCase()
+  return lowerMessage.includes('task terminated')
+    || lowerMessage.includes('terminated during')
+    || lowerMessage.includes('lease lost')
+}
+
 function shouldRetryStepError(error: unknown, message: string, retryable: boolean) {
+  if (isTerminatedStepError(error, message)) return false
   if (error instanceof JsonParseError) return true
   if (retryable) return true
   const lowerMessage = message.toLowerCase()
@@ -502,14 +610,27 @@ async function runStepWithRetry<T>(
   parse: (text: string) => T,
   maxStepAttempts: number,
 ): Promise<{ output: ScriptToStoryboardStepOutput; parsed: T }> {
+  const hasBaseStepAttempt =
+    typeof baseMeta.stepAttempt === 'number' && Number.isFinite(baseMeta.stepAttempt)
+  const baseStepAttempt = hasBaseStepAttempt
+    ? Math.max(1, Math.floor(baseMeta.stepAttempt as number))
+    : 1
   let lastError: Error | null = null
   for (let attempt = 1; attempt <= maxStepAttempts; attempt++) {
+    const stepAttempt = baseStepAttempt + attempt - 1
     const meta = attempt === 1
-      ? baseMeta
+      ? (
+        hasBaseStepAttempt
+          ? {
+            ...baseMeta,
+            stepAttempt,
+          }
+          : baseMeta
+      )
       : {
         ...baseMeta,
         stepId: baseMeta.stepId,
-        stepAttempt: attempt,
+        stepAttempt,
         stepTitle: baseMeta.stepTitle,
       }
     try {
@@ -574,250 +695,406 @@ export async function runScriptToStoryboardOrchestrator(
     DEFAULT_ANALYSIS_WORKFLOW_CONCURRENCY,
   )
 
-  const totalStepCount = clips.length * 4 + 2
+  const totalStepCount = clips.length * 5 + 2
   const charactersLibName = (novelPromotionData.characters || []).map((c) => c.name).join(', ') || '无'
   const locationsLibName = (novelPromotionData.locations || []).map((l) => l.name).join(', ') || '无'
   const charactersIntroduction = buildCharactersIntroduction(novelPromotionData.characters || [])
+  const phase2GroupSplitTemplate = promptTemplates.phase2GroupSplitTemplate || '{coarse_storyboard_group}'
 
   const phase1PanelsByClipId = new Map<string, StoryboardPanel[]>()
   const phase2CinematographyByClipId = new Map<string, PhotographyRule[]>()
   const phase2ActingByClipId = new Map<string, ActingDirection[]>()
   const phase3PanelsByClipId = new Map<string, StoryboardPanel[]>()
 
-  const clipPanels = await mapWithConcurrency(
-    clips,
-    concurrency,
-    async (clip, index): Promise<ClipStoryboardPanels> => {
-      const clipIndex = index + 1
-      const clipContent = typeof clip.content === 'string' ? clip.content.trim() : ''
-      if (!clipContent) {
-        throw new Error(`Clip ${formatClipId(clip)} content is empty`)
-      }
-      const clipCharacters = parseClipCharacters(clip.characters)
-      const clipLocation = clip.location || null
-      const clipProps = parseClipProps(clip.props ?? null)
-      const filteredAppearanceList = getFilteredAppearanceList(novelPromotionData.characters || [], clipCharacters)
-      const filteredFullDescription = getFilteredFullDescription(novelPromotionData.characters || [], clipCharacters)
-      const filteredLocationsDescription = getFilteredLocationsDescription(
-        novelPromotionData.locations || [],
-        clipLocation,
-        input.locale ?? 'zh',
-      )
-      const filteredPropsDescription = compileAssetPromptFragments(buildPromptAssetContext({
-        characters: [],
-        locations: [],
-        props: novelPromotionData.props || [],
-        clipCharacters: [],
-        clipLocation: null,
-        clipProps,
-      })).propsDescriptionText
-      const clipJson = JSON.stringify(
-        {
-          id: clip.id,
-          content: clipContent,
-          characters: clipCharacters,
-          location: clip.location || null,
-          props: clipProps,
-        },
-        null,
-        2,
-      )
+  const clipPanels = await mapWithConcurrency(clips, concurrency, async (clip, index): Promise<ClipStoryboardPanels> => {
+    const clipIndex = index + 1
+    const clipContent = typeof clip.content === 'string' ? clip.content.trim() : ''
+    if (!clipContent) {
+      throw new Error(`Clip ${formatClipId(clip)} content is empty`)
+    }
+    const clipCharacters = parseClipCharacters(clip.characters)
+    const clipProps = parseClipProps(clip.props ?? null)
+    const filteredAppearanceList = getFilteredAppearanceList(novelPromotionData.characters || [], clipCharacters)
+    const filteredFullDescription = getFilteredFullDescription(novelPromotionData.characters || [], clipCharacters)
+    const filteredPropsDescription = compileAssetPromptFragments(buildPromptAssetContext({
+      characters: [],
+      locations: [],
+      props: novelPromotionData.props || [],
+      clipCharacters: [],
+      clipLocation: null,
+      clipProps,
+    })).propsDescriptionText
+    const clipJson = JSON.stringify(
+      {
+        id: clip.id,
+        content: clipContent,
+        characters: clipCharacters,
+        location: clip.location || null,
+        props: clipProps,
+      },
+      null,
+      2,
+    )
 
-      let phase1Prompt = promptTemplates.phase1PlanTemplate
+    let phase1Prompt = promptTemplates.phase1PlanTemplate
+      .replace('{characters_lib_name}', charactersLibName)
+      .replace('{locations_lib_name}', locationsLibName)
+      .replace('{characters_introduction}', charactersIntroduction)
+      .replace('{characters_appearance_list}', filteredAppearanceList)
+      .replace('{characters_full_description}', filteredFullDescription)
+      .replace('{props_description}', filteredPropsDescription)
+      .replace('{clip_json}', clipJson)
+
+    const screenplay = parseScreenplay(clip.screenplay)
+    if (screenplay) {
+      phase1Prompt = phase1Prompt.replace('{clip_content}', `【剧本格式】\n${JSON.stringify(screenplay, null, 2)}`)
+    } else {
+      phase1Prompt = phase1Prompt.replace('{clip_content}', clipContent)
+    }
+
+    const phase1Meta = withStepMeta(
+      `clip_${clip.id}_phase1`,
+      'progress.streamStep.storyboardPlan',
+      clipIndex,
+      totalStepCount,
+      {
+        groupId: `clip_${clip.id}`,
+        parallelKey: 'phase1',
+        retryable: true,
+      },
+    )
+    const { parsed: coarseGroups } = await runStepWithRetry(
+      runStep,
+      phase1Meta,
+      phase1Prompt,
+      'storyboard_phase1_plan',
+      2600,
+      (text) => {
+        const groups = parseJsonArray<CoarseStoryboardGroup>(text, `phase1:${formatClipId(clip)}`)
+        if (groups.length === 0) {
+          throw new Error(`Phase 1 returned empty coarse groups for clip ${formatClipId(clip)}`)
+        }
+        return groups
+      },
+      maxStepAttempts,
+    )
+    phase1PanelsByClipId.set(clip.id, coarseGroups as StoryboardPanel[])
+
+    if (onArtifact) {
+      await onArtifact({
+        clipId: clip.id,
+        stepKey: `clip_${clip.id}_phase1`,
+        artifactType: 'storyboard.clip.phase1',
+        payload: { panels: coarseGroups },
+      })
+    }
+
+    const phase2Meta = withStepMeta(
+      `clip_${clip.id}_phase2_cinematography`,
+      'progress.streamStep.storyboardGroupSplit',
+      clips.length + index * 4 + 1,
+      totalStepCount,
+      {
+        dependsOn: [`clip_${clip.id}_phase1`],
+        groupId: `clip_${clip.id}`,
+        parallelKey: 'phase2',
+        retryable: true,
+      },
+    )
+    const phase3CinematographyMeta = withStepMeta(
+      `clip_${clip.id}_phase3_cinematography`,
+      'progress.streamStep.cinematographyRules',
+      clips.length + index * 4 + 2,
+      totalStepCount,
+      {
+        dependsOn: [`clip_${clip.id}_phase2_cinematography`],
+        groupId: `clip_${clip.id}`,
+        parallelKey: 'phase3',
+        retryable: false,
+      },
+    )
+    const phase3ActingMeta = withStepMeta(
+      `clip_${clip.id}_phase2_acting`,
+      'progress.streamStep.actingDirection',
+      clips.length + index * 4 + 3,
+      totalStepCount,
+      {
+        dependsOn: [`clip_${clip.id}_phase2_cinematography`],
+        groupId: `clip_${clip.id}`,
+        parallelKey: 'phase3',
+        retryable: true,
+      },
+    )
+    const phase3Meta = withStepMeta(
+      `clip_${clip.id}_phase3_detail`,
+      'progress.streamStep.storyboardDetailRefine',
+      clips.length + index * 4 + 4,
+      totalStepCount,
+      {
+        dependsOn: [
+          `clip_${clip.id}_phase3_cinematography`,
+          `clip_${clip.id}_phase2_acting`,
+        ],
+        groupId: `clip_${clip.id}`,
+        parallelKey: 'phase4',
+        retryable: true,
+      },
+    )
+
+    const finePanelsByGroup: StoryboardPanel[][] = []
+    const isCoarsePlan = coarseGroups.some(isLikelyCoarseStoryboardGroup)
+    if (isCoarsePlan) {
+      for (let groupIndex = 0; groupIndex < coarseGroups.length; groupIndex += 1) {
+        const coarseGroup = coarseGroups[groupIndex]
+        const splitStepMeta: ScriptToStoryboardStepMeta = {
+          ...phase2Meta,
+          stepAttempt: groupIndex + 1,
+          stepTitle: resolveGroupSplitProgressTitle({
+            locale: input.locale,
+            current: groupIndex + 1,
+            total: coarseGroups.length,
+          }),
+        }
+        const splitPrompt = phase2GroupSplitTemplate
+          .replace('{characters_lib_name}', charactersLibName)
+          .replace('{locations_lib_name}', locationsLibName)
+          .replace('{characters_introduction}', charactersIntroduction)
+          .replace('{characters_appearance_list}', filteredAppearanceList)
+          .replace('{characters_full_description}', filteredFullDescription)
+          .replace('{props_description}', filteredPropsDescription)
+          .replace('{coarse_storyboard_group}', JSON.stringify(coarseGroup, null, 2))
+          .replace('{adjacent_groups_context}', buildAdjacentCoarseGroupsContext(coarseGroups, groupIndex))
+        const { parsed: finePanels } = await runStepWithRetry(
+          runStep,
+          splitStepMeta,
+          splitPrompt,
+          'storyboard_phase2_cinematography',
+          2600,
+          (text) => {
+            const panels = parseJsonArray<StoryboardPanel>(text, `phase2-split:${formatClipId(clip)}:group-${groupIndex + 1}`)
+            if (panels.length === 0) {
+              throw new Error(`Phase 2 returned empty fine panels for clip ${formatClipId(clip)} group ${groupIndex + 1}`)
+            }
+            return panels
+          },
+          maxStepAttempts,
+        )
+        const normalizedFinePanels = finePanels.map((panel, panelIndex) => ({
+          ...panel,
+          panel_number: typeof panel.panel_number === 'number' ? panel.panel_number : panelIndex + 1,
+          parent_group_number:
+            typeof (panel as Record<string, unknown>).parent_group_number === 'number'
+              ? (panel as Record<string, unknown>).parent_group_number
+              : (typeof coarseGroup.group_number === 'number' ? coarseGroup.group_number : groupIndex + 1),
+        }))
+        finePanelsByGroup.push(normalizedFinePanels)
+      }
+    } else {
+      finePanelsByGroup.push((coarseGroups as StoryboardPanel[]).map((panel, panelIndex) => ({
+        ...panel,
+        panel_number: typeof panel.panel_number === 'number' ? panel.panel_number : panelIndex + 1,
+      })))
+    }
+
+    const flattenedFinePanels = finePanelsByGroup.flat()
+    if (flattenedFinePanels.length === 0) {
+      throw new Error(`Phase 2 produced no fine panels for clip ${formatClipId(clip)}`)
+    }
+
+    if (onArtifact) {
+      await onArtifact({
+        clipId: clip.id,
+        stepKey: `clip_${clip.id}_phase2_cinematography`,
+        artifactType: 'storyboard.clip.phase2.cine',
+        payload: {
+          fine_groups: finePanelsByGroup.map((panels, groupIndex) => ({
+            group_index: groupIndex + 1,
+            panels,
+          })),
+          panels: flattenedFinePanels,
+        },
+      })
+    }
+
+    const finePanelsWithGuidanceByGroup: StoryboardPanel[][] = []
+    const photographyRulesByGroup: PhotographyRule[][] = []
+    const actingDirectionsByGroup: ActingDirection[][] = []
+    for (let groupIndex = 0; groupIndex < finePanelsByGroup.length; groupIndex += 1) {
+      const finePanels = finePanelsByGroup[groupIndex]
+      const adjacentContext = buildAdjacentFineGroupContext(finePanelsByGroup, groupIndex)
+      const cinematographyMeta: ScriptToStoryboardStepMeta = {
+        ...phase3CinematographyMeta,
+        stepAttempt: groupIndex + 1,
+        stepTitle: resolveGuidanceProgressTitle({
+          locale: input.locale,
+          kind: 'cinematography',
+          current: groupIndex + 1,
+          total: finePanelsByGroup.length,
+        }),
+      }
+      const actingMeta: ScriptToStoryboardStepMeta = {
+        ...phase3ActingMeta,
+        stepAttempt: groupIndex + 1,
+        stepTitle: resolveGuidanceProgressTitle({
+          locale: input.locale,
+          kind: 'acting',
+          current: groupIndex + 1,
+          total: finePanelsByGroup.length,
+        }),
+      }
+      const cinematographyPrompt = promptTemplates.phase2CinematographyTemplate
         .replace('{characters_lib_name}', charactersLibName)
         .replace('{locations_lib_name}', locationsLibName)
         .replace('{characters_introduction}', charactersIntroduction)
         .replace('{characters_appearance_list}', filteredAppearanceList)
         .replace('{characters_full_description}', filteredFullDescription)
         .replace('{props_description}', filteredPropsDescription)
-        .replace('{clip_json}', clipJson)
-
-      const screenplay = parseScreenplay(clip.screenplay)
-      if (screenplay) {
-        phase1Prompt = phase1Prompt.replace('{clip_content}', `【剧本格式】\n${JSON.stringify(screenplay, null, 2)}`)
-      } else {
-        phase1Prompt = phase1Prompt.replace('{clip_content}', clipContent)
-      }
-
-      const phase1Meta = withStepMeta(
-        `clip_${clip.id}_phase1`,
-        'progress.streamStep.storyboardPlan',
-        clipIndex,
-        totalStepCount,
-        {
-          groupId: `clip_${clip.id}`,
-          parallelKey: 'phase1',
-          retryable: true,
-        },
-      )
-      const { parsed: planPanels } = await runStepWithRetry(
-        runStep, phase1Meta, phase1Prompt, 'storyboard_phase1_plan', 2600,
-        (text) => {
-          const panels = parseJsonArray<StoryboardPanel>(text, `phase1:${formatClipId(clip)}`)
-          if (panels.length === 0) {
-            throw new Error(`Phase 1 returned empty panels for clip ${formatClipId(clip)}`)
-          }
-          return panels
-        },
-        maxStepAttempts,
-      )
-      phase1PanelsByClipId.set(clip.id, planPanels)
-
-      if (onArtifact) {
-        await onArtifact({
-          clipId: clip.id,
-          stepKey: `clip_${clip.id}_phase1`,
-          artifactType: 'storyboard.clip.phase1',
-          payload: { panels: planPanels },
-        })
-      }
-
-      const phase2Meta = withStepMeta(
-        `clip_${clip.id}_phase2_cinematography`,
-        'progress.streamStep.cinematographyRules',
-        clips.length + index * 3 + 1,
-        totalStepCount,
-        {
-          dependsOn: [`clip_${clip.id}_phase1`],
-          groupId: `clip_${clip.id}`,
-          parallelKey: 'phase2',
-          retryable: true,
-        },
-      )
-      const phase2ActingMeta = withStepMeta(
-        `clip_${clip.id}_phase2_acting`,
-        'progress.streamStep.actingDirection',
-        clips.length + index * 3 + 2,
-        totalStepCount,
-        {
-          dependsOn: [`clip_${clip.id}_phase1`],
-          groupId: `clip_${clip.id}`,
-          parallelKey: 'phase2',
-          retryable: true,
-        },
-      )
-      const phase3Meta = withStepMeta(
-        `clip_${clip.id}_phase3_detail`,
-        'progress.streamStep.storyboardDetailRefine',
-        clips.length + index * 3 + 3,
-        totalStepCount,
-        {
-          dependsOn: [
-            `clip_${clip.id}_phase2_cinematography`,
-            `clip_${clip.id}_phase2_acting`,
-          ],
-          groupId: `clip_${clip.id}`,
-          parallelKey: 'phase3',
-          retryable: true,
-        },
-      )
-
-      const phase2Prompt = promptTemplates.phase2CinematographyTemplate
-        .replace('{panels_json}', JSON.stringify(planPanels, null, 2))
-        .replace(/\{panel_count\}/g, String(planPanels.length))
-        .replace('{locations_description}', filteredLocationsDescription)
+        .replace('{fine_storyboard_group}', JSON.stringify(finePanels, null, 2))
+        .replace('{adjacent_context}', adjacentContext)
+        .replace('{panels_json}', JSON.stringify(finePanels, null, 2))
+        .replace(/\{panel_count\}/g, String(finePanels.length))
+        .replace('{locations_description}', '')
         .replace('{characters_info}', filteredFullDescription)
-        .replace('{props_description}', filteredPropsDescription)
-
-      const phase2ActingPrompt = promptTemplates.phase2ActingTemplate
-        .replace('{panels_json}', JSON.stringify(planPanels, null, 2))
-        .replace(/\{panel_count\}/g, String(planPanels.length))
+      const actingPrompt = promptTemplates.phase2ActingTemplate
+        .replace('{panels_json}', JSON.stringify(finePanels, null, 2))
+        .replace(/\{panel_count\}/g, String(finePanels.length))
         .replace('{characters_info}', filteredFullDescription)
+        .replace('{adjacent_context}', adjacentContext)
 
       const [
         { parsed: photographyRules },
         { parsed: actingDirections },
       ] = await Promise.all([
         runStepWithRetry(
-          runStep, phase2Meta, phase2Prompt, 'storyboard_phase2_cinematography', 2400,
-          (text) => parseJsonArray<PhotographyRule>(text, `phase2:${formatClipId(clip)}`),
+          runStep,
+          cinematographyMeta,
+          cinematographyPrompt,
+          'storyboard_phase2_cinematography',
+          2400,
+          (text) => parseJsonArray<PhotographyRule>(text, `phase3-cine:${formatClipId(clip)}:group-${groupIndex + 1}`),
           maxStepAttempts,
         ),
         runStepWithRetry(
-          runStep, phase2ActingMeta, phase2ActingPrompt, 'storyboard_phase2_acting', 2400,
-          (text) => parseJsonArray<ActingDirection>(text, `phase2-acting:${formatClipId(clip)}`),
+          runStep,
+          actingMeta,
+          actingPrompt,
+          'storyboard_phase2_acting',
+          2400,
+          (text) => parseJsonArray<ActingDirection>(text, `phase3-acting:${formatClipId(clip)}:group-${groupIndex + 1}`),
           maxStepAttempts,
         ),
       ])
 
-      phase2CinematographyByClipId.set(clip.id, photographyRules)
-      phase2ActingByClipId.set(clip.id, actingDirections)
-
-      const phase3PanelsInput = buildPhase3PanelsInput({
-        planPanels,
+      photographyRulesByGroup.push(photographyRules)
+      actingDirectionsByGroup.push(actingDirections)
+      finePanelsWithGuidanceByGroup.push(buildFinePanelsWithCinematography({
+        finePanels,
         photographyRules,
         actingDirections,
-      })
-      const phase3Prompt = promptTemplates.phase3DetailTemplate
-        .replace('{panels_json}', JSON.stringify(phase3PanelsInput, null, 2))
-        .replace('{characters_age_gender}', filteredFullDescription)
-        .replace('{locations_description}', filteredLocationsDescription)
-        .replace('{props_description}', filteredPropsDescription)
+      }))
+    }
 
-      if (onArtifact) {
-        await Promise.all([
-          onArtifact({
-            clipId: clip.id,
-            stepKey: `clip_${clip.id}_phase2_cinematography`,
-            artifactType: 'storyboard.clip.phase2.cine',
-            payload: { rules: photographyRules },
-          }),
-          onArtifact({
-            clipId: clip.id,
-            stepKey: `clip_${clip.id}_phase2_acting`,
-            artifactType: 'storyboard.clip.phase2.acting',
-            payload: { directions: actingDirections },
-          }),
-        ])
-      }
+    const flattenedPhotographyRules = photographyRulesByGroup.flat()
+    const flattenedActingDirections = actingDirectionsByGroup.flat()
+    phase2CinematographyByClipId.set(clip.id, flattenedPhotographyRules)
+    phase2ActingByClipId.set(clip.id, flattenedActingDirections)
 
-      const { parsed: rawPhase3Panels } = await runStepWithRetry(
-        runStep, phase3Meta, phase3Prompt, 'storyboard_phase3_detail', 2600,
-        (text) => parseJsonArray<StoryboardPanel>(text, `phase3:${formatClipId(clip)}`),
-        maxStepAttempts,
-      )
-
-      const reconciledPhase3Panels = reconcilePhase3Panels({
-        phase3Panels: rawPhase3Panels,
-        planPanels,
-        photographyRules,
-        actingDirections,
-      })
-      if (reconciledPhase3Panels.length === 0) {
-        throw new Error(`Phase 3 returned empty valid panels for clip ${formatClipId(clip)}`)
-      }
-
-      const normalizedPhase3Panels = hydrateFinalPanelCharactersWithPlanSlots({
-        finalPanels: reconciledPhase3Panels,
-        planPanels,
-      })
-
-      phase3PanelsByClipId.set(clip.id, normalizedPhase3Panels)
-
-      if (onArtifact) {
-        await onArtifact({
-          clipId: clip.id,
-          stepKey: `clip_${clip.id}_phase3_detail`,
-          artifactType: 'storyboard.clip.phase3',
-          payload: { panels: normalizedPhase3Panels },
-        })
-      }
-
-      const clipResult = {
+    if (onArtifact) {
+      await onArtifact({
         clipId: clip.id,
-        clipIndex,
-        finalPanels: mergePanelsWithRules({
-          finalPanels: normalizedPhase3Panels,
-          photographyRules,
-          actingDirections,
+        stepKey: `clip_${clip.id}_phase2_acting`,
+        artifactType: 'storyboard.clip.phase2.acting',
+        payload: {
+          rules: flattenedPhotographyRules,
+          directions: flattenedActingDirections,
+          fine_groups_with_guidance: finePanelsWithGuidanceByGroup.map((panels, groupIndex) => ({
+            group_index: groupIndex + 1,
+            panels,
+          })),
+        },
+      })
+    }
+
+    const finalPanelsByGroup: StoryboardPanel[][] = []
+    for (let groupIndex = 0; groupIndex < finePanelsByGroup.length; groupIndex += 1) {
+      const finePanels = finePanelsByGroup[groupIndex]
+      const photographyRules = photographyRulesByGroup[groupIndex] || []
+      const actingDirections = actingDirectionsByGroup[groupIndex] || []
+      const guidancePanels = finePanelsWithGuidanceByGroup[groupIndex] || []
+      const detailMeta: ScriptToStoryboardStepMeta = {
+        ...phase3Meta,
+        stepAttempt: groupIndex + 1,
+        stepTitle: resolveDetailProgressTitle({
+          locale: input.locale,
+          current: groupIndex + 1,
+          total: finePanelsByGroup.length,
         }),
       }
-      if (onClipCompleted) {
-        await onClipCompleted(clipResult)
-      }
-      return clipResult
-    },
-  )
+      const detailPrompt = promptTemplates.phase3DetailTemplate
+        .replace('{characters_lib_name}', charactersLibName)
+        .replace('{locations_lib_name}', locationsLibName)
+        .replace('{characters_introduction}', charactersIntroduction)
+        .replace('{characters_appearance_list}', filteredAppearanceList)
+        .replace('{characters_full_description}', filteredFullDescription)
+        .replace('{props_description}', filteredPropsDescription)
+        .replace('{fine_storyboard_group_with_cinematography}', JSON.stringify(guidancePanels, null, 2))
+        .replace('{adjacent_context}', buildAdjacentFineGroupContext(finePanelsWithGuidanceByGroup, groupIndex))
+        .replace('{panels_json}', JSON.stringify(guidancePanels, null, 2))
+        .replace('{characters_age_gender}', filteredFullDescription)
+        .replace('{locations_description}', '')
+
+      const { parsed: rawDetailedPanels } = await runStepWithRetry(
+        runStep,
+        detailMeta,
+        detailPrompt,
+        'storyboard_phase3_detail',
+        2600,
+        (text) => parseJsonArray<StoryboardPanel>(text, `phase4:${formatClipId(clip)}:group-${groupIndex + 1}`),
+        maxStepAttempts,
+      )
+      const reconciledPanels = reconcilePhase3Panels({
+        phase3Panels: rawDetailedPanels,
+        planPanels: finePanels,
+        photographyRules,
+        actingDirections,
+      })
+      const normalizedPanels = hydrateFinalPanelCharactersWithPlanSlots({
+        finalPanels: reconciledPanels,
+        planPanels: finePanels,
+      })
+      finalPanelsByGroup.push(mergePanelsWithRules({
+        finalPanels: normalizedPanels,
+        photographyRules,
+        actingDirections,
+      }))
+    }
+
+    const finalPanels = assignSequentialPanelNumbers(finalPanelsByGroup.flat())
+    if (finalPanels.length === 0) {
+      throw new Error(`Phase 4 returned empty valid panels for clip ${formatClipId(clip)}`)
+    }
+
+    phase3PanelsByClipId.set(clip.id, finalPanels)
+
+    if (onArtifact) {
+      await onArtifact({
+        clipId: clip.id,
+        stepKey: `clip_${clip.id}_phase3_detail`,
+        artifactType: 'storyboard.clip.phase3',
+        payload: { panels: finalPanels },
+      })
+    }
+
+    const clipResult = {
+      clipId: clip.id,
+      clipIndex,
+      finalPanels,
+    }
+    if (onClipCompleted) {
+      await onClipCompleted(clipResult)
+    }
+    return clipResult
+  })
 
   const totalPanelCount = clipPanels.reduce((sum, item) => sum + item.finalPanels.length, 0)
 

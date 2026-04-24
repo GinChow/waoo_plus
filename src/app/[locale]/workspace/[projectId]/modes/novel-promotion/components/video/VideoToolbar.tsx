@@ -5,6 +5,8 @@ import { resolveTaskPresentationState } from '@/lib/task/presentation'
 import { AppIcon } from '@/components/ui/icons'
 
 interface VideoToolbarProps {
+  totalCoarseShots: number
+  totalFineShots: number
   totalPanels: number
   runningCount: number
   videosWithUrl: number
@@ -19,6 +21,8 @@ interface VideoToolbarProps {
 }
 
 export default function VideoToolbar({
+  totalCoarseShots,
+  totalFineShots,
   totalPanels,
   runningCount,
   videosWithUrl,
@@ -56,7 +60,8 @@ export default function VideoToolbar({
              {t('toolbar.title')}
           </span>
           <span className="text-sm text-[var(--glass-text-tertiary)]">
-            {t('toolbar.totalShots', { count: totalPanels })}
+            {t('toolbar.totalCoarseShots', { count: totalCoarseShots })}
+            <span className="ml-1">{t('toolbar.totalFineShots', { count: totalFineShots || totalPanels })}</span>
             {runningCount > 0 && (
               <span className="text-[var(--glass-tone-info-fg)] ml-2 animate-pulse">({t('toolbar.generatingShots', { count: runningCount })})</span>
             )}

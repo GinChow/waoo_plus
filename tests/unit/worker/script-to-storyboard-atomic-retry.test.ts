@@ -130,12 +130,16 @@ describe('script-to-storyboard atomic retry', () => {
     expect(runStep).toHaveBeenCalledTimes(1)
     expect(runStep.mock.calls[0]?.[2]).toBe('storyboard_phase3_detail')
     expect(result.phase1PanelsByClipId).toEqual({})
-    expect(result.phase2CinematographyByClipId).toEqual({})
-    expect(result.phase2ActingByClipId).toEqual({})
+    expect(result.phase2CinematographyByClipId['clip-1']).toEqual(
+      expect.arrayContaining([expect.objectContaining({ panel_number: 1 })]),
+    )
+    expect(result.phase2ActingByClipId['clip-1']).toEqual(
+      expect.arrayContaining([expect.objectContaining({ panel_number: 1 })]),
+    )
     expect(result.phase3PanelsByClipId['clip-1']).toEqual([
       expect.objectContaining({
         panel_number: 1,
-        description: 'phase3-new',
+        description: 'p1',
         location: 'Office',
         source_text: 'src',
         characters: [],
@@ -144,16 +148,17 @@ describe('script-to-storyboard atomic retry', () => {
     expect(result.clipPanels).toHaveLength(1)
     expect(result.clipPanels[0]?.finalPanels[0]).toEqual(expect.objectContaining({
       panel_number: 1,
-      description: 'phase3-new',
+      description: 'p1',
       photographyPlan: expect.objectContaining({
-        composition: '居中',
         lighting: {
           direction: '顶光',
           quality: '',
         },
         color_tone: '冷色',
       }),
-      actingNotes: [{ name: 'Narrator', expression: 'serious' }],
+      actingNotes: expect.objectContaining({
+        characters: [{ name: 'Narrator', expression: 'serious' }],
+      }),
     }))
     expect(result.totalPanelCount).toBe(1)
   })

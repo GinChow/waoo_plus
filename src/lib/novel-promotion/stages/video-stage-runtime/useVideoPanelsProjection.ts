@@ -23,6 +23,47 @@ interface UseVideoPanelsProjectionParams {
   panelLipStates: TaskPresentationLike
 }
 
+function parseParentGroupByPanelNumber(raw: string | null | undefined): Map<number, number> {
+  if (!raw) return new Map()
+  try {
+    const parsed = JSON.parse(raw)
+    const mapping = new Map<number, number>()
+    if (Array.isArray(parsed)) {
+      for (const item of parsed) {
+        if (Array.isArray(item) && item.length >= 2 && typeof item[0] === 'number' && typeof item[1] === 'number') {
+          mapping.set(item[0], item[1])
+          continue
+        }
+        if (
+          item
+          && typeof item === 'object'
+          && typeof (item as { panel_number?: unknown }).panel_number === 'number'
+          && typeof (item as { parent_group_number?: unknown }).parent_group_number === 'number'
+        ) {
+          mapping.set(
+            (item as { panel_number: number }).panel_number,
+            (item as { parent_group_number: number }).parent_group_number,
+          )
+        }
+      }
+      return mapping
+    }
+
+    if (parsed && typeof parsed === 'object') {
+      for (const [panelNumberRaw, groupRaw] of Object.entries(parsed as Record<string, unknown>)) {
+        const panelNumber = Number(panelNumberRaw)
+        if (!Number.isFinite(panelNumber) || typeof groupRaw !== 'number') continue
+        mapping.set(panelNumber, groupRaw)
+      }
+      return mapping
+    }
+
+    return new Map()
+  } catch {
+    return new Map()
+  }
+}
+
 export function useVideoPanelsProjection({
   storyboards,
   clips,
@@ -40,9 +81,12 @@ export function useVideoPanelsProjection({
   const allPanels = useMemo<VideoPanel[]>(() => {
     const panels: VideoPanel[] = []
     sortedStoryboards.forEach((storyboard) => {
+      const parentGroupMap = parseParentGroupByPanelNumber(storyboard.storyboardTextJson)
       const storyboardPanels = storyboard.panels || []
       storyboardPanels.forEach((panel, index) => {
         const actualPanelIndex = panel.panelIndex ?? index
+        const panelNumber = panel.panelNumber || actualPanelIndex + 1
+        const parentGroupNumber = parentGroupMap.get(panelNumber)
         let charactersArray: string[] = []
         if (panel.characters) {
           try {
@@ -61,8 +105,10 @@ export function useVideoPanelsProjection({
           panelId,
           storyboardId: storyboard.id,
           panelIndex: actualPanelIndex,
+          parentGroupNumber,
           textPanel: {
-            panel_number: panel.panelNumber || actualPanelIndex + 1,
+            panel_number: panelNumber,
+            parent_group_number: parentGroupNumber,
             shot_type: panel.shotType || '',
             camera_move: panel.cameraMove || '',
             description: panel.description || '',

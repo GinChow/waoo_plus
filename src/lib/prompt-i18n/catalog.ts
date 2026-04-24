@@ -14,6 +14,10 @@ export const PROMPT_CATALOG: Record<PromptId, PromptCatalogEntry> = {
     pathStem: 'novel-promotion/agent_acting_direction',
     variableKeys: ['panels_json', 'panel_count', 'characters_info'],
   },
+  [PROMPT_IDS.NP_AGENT_ACTING_DIRECTION_V2]: {
+    pathStem: 'novel-promotion/agent_acting_direction_v2',
+    variableKeys: ['panels_json', 'panel_count', 'characters_info', 'adjacent_context'],
+  },
   [PROMPT_IDS.NP_AGENT_CHARACTER_PROFILE]: {
     pathStem: 'novel-promotion/agent_character_profile',
     variableKeys: ['input', 'characters_lib_info'],
@@ -25,6 +29,19 @@ export const PROMPT_CATALOG: Record<PromptId, PromptCatalogEntry> = {
   [PROMPT_IDS.NP_AGENT_CINEMATOGRAPHER]: {
     pathStem: 'novel-promotion/agent_cinematographer_v2',
     variableKeys: ['panels_json', 'panel_count', 'locations_description', 'characters_info', 'props_description'],
+  },
+  [PROMPT_IDS.NP_AGENT_CINEMATOGRAPHER_V3]: {
+    pathStem: 'novel-promotion/agent_cinematographer_v3',
+    variableKeys: [
+      'characters_lib_name',
+      'locations_lib_name',
+      'characters_introduction',
+      'characters_appearance_list',
+      'characters_full_description',
+      'props_description',
+      'fine_storyboard_group',
+      'adjacent_context',
+    ],
   },
   [PROMPT_IDS.NP_AGENT_CLIP]: {
     pathStem: 'novel-promotion/agent_clip',
@@ -57,6 +74,32 @@ export const PROMPT_CATALOG: Record<PromptId, PromptCatalogEntry> = {
     pathStem: 'novel-promotion/agent_storyboard_detail_v2',
     variableKeys: ['panels_json', 'characters_age_gender', 'locations_description', 'props_description'],
   },
+  [PROMPT_IDS.NP_AGENT_STORYBOARD_DETAIL_V3]: {
+    pathStem: 'novel-promotion/agent_storyboard_detail_v3',
+    variableKeys: [
+      'characters_lib_name',
+      'locations_lib_name',
+      'characters_introduction',
+      'characters_appearance_list',
+      'characters_full_description',
+      'props_description',
+      'fine_storyboard_group_with_cinematography',
+      'adjacent_context',
+    ],
+  },
+  [PROMPT_IDS.NP_AGENT_STORYBOARD_GROUP_SPLIT]: {
+    pathStem: 'novel-promotion/agent_storyboard_group_split',
+    variableKeys: [
+      'characters_lib_name',
+      'locations_lib_name',
+      'characters_introduction',
+      'characters_appearance_list',
+      'characters_full_description',
+      'props_description',
+      'coarse_storyboard_group',
+      'adjacent_groups_context',
+    ],
+  },
   [PROMPT_IDS.NP_AGENT_STORYBOARD_INSERT]: {
     pathStem: 'novel-promotion/agent_storyboard_insert',
     variableKeys: [
@@ -70,6 +113,19 @@ export const PROMPT_CATALOG: Record<PromptId, PromptCatalogEntry> = {
   },
   [PROMPT_IDS.NP_AGENT_STORYBOARD_PLAN]: {
     pathStem: 'novel-promotion/agent_storyboard_plan_v3',
+    variableKeys: [
+      'characters_lib_name',
+      'locations_lib_name',
+      'characters_introduction',
+      'characters_appearance_list',
+      'characters_full_description',
+      'props_description',
+      'clip_json',
+      'clip_content',
+    ],
+  },
+  [PROMPT_IDS.NP_AGENT_STORYBOARD_PLAN_V4]: {
+    pathStem: 'novel-promotion/agent_storyboard_plan_v4',
     variableKeys: [
       'characters_lib_name',
       'locations_lib_name',

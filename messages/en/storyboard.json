@@ -47,7 +47,11 @@
         "generateMissingImages": "Generate all panels without images in this segment",
         "segment": "Segment",
         "addAtStart": "Add new storyboard group at the start",
-        "insertHere": "Insert new storyboard group here"
+        "insertHere": "Insert new storyboard group here",
+        "coarseGridPreview": "Coarse-shot grid preview",
+        "coarseShotTitle": "Coarse Shot {number}",
+        "fineShotCount": "{count} fine shots",
+        "backToCoarseList": "Back to coarse shots"
     },
     "header": {
         "title": "Storyboard Editing",

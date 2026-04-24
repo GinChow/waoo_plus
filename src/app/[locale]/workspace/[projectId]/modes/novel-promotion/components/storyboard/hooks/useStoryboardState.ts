@@ -17,6 +17,7 @@ export interface StoryboardPanel {
   id: string
   panelIndex: number
   panel_number: number
+  parent_group_number?: number
   shot_type: string
   camera_move: string | null
   description: string
@@ -33,6 +34,47 @@ export interface StoryboardPanel {
   photographyRules?: string | null  // 单镜头摄影规则JSON
   actingNotes?: string | null       // 演技指导数据JSON
   imageTaskRunning?: boolean  // 任务态运行状态（由 tasks 派生）
+}
+
+function parseParentGroupByPanelNumber(raw: string | null): Map<number, number> {
+  if (!raw) return new Map()
+  try {
+    const parsed = JSON.parse(raw)
+    const mapping = new Map<number, number>()
+    if (Array.isArray(parsed)) {
+      for (const item of parsed) {
+        if (Array.isArray(item) && item.length >= 2 && typeof item[0] === 'number' && typeof item[1] === 'number') {
+          mapping.set(item[0], item[1])
+          continue
+        }
+        if (
+          item
+          && typeof item === 'object'
+          && typeof (item as { panel_number?: unknown }).panel_number === 'number'
+          && typeof (item as { parent_group_number?: unknown }).parent_group_number === 'number'
+        ) {
+          mapping.set(
+            (item as { panel_number: number }).panel_number,
+            (item as { parent_group_number: number }).parent_group_number,
+          )
+        }
+      }
+      return mapping
+    }
+
+    if (parsed && typeof parsed === 'object') {
+      for (const [panelNumberRaw, groupRaw] of Object.entries(parsed as Record<string, unknown>)) {
+        const panelNumber = Number(panelNumberRaw)
+        if (!Number.isFinite(panelNumber) || typeof groupRaw !== 'number') continue
+        mapping.set(panelNumber, groupRaw)
+      }
+      return mapping
+    }
+
+    return new Map()
+  } catch {
+    return new Map()
+  }
 }
 
 interface UseStoryboardStateProps {
@@ -107,6 +149,7 @@ export function useStoryboardState({
   }
 
   const getTextPanels = (storyboard: NovelPromotionStoryboard): StoryboardPanel[] => {
+    const parentGroupMap = parseParentGroupByPanelNumber(storyboard.storyboardTextJson)
     const panels = getStoryboardPanels(storyboard)
     const sortedPanels = [...panels].sort((a: NovelPromotionPanel, b: NovelPromotionPanel) =>
       (a.panelIndex || 0) - (b.panelIndex || 0)
@@ -135,6 +178,7 @@ export function useStoryboardState({
         id: p.id,
         panelIndex: p.panelIndex,
         panel_number: p.panelNumber ?? p.panelIndex + 1,
+        parent_group_number: parentGroupMap.get(p.panelNumber ?? (p.panelIndex + 1)),
         shot_type: p.shotType ?? '',
         camera_move: p.cameraMove,
         description: p.description ?? '',

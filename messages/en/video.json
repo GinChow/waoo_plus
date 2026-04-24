@@ -77,6 +77,8 @@
     "showPending": "Pending",
     "showFailed": "Failed",
     "totalShots": "Total {count} shots",
+    "totalCoarseShots": "{count} coarse shots,",
+    "totalFineShots": "{count} fine shots",
     "generatingShots": "{count} generating",
     "completedShots": "{count} completed",
     "failedShots": "{count} failed",
@@ -113,6 +115,15 @@
     },
     "downloadFailed": "Download failed",
     "unknownError": "Unknown error"
+  },
+  "render": {
+    "coarseShot": "Coarse Shot {number}",
+    "fineShotCount": "{count} fine shots",
+    "backToCoarseList": "Back to coarse shots",
+    "groupRunning": "Generating in this group",
+    "groupFailed": "Failed items in this group",
+    "groupCompleted": "Completed in this group",
+    "groupPending": "Pending in this group"
   },
   "firstLastFrame": {
     "title": "First/Last Frame Settings",
