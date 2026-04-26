@@ -1,28 +1,25 @@
 # Review Report
 
-Date: 2026-04-24
-Executor: Codex
-Task: Storyboard phase2/phase3/phase4 coarse group concurrency
+Date: 2026-04-26
+Reviewer: Codex
 
-## Checklist
+## Scope
 
-- Requirement coverage: pass. Phase2 coarse group split, phase3 guidance, and phase4 detail now run per group with bounded concurrency.
-- Interface contract: pass. Public orchestrator input/output shape unchanged; existing concurrency option reused.
-- Ordering: pass. mapWithConcurrency preserves input order, so artifacts and final panels remain stable.
-- Risk review: pass. No unbounded Promise.all over all groups; uses configured workflow concurrency.
-- Verification: pass. Targeted unit test, typecheck, and lint passed.
+修复 phase3 最终合并 JSON 中演技指导丢失或结构错误的问题。
 
-## Scores
+## Findings
 
-- Technical: 94/100
-- Strategic: 92/100
-- Overall: 93/100
-
-Recommendation: pass.
+- 技术评分: 92/100
+- 战略评分: 90/100
+- 综合评分: 91/100
+- 建议: 通过
 
 ## Evidence
 
-- src/lib/novel-promotion/script-to-storyboard/orchestrator.ts
-- tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts
-- .codex/testing.md
-- verification.md
+- `mergePanelsWithRules` 现在在主编排器和 atomic retry 中同时输出 `actingNotes` 与 `acting_notes`，值均为角色演技数组。
+- `normalizeActingNotesPayload` 兼容旧 artifact 中嵌套的 `{ panel_number, characters }` 结构，避免重试链路把对象继续传到最终 JSON。
+- 单测覆盖了主链路和 atomic retry 的最终输出契约。
+
+## Risks
+
+- `npm run test:unit:all` 存在一个无关失败：`project-global-analyze-mutation.test.ts` 的请求 body 断言落后于当前实现。

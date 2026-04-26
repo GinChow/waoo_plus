@@ -500,7 +500,7 @@ function derivePhotographyRulesFromGuidancePanels(panels: StoryboardPanel[]): Ph
 function deriveActingDirectionsFromGuidancePanels(panels: StoryboardPanel[]): ActingDirection[] {
   return panels.map((panel) => ({
     panel_number: panel.panel_number,
-    characters: (panel as JsonRecord).acting_notes,
+    characters: normalizeActingNotesPayload((panel as JsonRecord).acting_notes),
   }))
 }
 
@@ -698,12 +698,22 @@ function mergePanelsWithRules(params: {
     if (!acting) {
       throw new Error(`Missing acting direction for panel_number=${String(panel.panel_number)} at index=${index}`)
     }
+    const actingNotes = normalizeActingNotesPayload(acting.characters)
     return {
       ...panel,
       photographyPlan: buildUnifiedPhotographyPlan(rule, panel),
-      actingNotes: acting.characters,
+      acting_notes: actingNotes,
+      actingNotes,
     }
   })
+}
+
+function normalizeActingNotesPayload(value: unknown) {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object' && Array.isArray((value as JsonRecord).characters)) {
+    return (value as JsonRecord).characters
+  }
+  return []
 }
 
 function requireRows<T>(rows: T[], label: string) {

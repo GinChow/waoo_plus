@@ -1,10 +1,10 @@
 # Verification
 
-Date: 2026-04-24
+Date: 2026-04-26
 Executor: Codex
 
-- Unit: npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts passed (12 tests).
-- TypeScript: npm run typecheck passed.
-- Lint: targeted eslint passed for modified files.
-
-Residual risk: full npm run test:all was not executed because the change is localized and targeted coverage plus type/lint passed.
+- Passed: `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts tests/unit/worker/script-to-storyboard-atomic-retry.test.ts`
+- Passed: `npm run typecheck`
+- Not used as acceptance gate: `npm run test:unit:all`
+  - Result: failed in unrelated `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts`.
+  - Detail: expected `{"async":true}` but actual body included `{"async":true,"mode":"all"}`.

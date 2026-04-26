@@ -1,25 +1,27 @@
 {
-  "date": "2026-04-24",
+  "date": "2026-04-26",
   "executor": "Codex",
-  "task": "将分镜规划 phase2/phase3/phase4 对每个粗镜头的串行调用改为并发调用",
-  "toolingFallbacks": [
-    "sequential-thinking MCP unavailable; used local structured analysis",
-    "shrimp-task-manager MCP unavailable; used update_plan/local plan",
-    "code-index MCP unavailable; used rg/sed local search"
-  ],
-  "locations": [
-    "src/lib/novel-promotion/script-to-storyboard/orchestrator.ts",
-    "tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts"
-  ],
-  "currentImplementation": {
-    "phase1": "clips are processed with mapWithConcurrency",
-    "phase2GroupSplit": "coarseGroups now use bounded mapWithConcurrency",
-    "phase3Guidance": "fine groups now use bounded mapWithConcurrency; cinematography and acting remain parallel within each group",
-    "phase4Detail": "fine groups now use bounded mapWithConcurrency"
+  "task": "修复 phase3 合并 JSON 时演技指导结果丢失或结构错误",
+  "tooling_fallback": {
+    "sequential_thinking": "当前会话未提供该 MCP 工具，已使用本地代码检索与测试降级处理",
+    "shrimp_task_manager": "当前会话未提供该 MCP 工具，使用内置计划与执行流程降级处理",
+    "code_index": "当前会话未提供该 MCP 工具，使用 rg/sed 本地检索降级处理"
   },
-  "tests": [
-    "npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts",
-    "npm run typecheck",
-    "npm run lint -- src/lib/novel-promotion/script-to-storyboard/orchestrator.ts tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts"
-  ]
+  "location": [
+    "src/lib/novel-promotion/script-to-storyboard/orchestrator.ts",
+    "src/lib/workers/handlers/script-to-storyboard-atomic-retry.ts",
+    "src/lib/storyboard-phases.ts"
+  ],
+  "current_behavior": "最终 mergePanelsWithRules 只稳定写入 camelCase actingNotes；snake_case acting_notes 继承中间 panel 的旧对象结构，在部分合并 JSON 消费方中表现为演技指导缺失或结构不符合预期。",
+  "similar_cases": [
+    "AIDataModal.tsx 导出合并 AI 数据时使用 acting_notes 数组",
+    "panel-image-task-handler.ts 读取 panel.actingNotes 后写入 acting_notes 给下游提示",
+    "script-to-storyboard-orchestrator.retry.test.ts 已覆盖 phase3 分组演技不串组"
+  ],
+  "sufficiency_check": {
+    "interface_contract": true,
+    "technical_choice": true,
+    "risk_points": true,
+    "verification_path": true
+  }
 }

@@ -93,6 +93,7 @@ export type StoryboardPanel = JsonRecord & {
     duration?: number
     photographyPlan?: JsonRecord
     actingNotes?: unknown
+    acting_notes?: unknown
 }
 
 export type PhotographyRule = JsonRecord & {

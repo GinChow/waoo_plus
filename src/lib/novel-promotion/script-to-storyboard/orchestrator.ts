@@ -413,13 +413,23 @@ function mergePanelsWithRules(params: {
     if (!acting) {
       throw new Error(`Missing acting direction for panel_number=${String(panel.panel_number)} at index=${index}`)
     }
+    const actingNotes = normalizeActingNotesPayload(acting.characters)
 
     return {
       ...panel,
       photographyPlan: buildUnifiedPhotographyPlan(rules, panel),
-      actingNotes: acting.characters,
+      acting_notes: actingNotes,
+      actingNotes,
     }
   })
+}
+
+function normalizeActingNotesPayload(value: unknown) {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object' && Array.isArray((value as JsonRecord).characters)) {
+    return (value as JsonRecord).characters
+  }
+  return []
 }
 
 function findPanelByNumberOrIndex<T extends { panel_number?: number }>(

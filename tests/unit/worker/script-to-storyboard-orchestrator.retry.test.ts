@@ -781,7 +781,8 @@ describe('script-to-storyboard orchestrator retry', () => {
     expect(panel.first_frame_image_prompt).toBe('室内，角色A位于画面左侧，平视中景')
     expect(panel.duration).toBe(2.5)
     expect(panel.photographyPlan).toBeTruthy()
-    expect(panel.actingNotes).toBeTruthy()
+    expect(panel.acting_notes).toEqual([{ name: '角色A', acting: '平静说话' }])
+    expect(panel.actingNotes).toEqual([{ name: '角色A', acting: '平静说话' }])
   })
 
   it('fuses phase3 guidance by fine groups without cross-group mixing', async () => {
@@ -968,6 +969,8 @@ describe('script-to-storyboard orchestrator retry', () => {
     expect(finalPanels[1]?.video_prompt).toBe('组2视频')
     expect(finalPanels[0]?.photographyPlan?.composition_note).toBe('组1构图')
     expect(finalPanels[1]?.photographyPlan?.composition_note).toBe('组2构图')
+    expect((finalPanels[0]?.acting_notes as Array<{ acting?: string }>)?.[0]?.acting).toBe('组1演技')
+    expect((finalPanels[1]?.acting_notes as Array<{ acting?: string }>)?.[0]?.acting).toBe('组2演技')
     expect((finalPanels[0]?.actingNotes as Array<{ acting?: string }>)?.[0]?.acting).toBe('组1演技')
     expect((finalPanels[1]?.actingNotes as Array<{ acting?: string }>)?.[0]?.acting).toBe('组2演技')
   })

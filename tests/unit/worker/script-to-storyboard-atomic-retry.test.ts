@@ -156,9 +156,8 @@ describe('script-to-storyboard atomic retry', () => {
         },
         color_tone: '冷色',
       }),
-      actingNotes: expect.objectContaining({
-        characters: [{ name: 'Narrator', expression: 'serious' }],
-      }),
+      actingNotes: [{ name: 'Narrator', expression: 'serious' }],
+      acting_notes: [{ name: 'Narrator', expression: 'serious' }],
     }))
     expect(result.totalPanelCount).toBe(1)
   })
