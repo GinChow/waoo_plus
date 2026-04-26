@@ -1,0 +1,12 @@
+{
+  "date": "2026-04-24",
+  "executor": "Codex",
+  "question": "How to parallelize without changing storyboard ordering and progress metadata?",
+  "answer": "Reuse mapWithConcurrency because it writes results by input index; stepAttempt and progress titles still use groupIndex + 1.",
+  "sufficiency": {
+    "interfaceContractKnown": true,
+    "technicalChoiceReasonKnown": true,
+    "mainRisksIdentified": true,
+    "verificationKnown": true
+  }
+}

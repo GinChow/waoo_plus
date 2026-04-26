@@ -1,0 +1,25 @@
+{
+  "date": "2026-04-24",
+  "executor": "Codex",
+  "task": "将分镜规划 phase2/phase3/phase4 对每个粗镜头的串行调用改为并发调用",
+  "toolingFallbacks": [
+    "sequential-thinking MCP unavailable; used local structured analysis",
+    "shrimp-task-manager MCP unavailable; used update_plan/local plan",
+    "code-index MCP unavailable; used rg/sed local search"
+  ],
+  "locations": [
+    "src/lib/novel-promotion/script-to-storyboard/orchestrator.ts",
+    "tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts"
+  ],
+  "currentImplementation": {
+    "phase1": "clips are processed with mapWithConcurrency",
+    "phase2GroupSplit": "coarseGroups now use bounded mapWithConcurrency",
+    "phase3Guidance": "fine groups now use bounded mapWithConcurrency; cinematography and acting remain parallel within each group",
+    "phase4Detail": "fine groups now use bounded mapWithConcurrency"
+  },
+  "tests": [
+    "npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts",
+    "npm run typecheck",
+    "npm run lint -- src/lib/novel-promotion/script-to-storyboard/orchestrator.ts tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts"
+  ]
+}

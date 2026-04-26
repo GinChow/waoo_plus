@@ -346,6 +346,144 @@ describe('script-to-storyboard orchestrator retry', () => {
     expect(maxActivePhase1).toBe(1)
   })
 
+  it('runs coarse group phases with bounded concurrency while preserving group order', async () => {
+    let activeSplit = 0
+    let activeCinematography = 0
+    let activeActing = 0
+    let activeDetail = 0
+    let maxActiveSplit = 0
+    let maxActiveCinematography = 0
+    let maxActiveActing = 0
+    let maxActiveDetail = 0
+
+    const waitBriefly = () => new Promise((resolve) => setTimeout(resolve, 10))
+    const readGroupNumber = (prompt: string) => {
+      const match = prompt.match(/"(?:group_number|parent_group_number)":\s*(\d+)/)
+      return match ? Number(match[1]) : 1
+    }
+
+    const runStep = vi.fn(async (_meta, prompt, action: string) => {
+      const promptText = String(prompt)
+      if (action === 'storyboard_phase1_plan') {
+        return {
+          text: JSON.stringify([
+            { group_number: 1, description_group: '粗组1', source_text_group: '原文1' },
+            { group_number: 2, description_group: '粗组2', source_text_group: '原文2' },
+            { group_number: 3, description_group: '粗组3', source_text_group: '原文3' },
+          ]),
+          reasoning: '',
+        }
+      }
+
+      if (action === 'storyboard_phase2_cinematography' && promptText.startsWith('SPLIT::')) {
+        activeSplit += 1
+        maxActiveSplit = Math.max(maxActiveSplit, activeSplit)
+        await waitBriefly()
+        activeSplit -= 1
+        const groupNumber = readGroupNumber(promptText)
+        return {
+          text: JSON.stringify([{
+            panel_number: 1,
+            description: `细镜头-${groupNumber}`,
+            source_text: `细原文-${groupNumber}`,
+            location: '场景A',
+            scene_type: 'dialogue',
+            characters: [{ name: '角色A' }],
+          }]),
+          reasoning: '',
+        }
+      }
+
+      if (action === 'storyboard_phase2_cinematography' && promptText.startsWith('CINE::')) {
+        activeCinematography += 1
+        maxActiveCinematography = Math.max(maxActiveCinematography, activeCinematography)
+        await waitBriefly()
+        activeCinematography -= 1
+        const groupNumber = readGroupNumber(promptText)
+        return {
+          text: JSON.stringify([{
+            panel_number: 1,
+            lighting: `光线-${groupNumber}`,
+            camera_angle: `机位-${groupNumber}`,
+            depth_of_field: `景深-${groupNumber}`,
+            focus_priority: `主体-${groupNumber}`,
+            composition_note: `构图-${groupNumber}`,
+            viewpoint_constraint: `视角-${groupNumber}`,
+            characters: [{ name: '角色A', screen_position: '左侧' }],
+          }]),
+          reasoning: '',
+        }
+      }
+
+      if (action === 'storyboard_phase2_acting') {
+        activeActing += 1
+        maxActiveActing = Math.max(maxActiveActing, activeActing)
+        await waitBriefly()
+        activeActing -= 1
+        const groupNumber = readGroupNumber(promptText)
+        return {
+          text: JSON.stringify([{ panel_number: 1, characters: [{ name: '角色A', acting: `表演-${groupNumber}` }] }]),
+          reasoning: '',
+        }
+      }
+
+      if (action === 'storyboard_phase3_detail') {
+        activeDetail += 1
+        maxActiveDetail = Math.max(maxActiveDetail, activeDetail)
+        await waitBriefly()
+        activeDetail -= 1
+        const groupNumber = readGroupNumber(promptText)
+        return {
+          text: JSON.stringify([{
+            shot_type: `景别-${groupNumber}`,
+            camera_move: `运镜-${groupNumber}`,
+            video_prompt: `视频-${groupNumber}`,
+            first_frame_image_prompt: `首帧-${groupNumber}`,
+            duration: 2 + groupNumber / 10,
+          }]),
+          reasoning: '',
+        }
+      }
+
+      throw new Error(`unexpected action: ${action}`)
+    })
+
+    const result = await runScriptToStoryboardOrchestrator({
+      concurrency: 2,
+      clips: [
+        {
+          id: 'clip-1',
+          content: '文本',
+          characters: JSON.stringify([{ name: '角色A' }]),
+          location: '场景A',
+          screenplay: null,
+        },
+      ],
+      novelPromotionData: {
+        characters: [{ name: '角色A', appearances: [] }],
+        locations: [{ name: '场景A', images: [] }],
+      },
+      promptTemplates: {
+        phase1PlanTemplate: '{clip_content}',
+        phase2GroupSplitTemplate: 'SPLIT::{coarse_storyboard_group}',
+        phase2CinematographyTemplate: 'CINE::{panels_json}',
+        phase2ActingTemplate: 'ACT::{panels_json}',
+        phase3DetailTemplate: 'DETAIL::{panels_json}',
+      },
+      runStep,
+    })
+
+    expect(maxActiveSplit).toBe(2)
+    expect(maxActiveCinematography).toBe(2)
+    expect(maxActiveActing).toBe(2)
+    expect(maxActiveDetail).toBe(2)
+    expect(result.clipPanels[0]?.finalPanels.map((panel) => panel.video_prompt)).toEqual([
+      '视频-1',
+      '视频-2',
+      '视频-3',
+    ])
+  })
+
   it('pipelines clips so one clip can enter phase2 before another clip finishes phase1', async () => {
     let releaseClip1Phase1: (() => void) | null = null
     const clip1Phase1Gate = new Promise<void>((resolve) => {

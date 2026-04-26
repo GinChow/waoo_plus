@@ -844,14 +844,14 @@ export async function runScriptToStoryboardOrchestrator(
     const finePanelsByGroup: StoryboardPanel[][] = []
     const isCoarsePlan = coarseGroups.some(isLikelyCoarseStoryboardGroup)
     if (isCoarsePlan) {
-      for (let groupIndex = 0; groupIndex < coarseGroups.length; groupIndex += 1) {
-        const coarseGroup = coarseGroups[groupIndex]
+      const splitResults = await mapWithConcurrency(coarseGroups, concurrency, async (coarseGroup, groupIndex) => {
+        const groupNumber = groupIndex + 1
         const splitStepMeta: ScriptToStoryboardStepMeta = {
           ...phase2Meta,
-          stepAttempt: groupIndex + 1,
+          stepAttempt: groupNumber,
           stepTitle: resolveGroupSplitProgressTitle({
             locale: input.locale,
-            current: groupIndex + 1,
+            current: groupNumber,
             total: coarseGroups.length,
           }),
         }
@@ -871,24 +871,24 @@ export async function runScriptToStoryboardOrchestrator(
           'storyboard_phase2_cinematography',
           2600,
           (text) => {
-            const panels = parseJsonArray<StoryboardPanel>(text, `phase2-split:${formatClipId(clip)}:group-${groupIndex + 1}`)
+            const panels = parseJsonArray<StoryboardPanel>(text, `phase2-split:${formatClipId(clip)}:group-${groupNumber}`)
             if (panels.length === 0) {
-              throw new Error(`Phase 2 returned empty fine panels for clip ${formatClipId(clip)} group ${groupIndex + 1}`)
+              throw new Error(`Phase 2 returned empty fine panels for clip ${formatClipId(clip)} group ${groupNumber}`)
             }
             return panels
           },
           maxStepAttempts,
         )
-        const normalizedFinePanels = finePanels.map((panel, panelIndex) => ({
+        return finePanels.map((panel, panelIndex) => ({
           ...panel,
           panel_number: typeof panel.panel_number === 'number' ? panel.panel_number : panelIndex + 1,
           parent_group_number:
             typeof (panel as Record<string, unknown>).parent_group_number === 'number'
               ? (panel as Record<string, unknown>).parent_group_number
-              : (typeof coarseGroup.group_number === 'number' ? coarseGroup.group_number : groupIndex + 1),
+              : (typeof coarseGroup.group_number === 'number' ? coarseGroup.group_number : groupNumber),
         }))
-        finePanelsByGroup.push(normalizedFinePanels)
-      }
+      })
+      finePanelsByGroup.push(...splitResults)
     } else {
       finePanelsByGroup.push((coarseGroups as StoryboardPanel[]).map((panel, panelIndex) => ({
         ...panel,
@@ -919,26 +919,26 @@ export async function runScriptToStoryboardOrchestrator(
     const finePanelsWithGuidanceByGroup: StoryboardPanel[][] = []
     const photographyRulesByGroup: PhotographyRule[][] = []
     const actingDirectionsByGroup: ActingDirection[][] = []
-    for (let groupIndex = 0; groupIndex < finePanelsByGroup.length; groupIndex += 1) {
-      const finePanels = finePanelsByGroup[groupIndex]
+    const guidanceResults = await mapWithConcurrency(finePanelsByGroup, concurrency, async (finePanels, groupIndex) => {
+      const groupNumber = groupIndex + 1
       const adjacentContext = buildAdjacentFineGroupContext(finePanelsByGroup, groupIndex)
       const cinematographyMeta: ScriptToStoryboardStepMeta = {
         ...phase3CinematographyMeta,
-        stepAttempt: groupIndex + 1,
+        stepAttempt: groupNumber,
         stepTitle: resolveGuidanceProgressTitle({
           locale: input.locale,
           kind: 'cinematography',
-          current: groupIndex + 1,
+          current: groupNumber,
           total: finePanelsByGroup.length,
         }),
       }
       const actingMeta: ScriptToStoryboardStepMeta = {
         ...phase3ActingMeta,
-        stepAttempt: groupIndex + 1,
+        stepAttempt: groupNumber,
         stepTitle: resolveGuidanceProgressTitle({
           locale: input.locale,
           kind: 'acting',
-          current: groupIndex + 1,
+          current: groupNumber,
           total: finePanelsByGroup.length,
         }),
       }
@@ -971,7 +971,7 @@ export async function runScriptToStoryboardOrchestrator(
           cinematographyPrompt,
           'storyboard_phase2_cinematography',
           2400,
-          (text) => parseJsonArray<PhotographyRule>(text, `phase3-cine:${formatClipId(clip)}:group-${groupIndex + 1}`),
+          (text) => parseJsonArray<PhotographyRule>(text, `phase3-cine:${formatClipId(clip)}:group-${groupNumber}`),
           maxStepAttempts,
         ),
         runStepWithRetry(
@@ -980,19 +980,24 @@ export async function runScriptToStoryboardOrchestrator(
           actingPrompt,
           'storyboard_phase2_acting',
           2400,
-          (text) => parseJsonArray<ActingDirection>(text, `phase3-acting:${formatClipId(clip)}:group-${groupIndex + 1}`),
+          (text) => parseJsonArray<ActingDirection>(text, `phase3-acting:${formatClipId(clip)}:group-${groupNumber}`),
           maxStepAttempts,
         ),
       ])
 
-      photographyRulesByGroup.push(photographyRules)
-      actingDirectionsByGroup.push(actingDirections)
-      finePanelsWithGuidanceByGroup.push(buildFinePanelsWithCinematography({
-        finePanels,
+      return {
         photographyRules,
         actingDirections,
-      }))
-    }
+        finePanelsWithGuidance: buildFinePanelsWithCinematography({
+          finePanels,
+          photographyRules,
+          actingDirections,
+        }),
+      }
+    })
+    photographyRulesByGroup.push(...guidanceResults.map((result) => result.photographyRules))
+    actingDirectionsByGroup.push(...guidanceResults.map((result) => result.actingDirections))
+    finePanelsWithGuidanceByGroup.push(...guidanceResults.map((result) => result.finePanelsWithGuidance))
 
     const flattenedPhotographyRules = photographyRulesByGroup.flat()
     const flattenedActingDirections = actingDirectionsByGroup.flat()
@@ -1016,17 +1021,17 @@ export async function runScriptToStoryboardOrchestrator(
     }
 
     const finalPanelsByGroup: StoryboardPanel[][] = []
-    for (let groupIndex = 0; groupIndex < finePanelsByGroup.length; groupIndex += 1) {
-      const finePanels = finePanelsByGroup[groupIndex]
+    finalPanelsByGroup.push(...await mapWithConcurrency(finePanelsByGroup, concurrency, async (finePanels, groupIndex) => {
+      const groupNumber = groupIndex + 1
       const photographyRules = photographyRulesByGroup[groupIndex] || []
       const actingDirections = actingDirectionsByGroup[groupIndex] || []
       const guidancePanels = finePanelsWithGuidanceByGroup[groupIndex] || []
       const detailMeta: ScriptToStoryboardStepMeta = {
         ...phase3Meta,
-        stepAttempt: groupIndex + 1,
+        stepAttempt: groupNumber,
         stepTitle: resolveDetailProgressTitle({
           locale: input.locale,
-          current: groupIndex + 1,
+          current: groupNumber,
           total: finePanelsByGroup.length,
         }),
       }
@@ -1049,7 +1054,7 @@ export async function runScriptToStoryboardOrchestrator(
         detailPrompt,
         'storyboard_phase3_detail',
         2600,
-        (text) => parseJsonArray<StoryboardPanel>(text, `phase4:${formatClipId(clip)}:group-${groupIndex + 1}`),
+        (text) => parseJsonArray<StoryboardPanel>(text, `phase4:${formatClipId(clip)}:group-${groupNumber}`),
         maxStepAttempts,
       )
       const reconciledPanels = reconcilePhase3Panels({
@@ -1062,12 +1067,12 @@ export async function runScriptToStoryboardOrchestrator(
         finalPanels: reconciledPanels,
         planPanels: finePanels,
       })
-      finalPanelsByGroup.push(mergePanelsWithRules({
+      return mergePanelsWithRules({
         finalPanels: normalizedPanels,
         photographyRules,
         actingDirections,
-      }))
-    }
+      })
+    }))
 
     const finalPanels = assignSequentialPanelNumbers(finalPanelsByGroup.flat())
     if (finalPanels.length === 0) {
