@@ -68,3 +68,34 @@ Fix missing `screen_position/posture/facing` in final `photography_rules.charact
 
 - `npm run typecheck`: passed.
 - `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts tests/unit/worker/script-to-storyboard-atomic-retry.test.ts tests/unit/worker/script-to-storyboard.test.ts`: passed.
+
+## 2026-04-27 Phase Start Scope
+
+分镜面板重新生成文字支持选择从 phase1/phase2/phase3/phase4 开始，基于当前结果继续生成，减少不必要的全量耗时。
+
+## 2026-04-27 Phase Start Scores
+
+- Technical: 92/100
+- Strategic: 92/100
+- Overall: 92/100
+
+## 2026-04-27 Phase Start Recommendation
+
+Pass.
+
+## 2026-04-27 Phase Start Findings
+
+- API 接收并校验 `startPhase`，默认 `phase1` 保持旧行为。
+- worker 在非 phase1 时读取当前 panels 并转换为 orchestrator seed。
+- orchestrator 支持从 phase2/phase3/phase4 跳过前置步骤继续执行。
+- UI 在重新生成文字旁新增起始阶段选择器。
+
+## 2026-04-27 Phase Start Verification
+
+- `npm run typecheck`: passed.
+- `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts`: passed.
+- `npm run lint:all`: passed with existing warnings.
+
+## 2026-04-27 Phase Start Residual Risk
+
+- phase4 续跑沿用既有 reconcile 规则，不覆盖 `description/source_text`，主要刷新视频提示词、首帧提示、时长、镜头/运镜等 detail 字段。

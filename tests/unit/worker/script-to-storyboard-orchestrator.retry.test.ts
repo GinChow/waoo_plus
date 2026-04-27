@@ -65,6 +65,301 @@ describe('script-to-storyboard orchestrator retry', () => {
     ])
   })
 
+  it('starts regenerate flow from seeded phase4 without rerunning earlier phases', async () => {
+    const actions: string[] = []
+    const runStep = vi.fn(async (_meta, _prompt, action: string) => {
+      actions.push(action)
+      return {
+        text: JSON.stringify([{
+          panel_number: 1,
+          description: 'phase4 refreshed',
+          video_prompt: 'phase4 video prompt',
+          location: '场景A',
+          source_text: '原文',
+          characters: [{ name: '角色A' }],
+        }]),
+        reasoning: '',
+      }
+    })
+
+    const result = await runScriptToStoryboardOrchestrator({
+      startPhase: 'phase4',
+      seedPanelsByClipId: {
+        'clip-1': [{
+          panel_number: 1,
+          parent_group_number: 1,
+          description: 'current panel',
+          location: '场景A',
+          source_text: '原文',
+          characters: [{ name: '角色A' }],
+          photographyPlan: { composition: '居中' },
+          actingNotes: { characters: [{ name: '角色A', acting: '平静' }] },
+        }],
+      },
+      clips: [
+        {
+          id: 'clip-1',
+          content: '文本',
+          characters: JSON.stringify([{ name: '角色A' }]),
+          location: '场景A',
+          screenplay: null,
+        },
+      ],
+      novelPromotionData: {
+        characters: [{ name: '角色A', appearances: [] }],
+        locations: [{ name: '场景A', images: [] }],
+      },
+      promptTemplates: {
+        phase1PlanTemplate: '{clip_content}',
+        phase2CinematographyTemplate: '{panels_json}',
+        phase2ActingTemplate: '{panels_json}',
+        phase3DetailTemplate: '{panels_json}',
+      },
+      runStep,
+    })
+
+    expect(actions).toEqual(['storyboard_phase3_detail'])
+    expect(result.clipPanels[0]?.finalPanels[0]?.description).toBe('current panel')
+    expect(result.clipPanels[0]?.finalPanels[0]?.video_prompt).toBe('phase4 video prompt')
+  })
+
+  it('starts phase4 from seeded panels whose acting notes are stored as an array', async () => {
+    const actions: string[] = []
+    const runStep = vi.fn(async (_meta, _prompt, action: string) => {
+      actions.push(action)
+      return {
+        text: JSON.stringify([{
+          panel_number: 1,
+          video_prompt: 'phase4 video prompt',
+          location: '场景A',
+          characters: [{ name: '角色A' }],
+        }]),
+        reasoning: '',
+      }
+    })
+
+    const result = await runScriptToStoryboardOrchestrator({
+      startPhase: 'phase4',
+      seedPanelsByClipId: {
+        'clip-1': [{
+          panel_number: 1,
+          parent_group_number: 1,
+          description: 'current panel',
+          location: '场景A',
+          source_text: '原文',
+          characters: [{ name: '角色A' }],
+          photographyPlan: { composition: '居中' },
+          actingNotes: [{ name: '角色A', acting: '平静' }],
+        }],
+      },
+      clips: [
+        {
+          id: 'clip-1',
+          content: '文本',
+          characters: JSON.stringify([{ name: '角色A' }]),
+          location: '场景A',
+          screenplay: null,
+        },
+      ],
+      novelPromotionData: {
+        characters: [{ name: '角色A', appearances: [] }],
+        locations: [{ name: '场景A', images: [] }],
+      },
+      promptTemplates: {
+        phase1PlanTemplate: '{clip_content}',
+        phase2CinematographyTemplate: '{panels_json}',
+        phase2ActingTemplate: '{panels_json}',
+        phase3DetailTemplate: '{panels_json}',
+      },
+      runStep,
+    })
+
+    const panel = result.clipPanels[0]?.finalPanels[0]
+    expect(actions).toEqual(['storyboard_phase3_detail'])
+    expect(panel?.video_prompt).toBe('phase4 video prompt')
+    expect(panel?.acting_notes).toEqual([{ name: '角色A', acting: '平静' }])
+    expect(panel?.actingNotes).toEqual([{ name: '角色A', acting: '平静' }])
+  })
+
+  it('starts phase4 from seeded panels without acting notes', async () => {
+    const actions: string[] = []
+    const runStep = vi.fn(async (_meta, _prompt, action: string) => {
+      actions.push(action)
+      return {
+        text: JSON.stringify([{
+          panel_number: 1,
+          video_prompt: 'phase4 video prompt without acting seed',
+          location: '场景A',
+          characters: [{ name: '角色A' }],
+        }]),
+        reasoning: '',
+      }
+    })
+
+    const result = await runScriptToStoryboardOrchestrator({
+      startPhase: 'phase4',
+      seedPanelsByClipId: {
+        'clip-1': [{
+          panel_number: 1,
+          parent_group_number: 1,
+          description: 'current panel',
+          location: '场景A',
+          source_text: '原文',
+          characters: [{ name: '角色A' }],
+        }],
+      },
+      clips: [
+        {
+          id: 'clip-1',
+          content: '文本',
+          characters: JSON.stringify([{ name: '角色A' }]),
+          location: '场景A',
+          screenplay: null,
+        },
+      ],
+      novelPromotionData: {
+        characters: [{ name: '角色A', appearances: [] }],
+        locations: [{ name: '场景A', images: [] }],
+      },
+      promptTemplates: {
+        phase1PlanTemplate: '{clip_content}',
+        phase2CinematographyTemplate: '{panels_json}',
+        phase2ActingTemplate: '{panels_json}',
+        phase3DetailTemplate: '{panels_json}',
+      },
+      runStep,
+    })
+
+    const panel = result.clipPanels[0]?.finalPanels[0]
+    expect(actions).toEqual(['storyboard_phase3_detail'])
+    expect(panel?.video_prompt).toBe('phase4 video prompt without acting seed')
+    expect(panel?.acting_notes).toEqual([])
+    expect(panel?.actingNotes).toEqual([])
+    expect(panel?.photographyPlan?.characters).toEqual([{
+      name: '角色A',
+      screen_position: 'current panel',
+      posture: 'current panel',
+      facing: 'current panel',
+    }])
+  })
+
+  it('merges phase4 output when generated panel numbers do not match seeded guidance', async () => {
+    const runStep = vi.fn(async (_meta, _prompt, action: string) => {
+      if (action === 'storyboard_phase3_detail') {
+        return {
+          text: JSON.stringify([{
+            panel_number: 6,
+            video_prompt: 'phase4 renumbered prompt',
+            location: '场景A',
+            characters: [{ name: '角色A' }],
+          }]),
+          reasoning: '',
+        }
+      }
+      return { text: '[]', reasoning: '' }
+    })
+
+    const result = await runScriptToStoryboardOrchestrator({
+      startPhase: 'phase4',
+      seedPanelsByClipId: {
+        'clip-1': [{
+          panel_number: 1,
+          parent_group_number: 1,
+          description: 'current panel',
+          location: '场景A',
+          source_text: '原文',
+          characters: [{ name: '角色A' }],
+        }],
+      },
+      clips: [
+        {
+          id: 'clip-1',
+          content: '文本',
+          characters: JSON.stringify([{ name: '角色A' }]),
+          location: '场景A',
+          screenplay: null,
+        },
+      ],
+      novelPromotionData: {
+        characters: [{ name: '角色A', appearances: [] }],
+        locations: [{ name: '场景A', images: [] }],
+      },
+      promptTemplates: {
+        phase1PlanTemplate: '{clip_content}',
+        phase2CinematographyTemplate: '{panels_json}',
+        phase2ActingTemplate: '{panels_json}',
+        phase3DetailTemplate: '{panels_json}',
+      },
+      runStep,
+    })
+
+    const panel = result.clipPanels[0]?.finalPanels[0]
+    expect(panel?.panel_number).toBe(1)
+    expect(panel?.video_prompt).toBe('phase4 renumbered prompt')
+    expect(panel?.photographyPlan).toBeTruthy()
+    expect(panel?.actingNotes).toEqual([])
+  })
+
+  it('reads phase4 duration_final into final duration and photography plan', async () => {
+    const runStep = vi.fn(async (_meta, _prompt, action: string) => {
+      if (action === 'storyboard_phase3_detail') {
+        return {
+          text: JSON.stringify([{
+            panel_number: 1,
+            duration_final: 2.5,
+            video_prompt: 'phase4 prompt with duration',
+            location: '场景A',
+            characters: [],
+          }]),
+          reasoning: '',
+        }
+      }
+      return { text: '[]', reasoning: '' }
+    })
+
+    const result = await runScriptToStoryboardOrchestrator({
+      startPhase: 'phase4',
+      seedPanelsByClipId: {
+        'clip-1': [{
+          panel_number: 1,
+          parent_group_number: 1,
+          description: 'current panel',
+          location: '场景A',
+          source_text: '原文',
+          characters: [],
+          duration_base: 2,
+          duration: 2,
+        }],
+      },
+      clips: [
+        {
+          id: 'clip-1',
+          content: '文本',
+          characters: JSON.stringify([]),
+          location: '场景A',
+          screenplay: null,
+        },
+      ],
+      novelPromotionData: {
+        characters: [],
+        locations: [{ name: '场景A', images: [] }],
+      },
+      promptTemplates: {
+        phase1PlanTemplate: '{clip_content}',
+        phase2CinematographyTemplate: '{panels_json}',
+        phase2ActingTemplate: '{panels_json}',
+        phase3DetailTemplate: '{panels_json}',
+      },
+      runStep,
+    })
+
+    const panel = result.clipPanels[0]?.finalPanels[0]
+    expect(panel?.duration_base).toBe(2)
+    expect(panel?.duration).toBe(2.5)
+    expect(panel?.photographyPlan?.duration_base).toBe(2)
+    expect(panel?.photographyPlan?.duration).toBe(2.5)
+  })
+
   it('does not retry non-retryable step failure', async () => {
     let callCount = 0
     const runStep = vi.fn(async () => {

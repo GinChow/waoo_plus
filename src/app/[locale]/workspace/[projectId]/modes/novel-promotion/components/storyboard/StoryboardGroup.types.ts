@@ -3,6 +3,7 @@ import type { StoryboardPanel } from './hooks/useStoryboardState'
 import type { PanelEditData } from '../PanelEditForm'
 import type { VariantData, VariantOptions } from './hooks/usePanelVariant'
 import type { PanelSaveState } from './hooks/usePanelCrudActions'
+import type { StoryboardRegenerateStartPhase } from './hooks/useStoryboardGroupActions'
 
 export interface StoryboardGroupProps {
   storyboard: NovelPromotionStoryboard
@@ -28,7 +29,7 @@ export interface StoryboardGroupProps {
   onToggleExpand: () => void
   onMoveUp: () => void
   onMoveDown: () => void
-  onRegenerateText: () => void
+  onRegenerateText: (startPhase?: StoryboardRegenerateStartPhase) => void
   onAddPanel: () => void
   onDeleteStoryboard: () => void
   onGenerateAllIndividually: () => void

@@ -161,7 +161,11 @@ export default function StoryboardGroup({
 
   const resolveProgressText = useCallback((value: string | null | undefined) => {
     if (!value) return null
-    const key = value.startsWith('progress.') ? value.slice('progress.'.length) : value
+    const trimmed = value.trim()
+    const key = trimmed.startsWith('progress.') ? trimmed.slice('progress.'.length) : trimmed
+    if (!/^[A-Za-z0-9_.-]+$/.test(key) || !key.includes('.')) {
+      return value
+    }
     try {
       return tProgress(key)
     } catch {

@@ -9,6 +9,7 @@ import { VariantData, VariantOptions } from './hooks/usePanelVariant'
 import type { PanelSaveState } from './hooks/usePanelCrudActions'
 import { AppIcon } from '@/components/ui/icons'
 import { GlassButton } from '@/components/ui/primitives'
+import type { StoryboardRegenerateStartPhase } from './hooks/useStoryboardGroupActions'
 
 interface StoryboardCanvasProps {
   sortedStoryboards: NovelPromotionStoryboard[]
@@ -35,7 +36,7 @@ interface StoryboardCanvasProps {
   formatClipTitle: (clip: NovelPromotionClip | undefined) => string
   onToggleExpandedClip: (storyboardId: string) => void
   onMoveStoryboardGroup: (clipId: string, direction: 'up' | 'down') => Promise<void>
-  onRegenerateStoryboardText: (storyboardId: string) => Promise<void>
+  onRegenerateStoryboardText: (storyboardId: string, startPhase?: StoryboardRegenerateStartPhase) => Promise<void>
   onAddPanel: (storyboardId: string) => Promise<void>
   onDeleteStoryboard: (storyboardId: string, panelCount: number) => Promise<void>
   onGenerateAllIndividually: (storyboardId: string) => Promise<void>
@@ -177,7 +178,7 @@ export default function StoryboardCanvas({
               onToggleExpand={() => onToggleExpandedClip(storyboard.id)}
               onMoveUp={() => onMoveStoryboardGroup(storyboard.clipId, 'up')}
               onMoveDown={() => onMoveStoryboardGroup(storyboard.clipId, 'down')}
-              onRegenerateText={() => onRegenerateStoryboardText(storyboard.id)}
+              onRegenerateText={(startPhase) => onRegenerateStoryboardText(storyboard.id, startPhase)}
               onAddPanel={() => onAddPanel(storyboard.id)}
               onDeleteStoryboard={() => onDeleteStoryboard(storyboard.id, textPanels.length)}
               onGenerateAllIndividually={() => onGenerateAllIndividually(storyboard.id)}

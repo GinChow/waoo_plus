@@ -195,13 +195,19 @@ export function useDeleteProjectStoryboardGroup(projectId: string) {
 
 export function useRegenerateProjectStoryboardText(projectId: string) {
     return useMutation({
-        mutationFn: async ({ storyboardId }: { storyboardId: string }) => {
+        mutationFn: async ({
+            storyboardId,
+            startPhase = 'phase1',
+        }: {
+            storyboardId: string
+            startPhase?: 'phase1' | 'phase2' | 'phase3' | 'phase4'
+        }) => {
             const response = await requestTaskResponseWithError(
                 `/api/novel-promotion/${projectId}/regenerate-storyboard-text`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ storyboardId, async: true }),
+                    body: JSON.stringify({ storyboardId, startPhase, async: true }),
                 },
                 'regenerate storyboard text failed',
             )

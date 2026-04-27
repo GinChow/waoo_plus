@@ -11,6 +11,8 @@ import {
 } from '@/lib/query/hooks'
 import { getErrorMessage, isAbortError } from './panel-operations-shared'
 
+export type StoryboardRegenerateStartPhase = 'phase1' | 'phase2' | 'phase3' | 'phase4'
+
 interface UseStoryboardGroupActionsProps {
   projectId: string
   episodeId: string
@@ -49,12 +51,15 @@ export function useStoryboardGroupActions({
     }
   }, [deleteStoryboardMutation, onRefresh, t])
 
-  const regenerateStoryboardText = useCallback(async (storyboardId: string) => {
+  const regenerateStoryboardText = useCallback(async (
+    storyboardId: string,
+    startPhase: StoryboardRegenerateStartPhase = 'phase1',
+  ) => {
     if (submittingStoryboardTextIds.has(storyboardId)) return
     setSubmittingStoryboardTextIds((previous) => new Set(previous).add(storyboardId))
 
     try {
-      await regenerateStoryboardTextMutation.mutateAsync({ storyboardId })
+      await regenerateStoryboardTextMutation.mutateAsync({ storyboardId, startPhase })
       _ulogInfo('[重新生成分镜] 任务完成')
       await onRefresh()
     } catch (error: unknown) {

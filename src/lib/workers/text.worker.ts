@@ -12,9 +12,14 @@ import { buildInsertPanelLocationsDescription } from '@/lib/novel-promotion/inse
 import {
   runScriptToStoryboardOrchestrator,
   type ScriptToStoryboardStepMeta,
+  type StoryboardRegenerateStartPhase,
 } from '@/lib/novel-promotion/script-to-storyboard/orchestrator'
 import { persistStoryboardsAndPanels } from '@/lib/workers/handlers/script-to-storyboard-helpers'
-import { getProjectModelConfig } from '@/lib/config-service'
+import type { StoryboardPanel } from '@/lib/storyboard-phases'
+import {
+  getProjectModelConfig,
+  getUserWorkflowConcurrencyConfig,
+} from '@/lib/config-service'
 import { reportTaskProgress, reportTaskStreamChunk, withTaskLifecycle } from './shared'
 import { assertTaskActive } from './utils'
 import { handleStoryToScriptTask } from './handlers/story-to-script'
@@ -236,17 +241,88 @@ function parsePanelProps(panel: Record<string, unknown> | null | undefined): str
   }
 }
 
+function parseOptionalJson(value: string | null | undefined): unknown {
+  if (!value) return null
+  try {
+    return JSON.parse(value)
+  } catch {
+    return null
+  }
+}
+
+function parseParentGroupByPanelNumber(value: string | null | undefined): Map<number, number> {
+  const output = new Map<number, number>()
+  const parsed = parseOptionalJson(value)
+  if (!Array.isArray(parsed)) return output
+  for (const item of parsed) {
+    if (!Array.isArray(item) || item.length < 2) continue
+    const panelNumber = typeof item[0] === 'number' ? item[0] : null
+    const parentGroupNumber = typeof item[1] === 'number' ? item[1] : null
+    if (panelNumber !== null && parentGroupNumber !== null) {
+      output.set(panelNumber, parentGroupNumber)
+    }
+  }
+  return output
+}
+
+function normalizeRegenerateStartPhase(value: unknown): StoryboardRegenerateStartPhase {
+  if (value === 'phase2' || value === 'phase3' || value === 'phase4') return value
+  return 'phase1'
+}
+
+function buildSeedPanelsFromStoryboard(storyboard: {
+  storyboardTextJson?: string | null
+  panels?: Array<Record<string, unknown>>
+}): StoryboardPanel[] {
+  const parentGroupByPanelNumber = parseParentGroupByPanelNumber(storyboard.storyboardTextJson)
+  const panels = Array.isArray(storyboard.panels) ? storyboard.panels : []
+  return panels.map((panel, index) => {
+    const panelNumber = typeof panel.panelNumber === 'number' ? panel.panelNumber : index + 1
+    const photographyPlan = parseOptionalJson(typeof panel.photographyRules === 'string' ? panel.photographyRules : null)
+    const actingNotes = parseOptionalJson(typeof panel.actingNotes === 'string' ? panel.actingNotes : null)
+    const characters = parseOptionalJson(typeof panel.characters === 'string' ? panel.characters : null)
+    const props = parseOptionalJson(typeof panel.props === 'string' ? panel.props : null)
+    return {
+      panel_number: panelNumber,
+      parent_group_number: parentGroupByPanelNumber.get(panelNumber) || 1,
+      shot_type: typeof panel.shotType === 'string' ? panel.shotType : undefined,
+      camera_move: typeof panel.cameraMove === 'string' ? panel.cameraMove : undefined,
+      description: typeof panel.description === 'string' ? panel.description : undefined,
+      video_prompt: typeof panel.videoPrompt === 'string' ? panel.videoPrompt : undefined,
+      first_frame_image_prompt: typeof panel.firstLastFramePrompt === 'string' ? panel.firstLastFramePrompt : undefined,
+      location: typeof panel.location === 'string' ? panel.location : undefined,
+      scene_type: typeof panel.sceneType === 'string' ? panel.sceneType : undefined,
+      characters: Array.isArray(characters) ? characters : [],
+      props: Array.isArray(props) ? props : [],
+      source_text: typeof panel.srtSegment === 'string' ? panel.srtSegment : undefined,
+      photographyPlan: photographyPlan && typeof photographyPlan === 'object' && !Array.isArray(photographyPlan)
+        ? photographyPlan as Record<string, unknown>
+        : undefined,
+      actingNotes: actingNotes && typeof actingNotes === 'object'
+        ? actingNotes
+        : undefined,
+      duration_base: typeof panel.duration === 'number' ? panel.duration : undefined,
+      duration: typeof panel.duration === 'number' ? panel.duration : undefined,
+    }
+  })
+}
+
 async function handleRegenerateStoryboardTextTask(job: Job<TaskJobData>) {
   const payload = (job.data.payload || {}) as AnyObj
   const projectId = job.data.projectId
   const storyboardId = typeof payload.storyboardId === 'string' ? payload.storyboardId : job.data.targetId
+  const startPhase = normalizeRegenerateStartPhase(payload.startPhase)
   const userId = job.data.userId
 
   if (!storyboardId) throw new Error('regenerate_storyboard_text requires storyboardId')
 
   const storyboard = await prisma.novelPromotionStoryboard.findUnique({
     where: { id: storyboardId },
-    include: { clip: true, episode: true },
+    include: {
+      clip: true,
+      episode: true,
+      panels: { orderBy: { panelIndex: 'asc' } },
+    },
   })
   if (!storyboard) throw new Error('Storyboard not found')
   if (!storyboard.clip) throw new Error('Storyboard clip not found')
@@ -267,6 +343,7 @@ async function handleRegenerateStoryboardTextTask(job: Job<TaskJobData>) {
     : ''
   const analysisModel = payloadAnalysisModel || novelPromotionData.analysisModel
   if (!analysisModel) throw new Error('Analysis model not configured')
+  const workflowConcurrency = await getUserWorkflowConcurrencyConfig(userId)
   const normalizedNovelPromotionData = {
     characters: novelPromotionData.characters || [],
     locations: novelPromotionData.locations.filter((item) => readAssetKind(item as unknown as Record<string, unknown>) !== 'prop'),
@@ -325,7 +402,7 @@ async function handleRegenerateStoryboardTextTask(job: Job<TaskJobData>) {
     regenerateCallbacks,
     async () =>
       await runScriptToStoryboardOrchestrator({
-        concurrency: 1,
+        concurrency: workflowConcurrency.analysis,
         locale: job.data.locale,
         clips: [{
           id: storyboard.clip.id,
@@ -338,6 +415,10 @@ async function handleRegenerateStoryboardTextTask(job: Job<TaskJobData>) {
         novelPromotionData: normalizedNovelPromotionData,
         promptTemplates,
         runStep,
+        startPhase,
+        seedPanelsByClipId: startPhase === 'phase1'
+          ? undefined
+          : { [storyboard.clip.id]: buildSeedPanelsFromStoryboard(storyboard as unknown as { storyboardTextJson?: string | null; panels?: Array<Record<string, unknown>> }) },
       }),
   )
   await regenerateCallbacks.flush()

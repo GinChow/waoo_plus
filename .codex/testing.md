@@ -52,3 +52,43 @@ The changed path now shares the same orchestrator and persistence helper as the 
 ## 2026-04-27 Risk
 
 Existing generated records with only old `acting` text can now be merged without empty `posture/facing`; best output quality still depends on regenerating acting direction with the updated prompt so the model supplies explicit `screen_position/posture/facing`.
+
+## 2026-04-27 Phase Start Commands
+
+- `npm run typecheck`
+  - Result: passed.
+- `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts`
+  - Result: passed, 13 tests.
+- `npm run lint:all`
+  - Result: passed with existing warnings.
+  - Notes: 0 errors, 44 warnings.
+
+## 2026-04-27 Phase Start Risk
+
+phase4 续跑沿用现有 reconcile 规则，保留当前分镜的 `description/source_text`，主要刷新视频提示词、首帧提示、时长、镜头/运镜等 detail 字段。
+
+## 2026-04-27 Phase4 Acting Seed Fix
+
+- `npm run typecheck`
+  - Result: passed.
+- `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts`
+  - Result: passed, 16 tests.
+
+## 2026-04-27 Regenerate Text Concurrency
+
+- `npm run typecheck`
+  - Result: passed.
+- `npx vitest run tests/unit/worker/script-to-storyboard.test.ts tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts`
+  - Result: passed, 21 tests.
+
+## 2026-04-27 Phase4 Duration Final
+
+- `npm run typecheck`
+  - Result: passed.
+- `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts`
+  - Result: passed, 17 tests.
+
+## 2026-04-27 Progress Text Guard
+
+- `npm run typecheck`
+  - Result: passed.

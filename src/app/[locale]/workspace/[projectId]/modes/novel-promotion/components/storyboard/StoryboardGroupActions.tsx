@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { resolveTaskPresentationState } from '@/lib/task/presentation'
 import TaskStatusInline from '@/components/task/TaskStatusInline'
 import { GlassButton } from '@/components/ui/primitives'
 import { AppIcon } from '@/components/ui/icons'
+import type { StoryboardRegenerateStartPhase } from './hooks/useStoryboardGroupActions'
 
 interface StoryboardGroupActionsProps {
   hasAnyImage: boolean
@@ -13,7 +14,7 @@ interface StoryboardGroupActionsProps {
   isSubmittingStoryboardTextTask: boolean
   currentRunningCount: number
   pendingCount: number
-  onRegenerateText: () => void
+  onRegenerateText: (startPhase?: StoryboardRegenerateStartPhase) => void
   onGenerateAllIndividually: () => void
   onAddPanel: () => void
   onDeleteStoryboard: () => void
@@ -31,6 +32,7 @@ export default function StoryboardGroupActions({
   onDeleteStoryboard,
 }: StoryboardGroupActionsProps) {
   const t = useTranslations('storyboard')
+  const [regenerateStartPhase, setRegenerateStartPhase] = useState<StoryboardRegenerateStartPhase>('phase1')
 
   const textTaskRunningState = useMemo(() => {
     if (!isSubmittingStoryboardTextTask) return null
@@ -54,21 +56,38 @@ export default function StoryboardGroupActions({
 
   return (
     <div className="flex items-center gap-2">
-      <GlassButton
-        variant="secondary"
-        size="sm"
-        onClick={onRegenerateText}
-        disabled={isSubmittingStoryboardTextTask}
-      >
-        {isSubmittingStoryboardTextTask ? (
-          <TaskStatusInline state={textTaskRunningState} />
-        ) : (
-          <>
-            <AppIcon name="refresh" className="h-3 w-3" />
-            <span>{t('group.regenerateText')}</span>
-          </>
-        )}
-      </GlassButton>
+      <div className="flex items-center gap-1">
+        <div className="relative">
+          <select
+            value={regenerateStartPhase}
+            onChange={(event) => setRegenerateStartPhase(event.target.value as StoryboardRegenerateStartPhase)}
+            disabled={isSubmittingStoryboardTextTask}
+            title={t('group.regenerateTextStartPhase')}
+            className="h-8 appearance-none rounded-md border border-[var(--glass-border)] bg-[var(--glass-bg-surface)] pl-2 pr-7 text-xs text-[var(--glass-text-primary)] outline-none transition-colors hover:bg-[var(--glass-bg-surface-hover)] disabled:opacity-60"
+          >
+            <option value="phase1">{t('group.regenerateFromPhase1')}</option>
+            <option value="phase2">{t('group.regenerateFromPhase2')}</option>
+            <option value="phase3">{t('group.regenerateFromPhase3')}</option>
+            <option value="phase4">{t('group.regenerateFromPhase4')}</option>
+          </select>
+          <AppIcon name="chevronDown" className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--glass-text-tertiary)]" />
+        </div>
+        <GlassButton
+          variant="secondary"
+          size="sm"
+          onClick={() => onRegenerateText(regenerateStartPhase)}
+          disabled={isSubmittingStoryboardTextTask}
+        >
+          {isSubmittingStoryboardTextTask ? (
+            <TaskStatusInline state={textTaskRunningState} />
+          ) : (
+            <>
+              <AppIcon name="refresh" className="h-3 w-3" />
+              <span>{t('group.regenerateText')}</span>
+            </>
+          )}
+        </GlassButton>
+      </div>
 
       {pendingCount > 0 && (
         <GlassButton
@@ -112,4 +131,3 @@ export default function StoryboardGroupActions({
     </div>
   )
 }
-

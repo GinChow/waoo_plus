@@ -21,3 +21,14 @@
 - 2026-04-27 Codex: 更新主编排器与 atomic retry：`buildUnifiedPhotographyPlan` 接收 acting notes，优先用 acting 的 `screen_position/posture/facing`，再用 slot、composition、description、acting 文本兜底，并兼容 `screen_postion` 拼写。
 - 2026-04-27 Codex: 更新 `agent_acting_direction_v2.zh.txt`，要求 acting director 输出 `screen_position/posture/facing/acting` 五字段，且前三项必须非空。
 - 2026-04-27 Codex: 执行 `npm run typecheck` 通过；执行 `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts tests/unit/worker/script-to-storyboard-atomic-retry.test.ts tests/unit/worker/script-to-storyboard.test.ts` 通过，3 个文件 20 个用例。
+- 2026-04-27 Codex: 接到需求：分镜面板重新生成文字支持选择从 phase1/phase2/phase3/phase4 开始，避免无条件全量重跑。
+- 2026-04-27 Codex: 降级说明：当前会话没有 sequential-thinking、shrimp-task-manager、code-index MCP 工具，使用 `rg`、`sed`、`update_plan` 和本地补丁替代。
+- 2026-04-27 Codex: 实现 `startPhase` 合同、当前 panel seed 转换、orchestrator phase2/3/4 续跑分支和前端选择器。
+- 2026-04-27 Codex: 验证通过 `npm run typecheck`、`npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts`、`npm run lint:all`。
+- 2026-04-27 Codex: 修复 phase4 续跑中当前 `actingNotes` 为数组时被 seed/collector 过滤，导致 `Missing acting direction` 的问题。
+- 2026-04-27 Codex: 继续修复 phase4 续跑中当前 panel 完全缺少 `actingNotes` 或 `photographyPlan` 时的兜底 guidance，避免旧数据阻断细节重生成。
+- 2026-04-27 Codex: 将兜底逻辑下沉到 `reconcilePhase3Panels` 与 `buildFinePanelsWithCinematography` 最终合并层，确保上游传空 guidance 时也不会抛 `Missing acting direction`。
+- 2026-04-27 Codex: 修复 `mergePanelsWithRules` 最终合并层缺 `photographyRules` 时的兜底，覆盖 phase4 输出 panel_number 与当前 guidance 不匹配的情况。
+- 2026-04-27 Codex: 将 `regenerate_storyboard_text` 的 orchestrator 并发从固定 1 改为读取用户 `workflowConcurrency.analysis` 配置。
+- 2026-04-27 Codex: 修复 phase4 detail 输出 `duration_final` 未被解析，以及重新生成 seed 未保留 `duration_base` 导致导出 JSON 时长为 null 的问题。
+- 2026-04-27 Codex: 修复分镜任务进度中文明文被当作 `progress` i18n key 翻译，导致 `MISSING_MESSAGE` 控制台错误的问题。

@@ -71,6 +71,50 @@
         "mainRisksIdentified": true,
         "verificationKnown": true
       }
+    },
+    {
+      "date": "2026-04-27",
+      "executor": "Codex",
+      "task": "分镜面板重新生成文字支持选择从不同 phase 基于当前结果继续生成",
+      "toolFallbacks": [
+        {
+          "tool": "sequential-thinking",
+          "status": "unavailable",
+          "note": "当前会话未暴露该 MCP 工具，改用本地代码检索和测试验证。"
+        },
+        {
+          "tool": "shrimp-task-manager",
+          "status": "unavailable",
+          "note": "当前会话未暴露该 MCP 工具，使用内置计划与本地验证替代。"
+        },
+        {
+          "tool": "code-index",
+          "status": "unavailable",
+          "note": "当前会话未暴露该 MCP 工具，使用 rg 检索替代。"
+        }
+      ],
+      "scan": {
+        "apiEntry": "src/app/api/novel-promotion/[projectId]/regenerate-storyboard-text/route.ts",
+        "workerEntry": "src/lib/workers/text.worker.ts",
+        "orchestrator": "src/lib/novel-promotion/script-to-storyboard/orchestrator.ts",
+        "clientMutation": "src/lib/query/mutations/storyboard-panel-mutations.ts",
+        "uiEntry": "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/storyboard/StoryboardGroupActions.tsx"
+      },
+      "finding": {
+        "symptom": "分镜面板重新生成文字会从 phase1 到 phase4 全部执行，耗时较长。",
+        "rootCause": "regenerate_storyboard_text 任务只接收 storyboardId，worker 对单个 clip 调用完整 orchestrator，没有起始 phase 或当前结果 seed。",
+        "evidence": [
+          "API 原请求体只传 storyboardId 和 async。",
+          "text.worker.ts 的 handleRegenerateStoryboardTextTask 直接调用 runScriptToStoryboardOrchestrator。",
+          "orchestrator 原实现每个 clip 固定执行 phase1、phase2 split、phase3 摄影/演技、phase4 detail。"
+        ]
+      },
+      "sufficiency": {
+        "interfaceContractKnown": true,
+        "technicalChoiceKnown": true,
+        "mainRisksIdentified": true,
+        "verificationKnown": true
+      }
     }
   ]
 }

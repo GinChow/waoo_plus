@@ -20,13 +20,18 @@ export const POST = apiHandler(async (
   const body = await request.json()
   const locale = resolveRequiredTaskLocale(request, body)
   const storyboardId = body?.storyboardId
+  const startPhase = typeof body?.startPhase === 'string' ? body.startPhase : 'phase1'
 
-  if (!storyboardId) {
+  if (!storyboardId || !['phase1', 'phase2', 'phase3', 'phase4'].includes(startPhase)) {
     throw new ApiError('INVALID_PARAMS')
   }
 
   const projectModelConfig = await getProjectModelConfig(projectId, session.user.id)
-  const billingPayload = { ...body, ...(projectModelConfig.analysisModel ? { analysisModel: projectModelConfig.analysisModel } : {}) }
+  const billingPayload = {
+    ...body,
+    startPhase,
+    ...(projectModelConfig.analysisModel ? { analysisModel: projectModelConfig.analysisModel } : {}),
+  }
 
   const result = await submitTask({
     userId: session.user.id,
@@ -37,7 +42,7 @@ export const POST = apiHandler(async (
     targetType: 'NovelPromotionStoryboard',
     targetId: storyboardId,
     payload: billingPayload,
-    dedupeKey: `regenerate_storyboard_text:${storyboardId}`,
+    dedupeKey: `regenerate_storyboard_text:${storyboardId}:${startPhase}`,
     billingInfo: buildDefaultTaskBillingInfo(TASK_TYPE.REGENERATE_STORYBOARD_TEXT, billingPayload)
   })
 
