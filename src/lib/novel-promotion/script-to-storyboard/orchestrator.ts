@@ -265,11 +265,25 @@ function normalizePhotographyCharacters(value: unknown) {
     const record = asRecord(item)
     return {
       name: asText(record?.name),
-      screen_position: readTextByKeys(record, ['screen_position', 'screenPosition', 'position', 'slot']),
+      screen_position: readTextByKeys(record, ['screen_position', 'screen_postion', 'screenPosition', 'position', 'slot']),
       posture: readTextByKeys(record, ['posture', 'pose', 'body_pose', 'bodyPose']),
       facing: readTextByKeys(record, ['facing', 'look_direction', 'lookDirection', 'direction']),
     }
   })
+}
+
+function normalizeActingCharacters(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value.map((item) => {
+    const record = asRecord(item)
+    return {
+      name: asText(record?.name),
+      screen_position: readTextByKeys(record, ['screen_position', 'screen_postion', 'screenPosition', 'position', 'slot']),
+      posture: readTextByKeys(record, ['posture', 'pose', 'body_pose', 'bodyPose']),
+      facing: readTextByKeys(record, ['facing', 'look_direction', 'lookDirection', 'direction']),
+      acting: asText(record?.acting),
+    }
+  }).filter((item) => item.name)
 }
 
 function normalizeName(name: string): string {
@@ -342,26 +356,81 @@ function fallbackPhotographyCharactersFromPanel(panel: StoryboardPanel) {
   }))
 }
 
-function buildUnifiedPhotographyPlan(rule: PhotographyRule, panel: StoryboardPanel) {
+function firstNonEmpty(...values: Array<unknown>) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
+function buildUnifiedPhotographyPlan(rule: PhotographyRule, panel: StoryboardPanel, actingNotes: unknown[] = []) {
   const sceneSummary = asText(rule.scene_summary) || asText(rule.composition)
   const lighting = normalizeLighting(rule.lighting)
   const characters = (() => {
     const fromRules = normalizePhotographyCharacters(rule.characters).filter((item) => item.name)
+    const actingByName = new Map(
+      normalizeActingCharacters(actingNotes).map((item) => [normalizeName(item.name), item]),
+    )
     const fallback = fallbackPhotographyCharactersFromPanel(panel)
-    if (fromRules.length === 0) return fallback
+    const enrichFallback = (item: ReturnType<typeof fallbackPhotographyCharactersFromPanel>[number]) => {
+      const acting = actingByName.get(normalizeName(item.name))
+      return {
+        ...item,
+        screen_position: firstNonEmpty(
+          item.screen_position,
+          acting?.screen_position,
+          rule.composition_note,
+          rule.composition,
+          panel.description,
+        ),
+        posture: firstNonEmpty(
+          item.posture,
+          acting?.posture,
+          acting?.acting,
+          panel.description,
+        ),
+        facing: firstNonEmpty(
+          item.facing,
+          acting?.facing,
+          rule.viewpoint_constraint,
+          panel.description,
+        ),
+      }
+    }
+    if (fromRules.length === 0) return fallback.map(enrichFallback)
 
     const fallbackByName = new Map(fallback.map((item) => [normalizeName(item.name), item]))
     const merged = fromRules.map((item) => {
       const fb = fallbackByName.get(normalizeName(item.name))
+      const acting = actingByName.get(normalizeName(item.name))
       return {
         ...item,
-        screen_position: item.screen_position || fb?.screen_position || '',
-        posture: item.posture || '',
-        facing: item.facing || '',
+        screen_position: firstNonEmpty(
+          item.screen_position,
+          acting?.screen_position,
+          fb?.screen_position,
+          rule.composition_note,
+          rule.composition,
+          panel.description,
+        ),
+        posture: firstNonEmpty(
+          item.posture,
+          acting?.posture,
+          acting?.acting,
+          panel.description,
+        ),
+        facing: firstNonEmpty(
+          item.facing,
+          acting?.facing,
+          rule.viewpoint_constraint,
+          panel.description,
+        ),
       }
     })
     const existing = new Set(merged.map((item) => normalizeName(item.name)))
-    const missing = fallback.filter((item) => !existing.has(normalizeName(item.name)))
+    const missing = fallback
+      .filter((item) => !existing.has(normalizeName(item.name)))
+      .map(enrichFallback)
     return [...merged, ...missing]
   })()
   const depthOfField = asText(rule.depth_of_field)
@@ -417,17 +486,17 @@ function mergePanelsWithRules(params: {
 
     return {
       ...panel,
-      photographyPlan: buildUnifiedPhotographyPlan(rules, panel),
+      photographyPlan: buildUnifiedPhotographyPlan(rules, panel, actingNotes),
       acting_notes: actingNotes,
       actingNotes,
     }
   })
 }
 
-function normalizeActingNotesPayload(value: unknown) {
+function normalizeActingNotesPayload(value: unknown): unknown[] {
   if (Array.isArray(value)) return value
   if (value && typeof value === 'object' && Array.isArray((value as JsonRecord).characters)) {
-    return (value as JsonRecord).characters
+    return (value as JsonRecord).characters as unknown[]
   }
   return []
 }
@@ -569,6 +638,7 @@ function buildFinePanelsWithCinematography(params: {
       color_tone: matchedRule.color_tone || matchedRule.color_palette,
       focus_priority: matchedRule.focus_priority,
       composition_note: matchedRule.composition_note,
+      photography_rules: matchedRule,
       acting_notes: matchedActing,
     }
   })

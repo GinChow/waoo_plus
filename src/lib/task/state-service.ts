@@ -21,6 +21,11 @@ export type TaskTargetState = {
   progress: number | null
   stage: string | null
   stageLabel: string | null
+  message: string | null
+  stepTitle: string | null
+  stepIndex: number | null
+  stepTotal: number | null
+  stepAttempt: number | null
   lastError: {
     code: string
     message: string
@@ -58,6 +63,12 @@ export function toProgress(value: unknown): number | null {
   return rounded
 }
 
+function toPositiveInteger(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+  const rounded = Math.floor(value)
+  return rounded > 0 ? rounded : null
+}
+
 export function extractTaskStateFields(task: {
   type: string
   progress: number
@@ -68,6 +79,11 @@ export function extractTaskStateFields(task: {
   return {
     stage: asNonEmptyString(payload?.stage),
     stageLabel: asNonEmptyString(payload?.stageLabel),
+    message: asNonEmptyString(payload?.message),
+    stepTitle: asNonEmptyString(payload?.stepTitle),
+    stepIndex: toPositiveInteger(payload?.stepIndex),
+    stepTotal: toPositiveInteger(payload?.stepTotal),
+    stepAttempt: toPositiveInteger(payload?.stepAttempt),
     hasOutputAtStart: asBoolean(payloadUi?.hasOutputAtStart),
     intent: coerceTaskIntent(payloadUi?.intent ?? payload?.intent, task.type),
     progress: toProgress(task.progress),
@@ -98,6 +114,11 @@ export function buildIdleState(target: TaskTargetQuery): TaskTargetState {
     progress: null,
     stage: null,
     stageLabel: null,
+    message: null,
+    stepTitle: null,
+    stepIndex: null,
+    stepTotal: null,
+    stepAttempt: null,
     lastError: null,
     updatedAt: null,
   }
@@ -146,6 +167,11 @@ export function resolveTargetState(
       progress: runningFields.progress,
       stage: runningFields.stage,
       stageLabel: runningFields.stageLabel,
+      message: runningFields.message,
+      stepTitle: runningFields.stepTitle,
+      stepIndex: runningFields.stepIndex,
+      stepTotal: runningFields.stepTotal,
+      stepAttempt: runningFields.stepAttempt,
       lastError: null,
       updatedAt: running.updatedAt.toISOString(),
     }
@@ -163,6 +189,11 @@ export function resolveTargetState(
       progress: 100,
       stage: latestFields.stage,
       stageLabel: latestFields.stageLabel,
+      message: latestFields.message,
+      stepTitle: latestFields.stepTitle,
+      stepIndex: latestFields.stepIndex,
+      stepTotal: latestFields.stepTotal,
+      stepAttempt: latestFields.stepAttempt,
       lastError: null,
       updatedAt: latest.updatedAt.toISOString(),
     }
@@ -179,6 +210,11 @@ export function resolveTargetState(
     progress: null,
     stage: latestFields.stage,
     stageLabel: latestFields.stageLabel,
+    message: latestFields.message,
+    stepTitle: latestFields.stepTitle,
+    stepIndex: latestFields.stepIndex,
+    stepTotal: latestFields.stepTotal,
+    stepAttempt: latestFields.stepAttempt,
     lastError: normalizeFailedError(latest),
     updatedAt: latest.updatedAt.toISOString(),
   }

@@ -129,23 +129,40 @@ export function useStoryboardTaskAwareStoryboards({
   )
 
   const taskAwareStoryboards = useMemo(() => {
-    return initialStoryboards.map((storyboard) => ({
-      ...storyboard,
-      storyboardTaskRunning:
-        isRunningPhase(storyboardTextStates.getTaskState(`storyboard:${storyboard.id}`)?.phase) ||
-        isRunningPhase(storyboardTextStates.getTaskState(`episode:${storyboard.episodeId}`)?.phase),
-      panels: (storyboard.panels || []).map((panel) => {
-        const panelImageTaskState = panelImageStates.getTaskState(`panel-image:${panel.id}`)
-        const panelImageRunning = isRunningPhase(panelImageTaskState?.phase)
-        return {
-          ...panel,
-          imageTaskRunning: panelImageRunning,
-          imageTaskIntent: panelImageTaskState?.intent,
-          videoTaskRunning: isRunningPhase(panelVideoStates.getTaskState(`panel-video:${panel.id}`)?.phase),
-          lipSyncTaskRunning: isRunningPhase(panelLipSyncStates.getTaskState(`panel-lip:${panel.id}`)?.phase),
-        }
-      }),
-    }))
+    return initialStoryboards.map((storyboard) => {
+      const storyboardTaskState = storyboardTextStates.getTaskState(`storyboard:${storyboard.id}`)
+      const episodeTaskState = storyboardTextStates.getTaskState(`episode:${storyboard.episodeId}`)
+      const activeTextTaskState = isRunningPhase(storyboardTaskState?.phase)
+        ? storyboardTaskState
+        : isRunningPhase(episodeTaskState?.phase)
+          ? episodeTaskState
+          : storyboardTaskState || episodeTaskState || null
+
+      return {
+        ...storyboard,
+        storyboardTaskRunning:
+          isRunningPhase(storyboardTaskState?.phase) ||
+          isRunningPhase(episodeTaskState?.phase),
+        storyboardTaskProgress: activeTextTaskState?.progress ?? null,
+        storyboardTaskStageLabel: activeTextTaskState?.stageLabel ?? null,
+        storyboardTaskMessage: activeTextTaskState?.message ?? null,
+        storyboardTaskStepTitle: activeTextTaskState?.stepTitle ?? null,
+        storyboardTaskStepIndex: activeTextTaskState?.stepIndex ?? null,
+        storyboardTaskStepTotal: activeTextTaskState?.stepTotal ?? null,
+        storyboardTaskStepAttempt: activeTextTaskState?.stepAttempt ?? null,
+        panels: (storyboard.panels || []).map((panel) => {
+          const panelImageTaskState = panelImageStates.getTaskState(`panel-image:${panel.id}`)
+          const panelImageRunning = isRunningPhase(panelImageTaskState?.phase)
+          return {
+            ...panel,
+            imageTaskRunning: panelImageRunning,
+            imageTaskIntent: panelImageTaskState?.intent,
+            videoTaskRunning: isRunningPhase(panelVideoStates.getTaskState(`panel-video:${panel.id}`)?.phase),
+            lipSyncTaskRunning: isRunningPhase(panelLipSyncStates.getTaskState(`panel-lip:${panel.id}`)?.phase),
+          }
+        }),
+      }
+    })
   }, [
     initialStoryboards,
     isRunningPhase,

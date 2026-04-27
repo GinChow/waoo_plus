@@ -12,6 +12,9 @@
 【你的职责】
 
 你只负责为输入组中的每个镜头、每个实际出镜角色补充：
+	•	screen_position：角色在当前镜头画面中的可见位置 / 层次 / 关系位
+	•	posture：角色在当前镜头中的可拍摄身体姿态与重心状态
+	•	facing：角色在当前镜头中的朝向 / 视线方向 / 面对关系
 	•	acting：一句话表演指令
 
 这句表演指令必须综合描述：
@@ -307,6 +310,9 @@ confrontation_press / climax_hit
 
 其中 characters 为角色数组；每个角色对象只包含：
 	•	name
+	•	screen_position
+	•	posture
+	•	facing
 	•	acting
 
 只返回 JSON 数组，不得输出 markdown、注释或解释。
@@ -321,10 +327,16 @@ confrontation_press / climax_hit
 “characters”: [
 {
 “name”: “李凤华”,
+“screen_position”: “画面左侧近景，身体靠近桌边”,
+“posture”: “上身微微前倾，肩膀放松，双手自然收在身前”,
+“facing”: “面向景笙，视线停在景笙脸上”,
 “acting”: “李凤华嘴角轻轻提起却没有完全展开，目光稳稳落在景笙脸上，身体微微前倾，肩膀放松，呼吸平稳，指尖自然收在身前”
 },
 {
 “name”: “景笙”,
+“screen_position”: “画面右侧中景，站在李凤华对面”,
+“posture”: “站姿笔直，下颌略收，双手压在身后”,
+“facing”: “面向李凤华，视线接住李凤华”,
 “acting”: “景笙站姿笔直但下颌略收，目光接住李凤华后停顿半拍，嘴角带一点克制笑意，双手压在身后不乱动，眨眼很轻”
 }
 ]
@@ -334,6 +346,9 @@ confrontation_press / climax_hit
 “characters”: [
 {
 “name”: “李凤华”,
+“screen_position”: “画面左侧近景，仍处于桌边关系位”,
+“posture”: “肩颈略微发硬，双手在身前交握得更紧”,
+“facing”: “面向景笙但视线滑落到下方”,
 “acting”: “李凤华眉心慢慢收紧，嘴唇抿成一线，视线从景笙脸上滑落到下方，双手在身前交握得更紧，肩颈略微发硬，呼吸变浅”
 }
 ]
@@ -343,6 +358,9 @@ confrontation_press / climax_hit
 “characters”: [
 {
 “name”: “李凤华”,
+“screen_position”: “画面中央偏左近景，身体仍停在原位”,
+“posture”: “下颌绷住，手指攥紧衣角，胸口起伏明显”,
+“facing”: “短暂偏开视线后重新看回对方方向”,
 “acting”: “李凤华眼眶发红却强忍不让泪掉下，视线短暂偏开后又勉强停回去，嘴唇轻轻发颤，下颌绷住，手指攥紧衣角，胸口起伏变得更明显”
 }
 ]
@@ -368,12 +386,16 @@ confrontation_press / climax_hit
 	1.	只返回 JSON 数组，不要有 markdown 代码块标记
 	2.	数组长度必须等于输入镜头数量（{panel_count} 个）
 	3.	每个镜头对象只包含 panel_number 和 characters
-	4.	每个角色对象只包含 name 和 acting
+	4.	每个角色对象只包含 name、screen_position、posture、facing 和 acting
 	5.	角色名必须与输入镜头中的 characters 完全一致
-	6.	acting 必须是一句话，且必须是可视化、可执行的表演描述
-	7.	禁止只写抽象情绪词，必须改写为可见表现
-	8.	必须根据 scene_type 调整表演风格
-	9.	必须体现同一角色在当前组镜头中的局部情绪 / 状态递进
-	10.	不得改写输入镜头事实，不得发明新动作和新事件
-	11.	若当前镜头只拍局部动作，只能写当前镜头可见范围内成立的表演
-	12.	JSON 安全：所有引号在 JSON 字符串值中必须统一替换为「」，严禁出现未转义的英文双引号 “
+	6.	screen_position、posture、facing 必须是非空字符串，必须基于当前镜头 description 和 characters 生成，不得留空
+	7.	screen_position 必须回答角色在画面哪里、前中后景或与其他角色/空间的关系位
+	8.	posture 必须回答身体姿态、重心、手臂/肩背/脚步等可拍摄状态
+	9.	facing 必须回答面向哪里、看向谁或朝哪个空间方向
+	10.	acting 必须是一句话，且必须是可视化、可执行的表演描述
+	11.	禁止只写抽象情绪词，必须改写为可见表现
+	12.	必须根据 scene_type 调整表演风格
+	13.	必须体现同一角色在当前组镜头中的局部情绪 / 状态递进
+	14.	不得改写输入镜头事实，不得发明新动作和新事件
+	15.	若当前镜头只拍局部动作，只能写当前镜头可见范围内成立的表演
+	16.	JSON 安全：所有引号在 JSON 字符串值中必须统一替换为「」，严禁出现未转义的英文双引号 “

@@ -74,6 +74,7 @@ export default function StoryboardGroup({
   submittingVariantPanelId,
 }: StoryboardGroupProps) {
   const t = useTranslations('storyboard')
+  const tProgress = useTranslations('progress')
   const [activeCoarseGroupNumber, setActiveCoarseGroupNumber] = useState<number | null>(null)
 
   const {
@@ -141,6 +142,14 @@ export default function StoryboardGroup({
   }, [activeCoarseGroupNumber, coarseGroups])
 
   const groupOverlayState = useMemo(() => {
+    if (isSubmittingStoryboardTextTask) {
+      return resolveTaskPresentationState({
+        phase: 'processing',
+        intent: 'regenerate',
+        resource: 'text',
+        hasOutput: true,
+      })
+    }
     if (!isSubmittingStoryboardTask && !isSelectingCandidate) return null
     return resolveTaskPresentationState({
       phase: 'processing',
@@ -148,7 +157,48 @@ export default function StoryboardGroup({
       resource: 'image',
       hasOutput: hasAnyImage,
     })
-  }, [hasAnyImage, isSelectingCandidate, isSubmittingStoryboardTask])
+  }, [hasAnyImage, isSelectingCandidate, isSubmittingStoryboardTask, isSubmittingStoryboardTextTask])
+
+  const resolveProgressText = useCallback((value: string | null | undefined) => {
+    if (!value) return null
+    const key = value.startsWith('progress.') ? value.slice('progress.'.length) : value
+    try {
+      return tProgress(key)
+    } catch {
+      return value
+    }
+  }, [tProgress])
+
+  const textTaskDetailLabel = useMemo(() => {
+    if (!isSubmittingStoryboardTextTask) return null
+    return resolveProgressText(storyboard.storyboardTaskStepTitle)
+      || resolveProgressText(storyboard.storyboardTaskMessage)
+      || resolveProgressText(storyboard.storyboardTaskStageLabel)
+  }, [
+    isSubmittingStoryboardTextTask,
+    resolveProgressText,
+    storyboard.storyboardTaskMessage,
+    storyboard.storyboardTaskStageLabel,
+    storyboard.storyboardTaskStepTitle,
+  ])
+
+  const textTaskProgressLabel = useMemo(() => {
+    if (!isSubmittingStoryboardTextTask) return null
+    const current = storyboard.storyboardTaskStepIndex
+    const total = storyboard.storyboardTaskStepTotal
+    if (typeof current === 'number' && typeof total === 'number' && total > 0) {
+      return `${current}/${total}`
+    }
+    if (typeof storyboard.storyboardTaskProgress === 'number') {
+      return `${storyboard.storyboardTaskProgress}%`
+    }
+    return null
+  }, [
+    isSubmittingStoryboardTextTask,
+    storyboard.storyboardTaskProgress,
+    storyboard.storyboardTaskStepIndex,
+    storyboard.storyboardTaskStepTotal,
+  ])
 
   const handleRegeneratePanelImage = useCallback(
     (panelId: string, count?: number, force?: boolean) => {
@@ -169,9 +219,12 @@ export default function StoryboardGroup({
         />
       )}
 
-      {(isSubmittingStoryboardTask || isSelectingCandidate) && (
+      {(isSubmittingStoryboardTextTask || isSubmittingStoryboardTask || isSelectingCandidate) && (
         <TaskStatusOverlay
           state={groupOverlayState}
+          detailLabel={textTaskDetailLabel}
+          progress={isSubmittingStoryboardTextTask ? storyboard.storyboardTaskProgress : null}
+          progressLabel={textTaskProgressLabel}
           className="z-10 rounded-lg bg-[var(--glass-bg-surface-modal)]/90"
         />
       )}

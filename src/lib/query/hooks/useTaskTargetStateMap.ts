@@ -25,6 +25,11 @@ export type TaskTargetState = {
   progress: number | null
   stage: string | null
   stageLabel: string | null
+  message?: string | null
+  stepTitle?: string | null
+  stepIndex?: number | null
+  stepTotal?: number | null
+  stepAttempt?: number | null
   lastError: {
     code: string
     message: string
@@ -99,6 +104,11 @@ function buildIdleState(target: TaskTargetStateQuery): TaskTargetState {
     progress: null,
     stage: null,
     stageLabel: null,
+    message: null,
+    stepTitle: null,
+    stepIndex: null,
+    stepTotal: null,
+    stepAttempt: null,
     lastError: null,
     updatedAt: null,
   }

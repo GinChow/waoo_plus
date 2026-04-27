@@ -208,6 +208,13 @@ export interface NovelPromotionStoryboard {
   storyboardImageUrl: string | null
   media?: MediaRef | null
   storyboardTaskRunning?: boolean
+  storyboardTaskProgress?: number | null
+  storyboardTaskStageLabel?: string | null
+  storyboardTaskMessage?: string | null
+  storyboardTaskStepTitle?: string | null
+  storyboardTaskStepIndex?: number | null
+  storyboardTaskStepTotal?: number | null
+  storyboardTaskStepAttempt?: number | null
   candidateImages?: string | null
   lastError?: string | null  // 最后一次生成失败的错误信息
   photographyPlan?: string | null  // 摄影方案JSON

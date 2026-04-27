@@ -136,6 +136,8 @@ video_prompt 不是静态图提示词，也不是剧情摘要。
 	•	节奏清楚
 	•	不跨到下一镜内容
 	•	不补充 description 里没有的新事件
+    •   必须用年龄段+性别或有辨识度的描述（如"年轻女子"、"中年男子", "带斗笠的男人"）而非角色名来指代人物
+
 
 video_prompt 的本质是：
 
@@ -173,8 +175,6 @@ shot_type 和 camera_move 必须来自：
 	•	duration_final
 	•	first_frame_image_prompt
 	•	video_prompt
-
-输出时必须保留原镜头的所有已有字段。
 
 ⸻
 
@@ -442,29 +442,6 @@ video_prompt 风格
 {
 “panel_number”: 2,
 “parent_group_number”: 2,
-“shot_purpose”: “detail_insert”,
-“beat_role”: “强调李四听到后手上动作先停住，作为反应起点”,
-“description”: “李四手中的笔停在文件上方，没有继续落下，桌上的文件仍摊开在面前”,
-“characters”: [
-{
-“name”: “李四”,
-“appearance”: “初始形象”,
-“slot”: “办公桌后方靠窗座位”
-}
-],
-“location”: “办公室”,
-“scene_type”: “daily”,
-“source_text”: “李四停下手里的笔”,
-“duration_base”: 1.5,
-“continuity_from_prev”: “承接张三说话后信息传到李四这里”,
-“continuity_to_next”: “手部动作停住后，下一镜可转到李四抬头看向张三”,
-“lighting”: “延续办公室窗侧主光，桌面受光较清楚，手部与笔尖处有明确亮部，周围区域略弱”,
-“camera_angle”: “略高于桌面高度，轻微俯看手部动作”,
-“viewpoint_constraint”: “从李四桌前操作区域的关系位观察，保持与上一镜同一空间轴线，不跳到相反侧”,
-“depth_of_field”: “浅景深，停住的笔尖与手部最清楚，文件边缘次级清楚”,
-“color_tone”: “保持中性偏暖基调，不做额外色偏变化”,
-“focus_priority”: “停住的笔尖与手部动作”,
-“composition_note”: “压缩无关背景，只保留必要桌面信息，手部与文件边缘构成主要视觉中心”,
 “shot_type”: “detail insert close-up”,
 “camera_move”: “static”,
 “duration_final”: 1.3,
@@ -509,10 +486,7 @@ video_prompt 风格
 
 【严格要求】
 	1.	必须输出有效 JSON 数组
-	2.	必须保留输入镜头原有字段，不得删除
 	3.	只能新增：shot_type、camera_move、duration_final、first_frame_image_prompt、video_prompt
-	4.	不得改写 description、shot_purpose、beat_role、duration_base、characters、location、scene_type、source_text
-	5.	不得改写 lighting、camera_angle、viewpoint_constraint、depth_of_field、color_tone、focus_priority、composition_note
 	6.	duration_final 只能在 duration_base 基础上小幅微调，不得推翻节奏关系
 	7.	first_frame_image_prompt 必须是镜头开始时刻，不得偷写后续动作结果
 	8.	video_prompt 必须从首帧自然展开，只描述当前镜头内动态

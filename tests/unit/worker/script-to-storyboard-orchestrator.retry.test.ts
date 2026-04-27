@@ -584,7 +584,7 @@ describe('script-to-storyboard orchestrator retry', () => {
     expect(clip1Phase1ResolvedAfterClip2Phase2).toBe(true)
   })
 
-  it('builds phase3 input without duplicating cinematography fields at top level', async () => {
+  it('builds phase3 input with full cinematography and acting guidance merged', async () => {
     let capturedPhase3Prompt = ''
     const runStep = vi.fn(async (_meta, prompt, action: string) => {
       if (action === 'storyboard_phase1_plan') {
@@ -685,7 +685,15 @@ describe('script-to-storyboard orchestrator retry', () => {
     expect(Array.isArray(phase3Panels)).toBe(true)
     expect(phase3Panels).toHaveLength(1)
     const panel = phase3Panels[0]
-    expect(panel.photography_rules).toBeUndefined()
+    expect(panel.photography_rules).toEqual(expect.objectContaining({
+      panel_number: 2,
+      characters: [{
+        name: '樵夫',
+        facing: '朝前下方',
+        posture: '身体失衡下坠',
+        screen_position: '画面中部',
+      }],
+    }))
     expect(panel.acting_notes).toBeTruthy()
     expect(panel.lighting).toBeTruthy()
     expect(panel.color_tone).toBeTruthy()
@@ -727,7 +735,12 @@ describe('script-to-storyboard orchestrator retry', () => {
         return {
           text: JSON.stringify([{
             panel_number: 1,
-            characters: [{ name: '角色A', acting: '平静说话' }],
+            characters: [{
+              name: '角色A',
+              posture: '身体微微前倾',
+              facing: '面向镜头左前方',
+              acting: '平静说话',
+            }],
           }]),
           reasoning: '',
         }
@@ -781,8 +794,24 @@ describe('script-to-storyboard orchestrator retry', () => {
     expect(panel.first_frame_image_prompt).toBe('室内，角色A位于画面左侧，平视中景')
     expect(panel.duration).toBe(2.5)
     expect(panel.photographyPlan).toBeTruthy()
-    expect(panel.acting_notes).toEqual([{ name: '角色A', acting: '平静说话' }])
-    expect(panel.actingNotes).toEqual([{ name: '角色A', acting: '平静说话' }])
+    expect(panel.photographyPlan?.characters).toEqual([{
+      name: '角色A',
+      screen_position: '左侧',
+      posture: '身体微微前倾',
+      facing: '面向镜头左前方',
+    }])
+    expect(panel.acting_notes).toEqual([{
+      name: '角色A',
+      posture: '身体微微前倾',
+      facing: '面向镜头左前方',
+      acting: '平静说话',
+    }])
+    expect(panel.actingNotes).toEqual([{
+      name: '角色A',
+      posture: '身体微微前倾',
+      facing: '面向镜头左前方',
+      acting: '平静说话',
+    }])
   })
 
   it('fuses phase3 guidance by fine groups without cross-group mixing', async () => {
@@ -960,6 +989,16 @@ describe('script-to-storyboard orchestrator retry', () => {
     const group2Panels = (fineGroupsWithGuidance[1]?.panels || []) as Array<Record<string, unknown>>
     expect(group1Panels[0]?.composition_note).toBe('组1构图')
     expect(group2Panels[0]?.composition_note).toBe('组2构图')
+    expect(group1Panels[0]?.photography_rules).toEqual(expect.objectContaining({
+      panel_number: 1,
+      composition_note: '组1构图',
+      characters: [{ name: '角色A', screen_position: '左侧' }],
+    }))
+    expect(group2Panels[0]?.photography_rules).toEqual(expect.objectContaining({
+      panel_number: 1,
+      composition_note: '组2构图',
+      characters: [{ name: '角色A', screen_position: '右侧' }],
+    }))
     expect((group1Panels[0]?.acting_notes as { characters?: Array<{ acting?: string }> })?.characters?.[0]?.acting).toBe('组1演技')
     expect((group2Panels[0]?.acting_notes as { characters?: Array<{ acting?: string }> })?.characters?.[0]?.acting).toBe('组2演技')
 

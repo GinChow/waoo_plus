@@ -10,3 +10,14 @@
 - 2026-04-26 Codex: Updated main storyboard orchestrator and atomic retry merge paths to emit final acting guidance as both actingNotes and acting_notes arrays.
 - 2026-04-26 Codex: Added normalization for old nested acting guidance artifact shape in atomic retry.
 - 2026-04-26 Codex: Verified focused worker tests and typecheck pass; full unit suite has one unrelated project-global-analyze-mutation assertion failure and is not used as this task's acceptance gate.
+- 2026-04-26 Codex: 使用 `rg` 定位“重新生成文字”前端、API、worker 与分镜编排器链路；`sequential-thinking`、`shrimp-task-manager`、`code-index` 在当前会话不可用，已降级为本地检索。
+- 2026-04-26 Codex: 确认根因是 `regenerate_storyboard_text` 仍使用旧三阶段分镜流程，写入 `storyboardTextJson` 时缺失 `parent_group_number`，导致所有细镜头归入粗镜头 1。
+- 2026-04-26 Codex: 修改 `src/lib/workers/text.worker.ts`，让重新生成文字复用新版 `runScriptToStoryboardOrchestrator` 与 `persistStoryboardsAndPanels`，保持与首次生成一致的粗分镜拆细和分组映射。
+- 2026-04-26 Codex: 执行 `npm run typecheck` 通过。
+- 2026-04-26 Codex: 执行 `npm run lint:all` 通过，无错误；仓库存在 44 个既有 warning。
+- 2026-04-26 Codex: 误执行 `npm run test:unit:all -- ...`，该脚本实际跑完整 `tests/unit`，发现 1 个无关失败：`tests/unit/novel-promotion/project-global-analyze-mutation.test.ts` 期望 body 为 `{\"async\":true}`，实际为 `{\"async\":true,\"mode\":\"all\"}`。
+- 2026-04-26 Codex: 精确执行 `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts tests/unit/worker/script-to-storyboard.test.ts`，2 个文件 17 个用例通过。
+- 2026-04-27 Codex: 收到反馈 `photography_rules.characters` 中 `screen_position/posture/facing` 仍为空；确认主链路与 atomic retry 只保留 acting_notes，没有把 acting direction 合并进摄影角色约束。
+- 2026-04-27 Codex: 更新主编排器与 atomic retry：`buildUnifiedPhotographyPlan` 接收 acting notes，优先用 acting 的 `screen_position/posture/facing`，再用 slot、composition、description、acting 文本兜底，并兼容 `screen_postion` 拼写。
+- 2026-04-27 Codex: 更新 `agent_acting_direction_v2.zh.txt`，要求 acting director 输出 `screen_position/posture/facing/acting` 五字段，且前三项必须非空。
+- 2026-04-27 Codex: 执行 `npm run typecheck` 通过；执行 `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts tests/unit/worker/script-to-storyboard-atomic-retry.test.ts tests/unit/worker/script-to-storyboard.test.ts` 通过，3 个文件 20 个用例。

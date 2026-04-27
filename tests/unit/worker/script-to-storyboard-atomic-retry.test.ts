@@ -41,7 +41,13 @@ describe('script-to-storyboard atomic retry', () => {
           refId: 'clip-1',
           versionHash: null,
           payload: {
-            panels: [{ panel_number: 1, description: 'p1', location: 'Office', source_text: 'src', characters: [] }],
+            panels: [{
+              panel_number: 1,
+              description: 'p1',
+              location: 'Office',
+              source_text: 'src',
+              characters: [{ name: 'Narrator', slot: '画面中央' }],
+            }],
           },
           createdAt: '2026-03-03T00:00:00.000Z',
         }]
@@ -76,7 +82,10 @@ describe('script-to-storyboard atomic retry', () => {
           refId: 'clip-1',
           versionHash: null,
           payload: {
-            directions: [{ panel_number: 1, characters: [{ name: 'Narrator', expression: 'serious' }] }],
+            directions: [{
+              panel_number: 1,
+              characters: [{ name: 'Narrator', posture: '站立戒备', facing: '看向门口', expression: 'serious' }],
+            }],
           },
           createdAt: '2026-03-03T00:00:00.000Z',
         }]
@@ -92,7 +101,13 @@ describe('script-to-storyboard atomic retry', () => {
         throw new Error(`unexpected action ${action}`)
       }
       return {
-        text: JSON.stringify([{ panel_number: 1, description: 'phase3-new', location: 'Office', source_text: 'src', characters: [] }]),
+        text: JSON.stringify([{
+          panel_number: 1,
+          description: 'phase3-new',
+          location: 'Office',
+          source_text: 'src',
+          characters: [{ name: 'Narrator' }],
+        }]),
         reasoning: '',
       }
     })
@@ -142,7 +157,7 @@ describe('script-to-storyboard atomic retry', () => {
         description: 'p1',
         location: 'Office',
         source_text: 'src',
-        characters: [],
+        characters: [expect.objectContaining({ name: 'Narrator', slot: '画面中央' })],
       }),
     ])
     expect(result.clipPanels).toHaveLength(1)
@@ -155,9 +170,21 @@ describe('script-to-storyboard atomic retry', () => {
           quality: '',
         },
         color_tone: '冷色',
+        characters: [{
+          name: 'Narrator',
+          screen_position: '画面中央',
+          posture: '站立戒备',
+          facing: '看向门口',
+        }],
       }),
-      actingNotes: [{ name: 'Narrator', expression: 'serious' }],
-      acting_notes: [{ name: 'Narrator', expression: 'serious' }],
+      photography_rules: expect.objectContaining({
+        panel_number: 1,
+        color_palette: '冷色',
+        atmosphere: '紧张',
+        technical_notes: 'note',
+      }),
+      actingNotes: [{ name: 'Narrator', posture: '站立戒备', facing: '看向门口', expression: 'serious' }],
+      acting_notes: [{ name: 'Narrator', posture: '站立戒备', facing: '看向门口', expression: 'serious' }],
     }))
     expect(result.totalPanelCount).toBe(1)
   })

@@ -6,19 +6,14 @@ import { withInternalLLMStreamCallbacks, type InternalLLMStreamCallbacks } from 
 import type { LLMStreamKind } from '@/lib/llm-observe/types'
 import { QUEUE_NAME } from '@/lib/task/queues'
 import { TASK_TYPE, type TaskJobData } from '@/lib/task/types'
-import { buildPrompt, PROMPT_IDS } from '@/lib/prompt-i18n'
+import { buildPrompt, getPromptTemplate, PROMPT_IDS } from '@/lib/prompt-i18n'
 import { resolveInsertPanelUserInput } from '@/lib/novel-promotion/insert-panel'
 import { buildInsertPanelLocationsDescription } from '@/lib/novel-promotion/insert-panel-prompt-context'
 import {
-  executePhase1,
-  executePhase2,
-  executePhase2Acting,
-  executePhase3,
-  type ActingDirection,
-  type CharacterAsset,
-  type LocationAsset,
-  type PhotographyRule,
-} from '@/lib/storyboard-phases'
+  runScriptToStoryboardOrchestrator,
+  type ScriptToStoryboardStepMeta,
+} from '@/lib/novel-promotion/script-to-storyboard/orchestrator'
+import { persistStoryboardsAndPanels } from '@/lib/workers/handlers/script-to-storyboard-helpers'
 import { getProjectModelConfig } from '@/lib/config-service'
 import { reportTaskProgress, reportTaskStreamChunk, withTaskLifecycle } from './shared'
 import { assertTaskActive } from './utils'
@@ -48,21 +43,6 @@ function readNullableText(value: Record<string, unknown>, key: string): string |
 
 type AnyObj = Record<string, unknown>
 type JsonRecord = Record<string, unknown>
-type CompactStoryboardPanel = {
-  panel_number?: number
-  parent_group_number?: number
-}
-
-function buildParentGroupMappingCompact(panels: CompactStoryboardPanel[]): string {
-  const mapping: Array<[number, number]> = []
-  for (let index = 0; index < panels.length; index += 1) {
-    const panel = panels[index]
-    const panelNumber = typeof panel.panel_number === 'number' ? panel.panel_number : (index + 1)
-    const parentGroupNumber = typeof panel.parent_group_number === 'number' ? panel.parent_group_number : 1
-    mapping.push([panelNumber, parentGroupNumber])
-  }
-  return JSON.stringify(mapping)
-}
 
 type WorkerLLMStreamContext = {
   streamRunId: string
@@ -256,212 +236,6 @@ function parsePanelProps(panel: Record<string, unknown> | null | undefined): str
   }
 }
 
-function asText(value: unknown): string {
-  return typeof value === 'string' ? value : ''
-}
-
-function readTextByKeys(record: Record<string, unknown> | null, keys: string[]): string {
-  if (!record) return ''
-  for (const key of keys) {
-    const value = record[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
-  }
-  return ''
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-  return value as Record<string, unknown>
-}
-
-function normalizeLighting(value: unknown) {
-  if (typeof value === 'string') {
-    return {
-      direction: value,
-      quality: '',
-    }
-  }
-  const record = asRecord(value)
-  return {
-    direction: asText(record?.direction),
-    quality: asText(record?.quality),
-  }
-}
-
-function normalizePhotographyCharacters(value: unknown) {
-  if (!Array.isArray(value)) return []
-  return value
-    .map((item) => {
-      const record = asRecord(item)
-      return {
-        name: asText(record?.name),
-        screen_position: readTextByKeys(record, ['screen_position', 'screenPosition', 'position', 'slot']),
-        posture: readTextByKeys(record, ['posture', 'pose', 'body_pose', 'bodyPose']),
-        facing: readTextByKeys(record, ['facing', 'look_direction', 'lookDirection', 'direction']),
-      }
-    })
-    .filter((item) => item.name)
-}
-
-function normalizeName(name: string): string {
-  return name.trim().toLowerCase()
-}
-
-function fallbackPhotographyCharactersFromPanel(panel: AnyObj) {
-  const panelCharacters = Array.isArray(panel.characters) ? panel.characters : []
-  return panelCharacters
-    .map((item) => {
-      const record = asRecord(item)
-      const name = asText(record?.name)
-      if (!name) return null
-      return {
-        name,
-        screen_position: asText(record?.slot),
-        posture: '',
-        facing: '',
-      }
-    })
-    .filter((item): item is { name: string; screen_position: string; posture: string; facing: string } => !!item)
-}
-
-function buildUnifiedPhotographyPlan(rule: PhotographyRule, panel: AnyObj) {
-  const sceneSummary = asText(rule.scene_summary) || asText(rule.composition)
-  const lighting = normalizeLighting(rule.lighting)
-  const characters = (() => {
-    const fromRules = normalizePhotographyCharacters(rule.characters)
-    const fallback = fallbackPhotographyCharactersFromPanel(panel)
-    if (fromRules.length === 0) return fallback
-
-    const fallbackByName = new Map(fallback.map((item) => [normalizeName(item.name), item]))
-    const merged = fromRules.map((item) => {
-      const fb = fallbackByName.get(normalizeName(item.name))
-      return {
-        ...item,
-        screen_position: item.screen_position || fb?.screen_position || '',
-        posture: item.posture || '',
-        facing: item.facing || '',
-      }
-    })
-    const existing = new Set(merged.map((item) => normalizeName(item.name)))
-    const missing = fallback.filter((item) => !existing.has(normalizeName(item.name)))
-    return [...merged, ...missing]
-  })()
-  const depthOfField = asText(rule.depth_of_field)
-  const colorTone = asText(rule.color_tone) || asText(rule.color_palette)
-  const cameraAngle = asText(rule.camera_angle)
-  const viewpointConstraint = asText(rule.viewpoint_constraint)
-  const focusPriority = asText(rule.focus_priority)
-  const compositionNote = asText(rule.composition_note)
-  const composition = asText(rule.composition) || compositionNote || sceneSummary
-  const atmosphere = asText(rule.atmosphere)
-  const technicalNotes = asText(rule.technical_notes)
-
-  return {
-    panel_number: rule.panel_number,
-    shot_purpose: asText(panel.shot_purpose),
-    scene_type: asText(panel.scene_type),
-    source_text: asText(panel.source_text),
-    duration_base: typeof panel.duration_base === 'number' ? panel.duration_base : null,
-    duration: typeof panel.duration === 'number' ? panel.duration : null,
-    scene_summary: sceneSummary,
-    lighting,
-    camera_angle: cameraAngle,
-    viewpoint_constraint: viewpointConstraint,
-    characters,
-    depth_of_field: depthOfField,
-    color_tone: colorTone,
-    focus_priority: focusPriority,
-    composition_note: compositionNote,
-    // 兼容历史字段，避免旧调用链回归
-    composition,
-    colorPalette: asText(rule.color_palette) || colorTone,
-    atmosphere,
-    technicalNotes,
-  }
-}
-
-async function runStoryboardPhasesForClip(params: {
-  clip: {
-    id: string
-    content: string | null
-    characters: string | null
-    location: string | null
-    props?: string | null
-    screenplay: string | null
-  }
-  novelPromotionData: {
-    analysisModel: string
-    characters: CharacterAsset[]
-    locations: LocationAsset[]
-    props?: Array<{ name: string; summary?: string | null }>
-  }
-  projectId: string
-  projectName: string
-  userId: string
-  locale: TaskJobData['locale']
-}) {
-  const session = { user: { id: params.userId, name: 'Worker' } }
-  const phase1 = await executePhase1(
-    params.clip,
-    params.novelPromotionData,
-    session,
-    params.projectId,
-    params.projectName,
-    params.locale,
-  )
-  const [phase2, phase2Acting] = await Promise.all([
-    executePhase2(
-      params.clip,
-      phase1.planPanels || [],
-      params.novelPromotionData,
-      session,
-      params.projectId,
-      params.projectName,
-      params.locale,
-    ),
-    executePhase2Acting(
-      params.clip,
-      phase1.planPanels || [],
-      params.novelPromotionData,
-      session,
-      params.projectId,
-      params.projectName,
-      params.locale,
-    ),
-  ])
-  const phase3 = await executePhase3(
-    params.clip,
-    phase1.planPanels || [],
-    phase2.photographyRules || [],
-    phase2Acting.actingDirections || [],
-    params.novelPromotionData,
-    session,
-    params.projectId,
-    params.projectName,
-    params.locale,
-  )
-
-  const photographyRules: PhotographyRule[] = phase2.photographyRules || []
-  const actingDirections: ActingDirection[] = phase2Acting.actingDirections || []
-
-  const finalPanels = (phase3.finalPanels || []).map((panel, index) => {
-    const rules = photographyRules.find((r) => r.panel_number === panel.panel_number) || photographyRules[index]
-    const acting = actingDirections.find((a) => a.panel_number === panel.panel_number) || actingDirections[index]
-
-    return {
-      ...panel,
-      ...(rules
-        ? {
-          photographyPlan: buildUnifiedPhotographyPlan(rules, panel as AnyObj),
-        }
-        : {}),
-      ...(acting?.characters ? { actingNotes: acting.characters } : {}),
-    }
-  })
-
-  return finalPanels
-}
-
 async function handleRegenerateStoryboardTextTask(job: Job<TaskJobData>) {
   const payload = (job.data.payload || {}) as AnyObj
   const projectId = job.data.projectId
@@ -488,10 +262,13 @@ async function handleRegenerateStoryboardTextTask(job: Job<TaskJobData>) {
     },
   })
   if (!novelPromotionData) throw new Error('Novel promotion data not found')
-  if (!novelPromotionData.analysisModel) throw new Error('Analysis model not configured')
+  const payloadAnalysisModel = typeof payload.analysisModel === 'string' && payload.analysisModel.trim()
+    ? payload.analysisModel.trim()
+    : ''
+  const analysisModel = payloadAnalysisModel || novelPromotionData.analysisModel
+  if (!analysisModel) throw new Error('Analysis model not configured')
   const normalizedNovelPromotionData = {
-    ...novelPromotionData,
-    analysisModel: novelPromotionData.analysisModel,
+    characters: novelPromotionData.characters || [],
     locations: novelPromotionData.locations.filter((item) => readAssetKind(item as unknown as Record<string, unknown>) !== 'prop'),
     props: novelPromotionData.locations
       .filter((item) => readAssetKind(item as unknown as Record<string, unknown>) === 'prop')
@@ -502,19 +279,65 @@ async function handleRegenerateStoryboardTextTask(job: Job<TaskJobData>) {
   const regenerateStreamContext = createWorkerLLMStreamContext(job, 'regenerate_storyboard')
   const regenerateCallbacks = createWorkerLLMStreamCallbacks(job, regenerateStreamContext)
 
-  const finalPanels = await withInternalLLMStreamCallbacks(
+  const promptTemplates = {
+    phase1PlanTemplate: getPromptTemplate(PROMPT_IDS.NP_AGENT_STORYBOARD_PLAN_V4, job.data.locale),
+    phase2GroupSplitTemplate: getPromptTemplate(PROMPT_IDS.NP_AGENT_STORYBOARD_GROUP_SPLIT, job.data.locale),
+    phase2CinematographyTemplate: getPromptTemplate(PROMPT_IDS.NP_AGENT_CINEMATOGRAPHER_V3, job.data.locale),
+    phase2ActingTemplate: getPromptTemplate(PROMPT_IDS.NP_AGENT_ACTING_DIRECTION_V2, job.data.locale),
+    phase3DetailTemplate: getPromptTemplate(PROMPT_IDS.NP_AGENT_STORYBOARD_DETAIL_V3, job.data.locale),
+  }
+  const runStep = async (
+    meta: ScriptToStoryboardStepMeta,
+    prompt: string,
+    action: string,
+    _maxOutputTokens: number,
+  ) => {
+    void _maxOutputTokens
+    const progress = 20 + Math.min(60, Math.floor((meta.stepIndex / Math.max(1, meta.stepTotal)) * 60))
+    await reportTaskProgress(job, progress, {
+      stage: 'regenerate_storyboard_step',
+      displayMode: 'detail',
+      message: meta.stepTitle,
+      stepId: meta.stepId,
+      stepAttempt: meta.stepAttempt,
+      stepTitle: meta.stepTitle,
+      stepIndex: meta.stepIndex,
+      stepTotal: meta.stepTotal,
+      groupId: meta.groupId || null,
+      parallelKey: meta.parallelKey || null,
+    })
+
+    return await executeAiTextStep({
+      userId,
+      model: analysisModel,
+      messages: [{ role: 'user', content: prompt }],
+      reasoning: true,
+      projectId,
+      action,
+      meta: {
+        ...meta,
+        stepAttempt: meta.stepAttempt || 1,
+      },
+    })
+  }
+
+  const orchestratorResult = await withInternalLLMStreamCallbacks(
     regenerateCallbacks,
     async () =>
-      await runStoryboardPhasesForClip({
-        clip: {
-          ...storyboard.clip,
-          props: readNullableText(storyboard.clip as unknown as Record<string, unknown>, 'props'),
-        },
-        novelPromotionData: normalizedNovelPromotionData,
-        projectId,
-        projectName: project.name,
-        userId,
+      await runScriptToStoryboardOrchestrator({
+        concurrency: 1,
         locale: job.data.locale,
+        clips: [{
+          id: storyboard.clip.id,
+          content: storyboard.clip.content,
+          characters: storyboard.clip.characters,
+          location: storyboard.clip.location,
+          props: readNullableText(storyboard.clip as unknown as Record<string, unknown>, 'props'),
+          screenplay: storyboard.clip.screenplay,
+        }],
+        novelPromotionData: normalizedNovelPromotionData,
+        promptTemplates,
+        runStep,
       }),
   )
   await regenerateCallbacks.flush()
@@ -522,54 +345,15 @@ async function handleRegenerateStoryboardTextTask(job: Job<TaskJobData>) {
   await reportTaskProgress(job, 85, { stage: 'regenerate_storyboard_persist', storyboardId })
 
   await assertTaskActive(job, 'regenerate_storyboard_transaction')
-  await prisma.$transaction(async (tx) => {
-    const panelModel = tx.novelPromotionPanel as unknown as {
-      create: (args: { data: Record<string, unknown> }) => Promise<unknown>
-    }
-    await tx.novelPromotionPanel.deleteMany({ where: { storyboardId } })
-    await tx.novelPromotionStoryboard.update({
-      where: { id: storyboardId },
-      data: {
-        panelCount: finalPanels.length,
-        storyboardTextJson: buildParentGroupMappingCompact(finalPanels),
-        updatedAt: new Date(),
-      },
-    })
-
-    for (let i = 0; i < finalPanels.length; i++) {
-      const panel = finalPanels[i]
-      const srtRange = Array.isArray(panel.srt_range) ? panel.srt_range : []
-      const srtStart = typeof srtRange[0] === 'number' ? srtRange[0] : null
-      const srtEnd = typeof srtRange[1] === 'number' ? srtRange[1] : null
-      await panelModel.create({
-        data: {
-          storyboardId,
-          panelIndex: i,
-          panelNumber: panel.panel_number || i + 1,
-          shotType: panel.shot_type || null,
-          cameraMove: panel.camera_move || null,
-          description: panel.description || null,
-          location: panel.location || null,
-          characters: panel.characters ? JSON.stringify(panel.characters) : null,
-          props: panel.props ? JSON.stringify(panel.props) : null,
-          srtStart,
-          srtEnd,
-          duration: panel.duration || null,
-          videoPrompt: panel.video_prompt || null,
-          firstLastFramePrompt:
-            typeof panel.first_frame_image_prompt === 'string' ? panel.first_frame_image_prompt : null,
-          sceneType: typeof panel.scene_type === 'string' ? panel.scene_type : null,
-          srtSegment: panel.source_text || null,
-          photographyRules: panel.photographyPlan ? JSON.stringify(panel.photographyPlan) : null,
-          actingNotes: panel.actingNotes ? JSON.stringify(panel.actingNotes) : null,
-        },
-      })
-    }
-  }, { timeout: 30000 })
+  const persisted = await persistStoryboardsAndPanels({
+    episodeId: storyboard.episodeId,
+    clipPanels: orchestratorResult.clipPanels,
+  })
+  const persistedStoryboard = persisted.find((item) => item.storyboardId === storyboardId) || persisted[0]
 
   return {
-    storyboardId,
-    panelCount: finalPanels.length,
+    storyboardId: persistedStoryboard?.storyboardId || storyboardId,
+    panelCount: orchestratorResult.summary.totalPanelCount,
   }
 }
 

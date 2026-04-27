@@ -18,6 +18,11 @@ export type TaskTargetOverlayState = {
   progress: number | null
   stage: string | null
   stageLabel: string | null
+  message: string | null
+  stepTitle: string | null
+  stepIndex: number | null
+  stepTotal: number | null
+  stepAttempt: number | null
   updatedAt: string | null
   lastError: null
   expiresAt: number
@@ -33,6 +38,12 @@ function normalizeOptionalString(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
   return trimmed || null
+}
+
+function normalizeOptionalPositiveInteger(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+  const rounded = Math.floor(value)
+  return rounded > 0 ? rounded : null
 }
 
 function buildOptimisticTaskId(targetType: string, targetId: string, now: number): string {
@@ -63,6 +74,11 @@ export function upsertTaskTargetOverlay(
     progress?: number | null
     stage?: string | null
     stageLabel?: string | null
+    message?: string | null
+    stepTitle?: string | null
+    stepIndex?: number | null
+    stepTotal?: number | null
+    stepAttempt?: number | null
     updatedAt?: string | null
   },
 ) {
@@ -89,6 +105,11 @@ export function upsertTaskTargetOverlay(
         progress: params.progress ?? null,
         stage: params.stage ?? null,
         stageLabel: params.stageLabel ?? null,
+        message: params.message ?? null,
+        stepTitle: params.stepTitle ?? null,
+        stepIndex: normalizeOptionalPositiveInteger(params.stepIndex),
+        stepTotal: normalizeOptionalPositiveInteger(params.stepTotal),
+        stepAttempt: normalizeOptionalPositiveInteger(params.stepAttempt),
         updatedAt: params.updatedAt || new Date(now).toISOString(),
         lastError: null,
         expiresAt: now + TASK_TARGET_OVERLAY_TTL_MS,
@@ -132,6 +153,11 @@ export function applyTaskLifecycleToOverlay(
     progress: number | null
     stage: string | null
     stageLabel: string | null
+    message?: string | null
+    stepTitle?: string | null
+    stepIndex?: number | null
+    stepTotal?: number | null
+    stepAttempt?: number | null
     eventTs: string | null
   },
 ) {
@@ -149,6 +175,11 @@ export function applyTaskLifecycleToOverlay(
       progress: params.progress,
       stage: params.stage,
       stageLabel: params.stageLabel,
+      message: params.message,
+      stepTitle: params.stepTitle,
+      stepIndex: params.stepIndex,
+      stepTotal: params.stepTotal,
+      stepAttempt: params.stepAttempt,
       updatedAt: params.eventTs,
     })
     return
@@ -167,6 +198,11 @@ export function applyTaskLifecycleToOverlay(
       progress: params.progress,
       stage: params.stage,
       stageLabel: params.stageLabel,
+      message: params.message,
+      stepTitle: params.stepTitle,
+      stepIndex: params.stepIndex,
+      stepTotal: params.stepTotal,
+      stepAttempt: params.stepAttempt,
       updatedAt: params.eventTs,
     })
     return
