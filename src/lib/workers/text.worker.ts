@@ -284,7 +284,7 @@ async function handleRegenerateStoryboardTextTask(job: Job<TaskJobData>) {
     phase2GroupSplitTemplate: getPromptTemplate(PROMPT_IDS.NP_AGENT_STORYBOARD_GROUP_SPLIT, job.data.locale),
     phase2CinematographyTemplate: getPromptTemplate(PROMPT_IDS.NP_AGENT_CINEMATOGRAPHER_V3, job.data.locale),
     phase2ActingTemplate: getPromptTemplate(PROMPT_IDS.NP_AGENT_ACTING_DIRECTION_V2, job.data.locale),
-    phase3DetailTemplate: getPromptTemplate(PROMPT_IDS.NP_AGENT_STORYBOARD_DETAIL_V3, job.data.locale),
+    phase3DetailTemplate: getPromptTemplate(PROMPT_IDS.NP_AGENT_STORYBOARD_DETAIL_V4, job.data.locale),
   }
   const runStep = async (
     meta: ScriptToStoryboardStepMeta,

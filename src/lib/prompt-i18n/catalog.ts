@@ -87,6 +87,19 @@ export const PROMPT_CATALOG: Record<PromptId, PromptCatalogEntry> = {
       'adjacent_context',
     ],
   },
+  [PROMPT_IDS.NP_AGENT_STORYBOARD_DETAIL_V4]: {
+    pathStem: 'novel-promotion/agent_storyboard_detail_v4',
+    variableKeys: [
+      'characters_lib_name',
+      'locations_lib_name',
+      'characters_introduction',
+      'characters_appearance_list',
+      'characters_full_description',
+      'props_description',
+      'fine_storyboard_group_with_cinematography',
+      'adjacent_context',
+    ],
+  },
   [PROMPT_IDS.NP_AGENT_STORYBOARD_GROUP_SPLIT]: {
     pathStem: 'novel-promotion/agent_storyboard_group_split',
     variableKeys: [

@@ -145,9 +145,14 @@ vi.mock('@/lib/workers/handlers/llm-stream', () => ({
 vi.mock('@/lib/prompt-i18n', () => ({
   PROMPT_IDS: {
     NP_AGENT_STORYBOARD_PLAN: 'plan',
+    NP_AGENT_STORYBOARD_PLAN_V4: 'plan-v4',
     NP_AGENT_CINEMATOGRAPHER: 'cinematographer',
+    NP_AGENT_CINEMATOGRAPHER_V3: 'cinematographer-v3',
     NP_AGENT_ACTING_DIRECTION: 'acting',
+    NP_AGENT_ACTING_DIRECTION_V2: 'acting-v2',
     NP_AGENT_STORYBOARD_DETAIL: 'detail',
+    NP_AGENT_STORYBOARD_DETAIL_V4: 'detail-v4',
+    NP_AGENT_STORYBOARD_GROUP_SPLIT: 'group-split',
     NP_VOICE_ANALYSIS: 'voice-analysis',
   },
   getPromptTemplate: vi.fn(() => 'prompt-template'),
