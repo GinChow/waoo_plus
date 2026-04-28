@@ -204,6 +204,7 @@ export interface NovelPromotionStoryboard {
   episodeId: string
   clipId: string
   storyboardTextJson: string | null
+  coarseGroupsJson?: string | null
   panelCount: number
   storyboardImageUrl: string | null
   media?: MediaRef | null

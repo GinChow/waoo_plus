@@ -104,6 +104,30 @@ export async function hasPanelImageOutput(panelId: string | null | undefined) {
   return isNonEmptyString(panel.imageUrl) || !!panel.imageMediaId
 }
 
+export async function hasStoryboardGroupImageOutput(params: {
+  storyboardId: string | null | undefined
+  groupNumber: number | null | undefined
+}) {
+  if (!isNonEmptyString(params.storyboardId) || typeof params.groupNumber !== 'number') return false
+  const storyboard = await prisma.novelPromotionStoryboard.findUnique({
+    where: { id: params.storyboardId },
+    select: { coarseGroupsJson: true },
+  })
+  if (!storyboard?.coarseGroupsJson) return false
+  try {
+    const parsed = JSON.parse(storyboard.coarseGroupsJson)
+    if (!Array.isArray(parsed)) return false
+    return parsed.some((item) => (
+      item
+      && typeof item === 'object'
+      && (item as { groupNumber?: unknown }).groupNumber === params.groupNumber
+      && isNonEmptyString((item as { imageUrl?: unknown }).imageUrl)
+    ))
+  } catch {
+    return false
+  }
+}
+
 export async function hasPanelVideoOutput(panelId: string | null | undefined) {
   if (!isNonEmptyString(panelId)) return false
   const panel = await prisma.novelPromotionPanel.findUnique({

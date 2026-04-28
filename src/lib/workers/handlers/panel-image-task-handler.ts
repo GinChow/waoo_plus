@@ -34,6 +34,90 @@ function parseJsonUnknown(raw: string | null | undefined): unknown | null {
   }
 }
 
+type CoarseGroupImageState = {
+  groupNumber: number
+  imagePrompt: string
+  videoPrompt: string
+  imageUrl: string | null
+  candidateImages: string[] | null
+  updatedAt: string
+}
+
+function parseParentGroupByPanelNumber(raw: string | null | undefined): Map<number, number> {
+  if (!raw) return new Map()
+  try {
+    const parsed = JSON.parse(raw)
+    const mapping = new Map<number, number>()
+    if (!Array.isArray(parsed)) return mapping
+    for (const item of parsed) {
+      if (Array.isArray(item) && item.length >= 2 && typeof item[0] === 'number' && typeof item[1] === 'number') {
+        mapping.set(item[0], item[1])
+        continue
+      }
+      if (
+        item
+        && typeof item === 'object'
+        && typeof (item as { panel_number?: unknown }).panel_number === 'number'
+        && typeof (item as { parent_group_number?: unknown }).parent_group_number === 'number'
+      ) {
+        mapping.set(
+          (item as { panel_number: number }).panel_number,
+          (item as { parent_group_number: number }).parent_group_number,
+        )
+      }
+    }
+    return mapping
+  } catch {
+    return new Map()
+  }
+}
+
+function parseCoarseGroupsJson(raw: string | null | undefined): CoarseGroupImageState[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.flatMap((item): CoarseGroupImageState[] => {
+      if (!item || typeof item !== 'object') return []
+      const record = item as Partial<CoarseGroupImageState>
+      if (typeof record.groupNumber !== 'number') return []
+      return [{
+        groupNumber: record.groupNumber,
+        imagePrompt: typeof record.imagePrompt === 'string' ? record.imagePrompt : '',
+        videoPrompt: typeof record.videoPrompt === 'string' ? record.videoPrompt : '',
+        imageUrl: typeof record.imageUrl === 'string' ? record.imageUrl : null,
+        candidateImages: Array.isArray(record.candidateImages)
+          ? record.candidateImages.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+          : null,
+        updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : '',
+      }]
+    })
+  } catch {
+    return []
+  }
+}
+
+function upsertCoarseGroupState(params: {
+  raw: string | null | undefined
+  groupNumber: number
+  imagePrompt: string
+  videoPrompt: string
+  imageUrl: string | null
+  candidateImages: string[] | null
+}) {
+  const groups = parseCoarseGroupsJson(params.raw).filter((group) => group.groupNumber !== params.groupNumber)
+  groups.push({
+    groupNumber: params.groupNumber,
+    imagePrompt: params.imagePrompt,
+    videoPrompt: params.videoPrompt,
+    imageUrl: params.imageUrl,
+    candidateImages: params.candidateImages,
+    updatedAt: new Date().toISOString(),
+  })
+  groups.sort((left, right) => left.groupNumber - right.groupNumber)
+  return JSON.stringify(groups, null, 2)
+}
+
 function parseDescriptionList(raw: string | null | undefined): string[] {
   if (!raw) return []
   try {
@@ -43,6 +127,70 @@ function parseDescriptionList(raw: string | null | undefined): string[] {
   } catch {
     return []
   }
+}
+
+function pickPanelImagePrompt(panel: {
+  shotType: string | null
+  cameraMove: string | null
+  description: string | null
+  imagePrompt: string | null
+  firstLastFramePrompt?: string | null
+  location: string | null
+}): string {
+  const base = panel.imagePrompt || panel.firstLastFramePrompt || panel.description || '无画面描述'
+  const tags = [
+    panel.shotType,
+    panel.cameraMove,
+    panel.location ? `场景：${panel.location}` : null,
+  ].filter(Boolean).join('/')
+  return tags ? `(${tags})${base}` : base
+}
+
+function pickPanelVideoPrompt(panel: {
+  videoPrompt: string | null
+  description: string | null
+}): string {
+  return panel.videoPrompt || panel.description || '无视频描述'
+}
+
+function buildCoarseGroupImagePrompt(panels: Array<{
+  panelIndex: number
+  panelNumber: number | null
+  shotType: string | null
+  cameraMove: string | null
+  description: string | null
+  imagePrompt: string | null
+  firstLastFramePrompt?: string | null
+  location: string | null
+}>) {
+  const sortedPanels = [...panels].sort((left, right) => left.panelIndex - right.panelIndex)
+  const countText = sortedPanels.length === 9 ? '九宫格' : `${sortedPanels.length}宫格`
+  const rows = sortedPanels.map((panel, index) => {
+    return `分镜${index + 1}: ${pickPanelImagePrompt(panel)}`
+  })
+  return [
+    `【${countText}版本分镜 提示词】：`,
+    '生成一张多宫格分镜图片，所有格子属于同一个粗镜头，必须保持角色外貌、服装、场景、光线、色彩和镜头连续性一致。',
+    '从左到右从上到下：',
+    ...rows,
+  ].join('\n')
+}
+
+function buildCoarseGroupVideoPrompt(panels: Array<{
+  panelIndex: number
+  duration: number | null
+  videoPrompt: string | null
+  description: string | null
+}>) {
+  const sortedPanels = [...panels].sort((left, right) => left.panelIndex - right.panelIndex)
+  let cursor = 0
+  return sortedPanels.map((panel) => {
+    const current = cursor
+    cursor += typeof panel.duration === 'number' && Number.isFinite(panel.duration) && panel.duration > 0
+      ? panel.duration
+      : 0.5
+    return `[${current.toFixed(2)}秒]${pickPanelVideoPrompt(panel)}`
+  }).join('\n')
 }
 
 function pickAppearanceDescription(appearance: {
@@ -285,5 +433,109 @@ export async function handlePanelImageTask(job: Job<TaskJobData>) {
     panelId: panel.id,
     candidateCount: candidates.length,
     imageUrl: isFirstGeneration ? candidates[0] || null : null,
+  }
+}
+
+export async function handleStoryboardGroupImageTask(job: Job<TaskJobData>) {
+  const payload = (job.data.payload || {}) as AnyObj
+  const storyboardId = pickFirstString(payload.storyboardId, job.data.targetId)
+  const groupNumberRaw = typeof payload.groupNumber === 'number' ? payload.groupNumber : Number(payload.groupNumber)
+  const groupNumber = Number.isFinite(groupNumberRaw) ? Math.floor(groupNumberRaw) : null
+  if (!storyboardId || groupNumber === null || groupNumber <= 0) {
+    throw new Error('storyboardId or groupNumber missing')
+  }
+
+  const storyboard = await prisma.novelPromotionStoryboard.findUnique({
+    where: { id: storyboardId },
+    include: {
+      panels: { orderBy: { panelIndex: 'asc' } },
+    },
+  })
+  if (!storyboard) throw new Error('Storyboard not found')
+
+  const parentGroupByPanelNumber = parseParentGroupByPanelNumber(storyboard.storyboardTextJson)
+  const groupPanels = storyboard.panels.filter((panel) => {
+    const panelNumber = panel.panelNumber ?? panel.panelIndex + 1
+    return (parentGroupByPanelNumber.get(panelNumber) ?? 1) === groupNumber
+  })
+  if (groupPanels.length === 0) throw new Error(`No panels found for coarse group ${groupNumber}`)
+
+  const projectData = await resolveNovelData(job.data.projectId)
+  const modelConfig = await getProjectModels(job.data.projectId, job.data.userId)
+  const modelKey = modelConfig.storyboardModel
+  if (!modelKey) throw new Error('Storyboard model not configured')
+
+  const candidateCount = clampCount(payload.candidateCount ?? payload.count, 1, 4, 1)
+  const rawRefs = (await Promise.all(groupPanels.map((panel) => collectPanelReferenceImages(projectData, panel)))).flat()
+  const refs = Array.from(new Set(rawRefs))
+  const normalizedRefs = await normalizeReferenceImagesForGeneration(refs)
+
+  const artStyle = getArtStylePrompt(modelConfig.artStyle, job.data.locale)
+  if (!projectData.videoRatio) throw new Error('Project videoRatio not configured')
+  const aspectRatio = projectData.videoRatio
+  const imagePrompt = buildCoarseGroupImagePrompt(groupPanels)
+  const videoPrompt = buildCoarseGroupVideoPrompt(groupPanels)
+  const contextJson = JSON.stringify({
+    coarse_group: {
+      storyboard_id: storyboard.id,
+      group_number: groupNumber,
+      image_prompt: imagePrompt,
+      video_prompt: videoPrompt,
+      panels: groupPanels.map((panel) => buildPanelPromptContext({ panel, projectData }).panel),
+    },
+  }, null, 2)
+  const prompt = buildPanelPrompt({
+    locale: job.data.locale,
+    aspectRatio,
+    styleText: artStyle || '与参考图风格一致',
+    sourceText: imagePrompt,
+    contextJson,
+  })
+
+  const candidates: string[] = []
+  for (let i = 0; i < candidateCount; i += 1) {
+    await reportTaskProgress(job, 18 + Math.floor((i / Math.max(candidateCount, 1)) * 58), {
+      stage: 'generate_storyboard_group_candidate',
+      candidateIndex: i,
+      groupNumber,
+    })
+
+    const source = await resolveImageSourceFromGeneration(job, {
+      userId: job.data.userId,
+      modelId: modelKey,
+      prompt,
+      options: {
+        referenceImages: normalizedRefs,
+        aspectRatio,
+      },
+      allowTaskExternalIdResume: candidateCount === 1,
+      pollProgress: { start: 30, end: 90 },
+    })
+
+    const cosKey = await uploadImageSourceToCos(source, 'storyboard-group-candidate', `${storyboard.id}-${groupNumber}-${i}`)
+    candidates.push(cosKey)
+  }
+
+  await assertTaskActive(job, 'persist_storyboard_group_image')
+  const coarseGroupsJson = upsertCoarseGroupState({
+    raw: storyboard.coarseGroupsJson,
+    groupNumber,
+    imagePrompt,
+    videoPrompt,
+    imageUrl: candidates[0] || null,
+    candidateImages: candidateCount > 1 ? candidates : null,
+  })
+  await prisma.novelPromotionStoryboard.update({
+    where: { id: storyboard.id },
+    data: {
+      coarseGroupsJson,
+    },
+  })
+
+  return {
+    storyboardId: storyboard.id,
+    groupNumber,
+    candidateCount: candidates.length,
+    imageUrl: candidates[0] || null,
   }
 }

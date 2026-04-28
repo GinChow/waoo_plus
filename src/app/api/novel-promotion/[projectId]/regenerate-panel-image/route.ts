@@ -5,7 +5,7 @@ import { submitTask } from '@/lib/task/submitter'
 import { resolveRequiredTaskLocale } from '@/lib/task/resolve-locale'
 import { TASK_TYPE } from '@/lib/task/types'
 import { buildDefaultTaskBillingInfo } from '@/lib/billing'
-import { hasPanelImageOutput } from '@/lib/task/has-output'
+import { hasPanelImageOutput, hasStoryboardGroupImageOutput } from '@/lib/task/has-output'
 import { withTaskUiPayload } from '@/lib/task/ui-payload'
 import { getProjectModelConfig } from '@/lib/config-service'
 import { resolveProjectModelCapabilityGenerationOptions } from '@/lib/config-service'
@@ -28,10 +28,13 @@ export const POST = apiHandler(async (
   const body = await request.json()
   const locale = resolveRequiredTaskLocale(request, body)
   const panelId = body?.panelId
+  const storyboardId = typeof body?.storyboardId === 'string' ? body.storyboardId.trim() : ''
+  const groupNumberRaw = typeof body?.groupNumber === 'number' ? body.groupNumber : Number(body?.groupNumber)
+  const groupNumber = Number.isFinite(groupNumberRaw) ? Math.floor(groupNumberRaw) : null
   const count = body?.count
   const candidateCount = Math.max(1, Math.min(4, Number(count ?? DEFAULT_CANDIDATE_COUNT)))
 
-  if (!panelId) {
+  if (!panelId && (!storyboardId || groupNumber === null || groupNumber <= 0)) {
     throw new ApiError('INVALID_PARAMS')
   }
 
@@ -71,6 +74,8 @@ export const POST = apiHandler(async (
     message: 'regenerate panel image request params',
     details: {
       panelId,
+      storyboardId: storyboardId || null,
+      groupNumber,
       count,
       candidateCount,
       imageModel: projectModelConfig.storyboardModel,
@@ -78,7 +83,10 @@ export const POST = apiHandler(async (
     },
   })
 
-  const hasOutputAtStart = await hasPanelImageOutput(panelId)
+  const isStoryboardGroupTask = Boolean(storyboardId && groupNumber !== null && groupNumber > 0)
+  const hasOutputAtStart = isStoryboardGroupTask
+    ? await hasStoryboardGroupImageOutput({ storyboardId, groupNumber })
+    : await hasPanelImageOutput(panelId)
 
   const result = await submitTask({
     userId: session.user.id,
@@ -86,12 +94,14 @@ export const POST = apiHandler(async (
     requestId,
     projectId,
     type: TASK_TYPE.IMAGE_PANEL,
-    targetType: 'NovelPromotionPanel',
-    targetId: panelId,
+    targetType: isStoryboardGroupTask ? 'NovelPromotionStoryboard' : 'NovelPromotionPanel',
+    targetId: isStoryboardGroupTask ? storyboardId : panelId,
     payload: withTaskUiPayload(billingPayload, {
       intent: 'regenerate',
       hasOutputAtStart}),
-    dedupeKey: `image_panel:${panelId}:${candidateCount}`,
+    dedupeKey: isStoryboardGroupTask
+      ? `image_storyboard_group:${storyboardId}:${groupNumber}:${candidateCount}`
+      : `image_panel:${panelId}:${candidateCount}`,
     billingInfo: buildDefaultTaskBillingInfo(TASK_TYPE.IMAGE_PANEL, billingPayload)})
 
   return NextResponse.json(result)

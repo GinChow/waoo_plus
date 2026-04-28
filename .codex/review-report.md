@@ -1,3 +1,27 @@
+# Review Report - Coarse Grid Storyboard Images
+
+- Date: 2026-04-28
+- Reviewer: Codex
+- Recommendation: pass
+- Technical score: 92/100
+- Strategic score: 91/100
+- Overall score: 92/100
+
+## Findings
+
+- No blocking issues found in the changed image generation path.
+- Residual risk: `coarseGroupsJson` is JSON text rather than a normalized table because the existing data model has no persisted coarse group entity. This keeps the change small but requires future code to parse the JSON for per-group metadata.
+- Residual risk: the fine-panel image buttons now redirect to the parent coarse group generation when group metadata exists; the old single-panel path remains only as a fallback for malformed group data.
+
+## Evidence
+
+- `npm run typecheck` passed.
+- `npx vitest run tests/unit/worker/panel-image-task-handler.test.ts tests/unit/worker/image-worker.test.ts` passed.
+- `npm run lint:all` passed with existing warnings only.
+- Full unit run has one unrelated existing assertion failure documented in `.codex/testing.md`.
+
+---
+
 # Review Report
 
 Date: 2026-04-26

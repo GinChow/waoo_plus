@@ -32,3 +32,19 @@
 - 2026-04-27 Codex: 将 `regenerate_storyboard_text` 的 orchestrator 并发从固定 1 改为读取用户 `workflowConcurrency.analysis` 配置。
 - 2026-04-27 Codex: 修复 phase4 detail 输出 `duration_final` 未被解析，以及重新生成 seed 未保留 `duration_base` 导致导出 JSON 时长为 null 的问题。
 - 2026-04-27 Codex: 修复分镜任务进度中文明文被当作 `progress` i18n key 翻译，导致 `MISSING_MESSAGE` 控制台错误的问题。
+- 2026-04-28 Codex: 接到需求：分镜图片生成从细分镜单张生成改为按粗镜头分组生成一张多宫格分镜图，并把细分镜图片/视频提示词聚合存入粗镜头产物。
+- 2026-04-28 Codex: 降级说明：当前会话没有 sequential-thinking、shrimp-task-manager、code-index MCP 工具，使用 `rg`、`sed`、`update_plan` 和 `.codex/context-scan-storyboard-grid.json` 替代。
+- 2026-04-28 Codex: 新增 `NovelPromotionStoryboard.coarseGroupsJson` 字段和迁移 `20260428120000_add_storyboard_coarse_groups`，用于保存 `groupNumber/imagePrompt/videoPrompt/imageUrl/candidateImages`。
+- 2026-04-28 Codex: 扩展 `regenerate-panel-image` 接口，支持 `storyboardId + groupNumber` 提交 `image_panel` 任务；image worker 对 `NovelPromotionStoryboard` target 改走粗镜头多宫格生成路径。
+- 2026-04-28 Codex: `handleStoryboardGroupImageTask` 会按 `storyboardTextJson` 的 `parent_group_number` 聚合细分镜，生成多宫格图片提示词和时间轴视频提示词，并写回 `coarseGroupsJson`。
+- 2026-04-28 Codex: 前端批量生成按钮改为按粗镜头分组提交任务；粗镜头卡片优先展示已生成的多宫格图，未生成时保留细分镜缩略预览。
+- 2026-04-28 Codex: 执行 `npx prisma generate` 刷新 Prisma Client 类型。
+- 2026-04-28 Codex: 验证通过 `npm run typecheck`、`npx vitest run tests/unit/worker/panel-image-task-handler.test.ts tests/unit/worker/image-worker.test.ts`、`npm run lint:all`。
+- 2026-04-28 Codex: 误执行 `npm run test:unit:all -- panel-image-task-handler image-worker`，该脚本实际跑完整 `tests/unit`；唯一失败为既有无关断言 `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts` 期望 body 不含 `mode:"all"`。
+- 2026-04-28 Codex: 修复本地开发库缺列错误。将新增迁移 SQL 从双引号改为 MySQL 反引号，因当前库非空且无 migration baseline，使用 `npx prisma db execute --file prisma/migrations/20260428120000_add_storyboard_coarse_groups/migration.sql --schema prisma/schema.prisma` 直接补列。
+- 2026-04-28 Codex: 验证 `SHOW COLUMNS FROM novel_promotion_storyboards LIKE 'coarseGroupsJson'` 返回 `text nullable`，并重新执行 `npx prisma generate`。
+- 2026-04-28 Codex: 根据反馈在每个粗镜头预览卡片右上角新增“生成/重新生成”按钮，直接触发该粗镜头多宫格分镜图片生成；卡片本体改为 `div role=button` 避免按钮嵌套。
+- 2026-04-28 Codex: 根据反馈在每个粗镜头预览卡片内展示保存的 `imagePrompt` 与 `videoPrompt`，从 `coarseGroupsJson` 按 `groupNumber` 读取，生成前显示空状态。
+- 2026-04-28 Codex: 根据反馈将粗镜头提示词显示改为即时组织：优先显示 `coarseGroupsJson` 保存值，没有保存值时直接从该粗镜头下细镜头的首帧/描述/视频提示词现场聚合。
+- 2026-04-28 Codex: 根据反馈将多宫格图片提示词条目命名从 `细分镜N` 改为粗镜头内顺序 `分镜1:`、`分镜2:`，前端预览和后端保存逻辑保持一致。
+- 2026-04-28 Codex: 根据反馈调整粗镜头提示词文本区交互，文本区拦截点击/键盘事件并启用 `select-text`，避免选中文案时跳转到细分镜界面。

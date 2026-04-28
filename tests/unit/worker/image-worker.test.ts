@@ -20,6 +20,7 @@ const handlerMock = vi.hoisted(() => ({
   handleLocationImageTask: vi.fn(async () => ({ ok: true })),
   handleModifyAssetImageTask: vi.fn(async () => ({ ok: true })),
   handlePanelImageTask: vi.fn(async () => ({ ok: true })),
+  handleStoryboardGroupImageTask: vi.fn(async () => ({ ok: true })),
   handlePanelVariantTask: vi.fn(async () => ({ ok: true })),
 }))
 
@@ -101,5 +102,24 @@ describe('worker image concurrency behavior', () => {
       limit: 5,
     }))
     expect(handlerMock.handlePanelImageTask).toHaveBeenCalledWith(job)
+  })
+
+  it('routes storyboard group image_panel jobs to storyboard group handler', async () => {
+    const processor = workerState.processor
+    expect(processor).toBeTruthy()
+
+    const job = {
+      ...buildJob(TASK_TYPE.IMAGE_PANEL),
+      data: {
+        ...buildJob(TASK_TYPE.IMAGE_PANEL).data,
+        targetType: 'NovelPromotionStoryboard',
+        targetId: 'storyboard-1',
+        payload: { storyboardId: 'storyboard-1', groupNumber: 1 },
+      },
+    } as unknown as Job<TaskJobData>
+    await processor!(job)
+
+    expect(handlerMock.handleStoryboardGroupImageTask).toHaveBeenCalledWith(job)
+    expect(handlerMock.handlePanelImageTask).not.toHaveBeenCalledWith(job)
   })
 })

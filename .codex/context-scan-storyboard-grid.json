@@ -1,0 +1,38 @@
+{
+  "date": "2026-04-28",
+  "executor": "Codex",
+  "task": "将分镜图片生成从细分镜单张生成调整为粗镜头多宫格生成，并存储聚合图片/视频提示词",
+  "tooling_notes": {
+    "sequential_thinking": "当前会话未提供 sequential-thinking MCP 工具，已用本地代码检索和显式计划替代。",
+    "shrimp_task_manager": "当前会话未提供 shrimp-task-manager MCP 工具，已用 update_plan 和本文件留痕替代。",
+    "code_index": "当前会话未提供 code-index MCP 工具，已用 rg/sed 读取相关代码。"
+  },
+  "scan": {
+    "module": "novel-promotion storyboard stage",
+    "storage": {
+      "coarse_container": "NovelPromotionStoryboard",
+      "fine_panel": "NovelPromotionPanel",
+      "coarse_group_mapping": "NovelPromotionStoryboard.storyboardTextJson 当前保存 panel_number -> parent_group_number 紧凑映射"
+    },
+    "current_image_generation": {
+      "api": "src/app/api/novel-promotion/[projectId]/regenerate-panel-image/route.ts",
+      "worker": "src/lib/workers/handlers/panel-image-task-handler.ts",
+      "frontend_batch": "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/storyboard/hooks/useStoryboardBatchPanelGeneration.ts",
+      "behavior": "逐个 NovelPromotionPanel 提交 image_panel 任务，每个 panel 单独生成图片。"
+    },
+    "current_prompt_storage": {
+      "panel_video_prompt": "NovelPromotionPanel.videoPrompt",
+      "panel_image_prompt": "NovelPromotionPanel.imagePrompt 字段存在，但脚本转分镜主流程当前主要填充 videoPrompt/firstLastFramePrompt。"
+    },
+    "ui_grouping": {
+      "component": "StoryboardGroup.tsx",
+      "behavior": "前端按 parent_group_number 将 textPanels 聚合为粗镜头卡片。"
+    }
+  },
+  "sufficiency_check": {
+    "interface_contract": true,
+    "technical_choice": true,
+    "major_risks_identified": true,
+    "verification_known": true
+  }
+}

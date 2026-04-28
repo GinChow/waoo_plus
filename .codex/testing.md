@@ -92,3 +92,47 @@ phase4 续跑沿用现有 reconcile 规则，保留当前分镜的 `description/
 
 - `npm run typecheck`
   - Result: passed.
+
+## 2026-04-28 Coarse Grid Storyboard Images
+
+- `npx prisma generate`
+  - Result: passed.
+
+## 2026-04-28 Coarse Card Generate Button
+
+- `npm run typecheck`
+  - Result: passed.
+
+- `npm run lint:all`
+  - Result: passed with existing warnings.
+  - Notes: 0 errors, 44 warnings. Warnings are unrelated existing unused variable / hook dependency warnings.
+  - Purpose: refresh Prisma Client after adding `NovelPromotionStoryboard.coarseGroupsJson`.
+
+- `npm run typecheck`
+  - Result: passed.
+
+- `npx vitest run tests/unit/worker/panel-image-task-handler.test.ts tests/unit/worker/image-worker.test.ts`
+  - Result: passed.
+  - Coverage: 2 files, 7 tests.
+  - Focus: storyboard group image worker routing, multi-grid prompt aggregation, coarse group prompt persistence.
+
+- `npm run lint:all`
+  - Result: passed with existing warnings.
+  - Notes: 0 errors, 44 warnings. Warnings are unrelated existing unused variable / hook dependency warnings.
+
+- `npm run test:unit:all -- panel-image-task-handler image-worker`
+  - Result: failed because the npm script still ran the whole `tests/unit` suite.
+  - Relevant changed tests passed inside the run.
+  - Unrelated failure: `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts` expected request body `{"async":true}`, actual body included `{"async":true,"mode":"all"}`.
+
+## 2026-04-28 Local Database Repair
+
+- `npx prisma db execute --file prisma/migrations/20260428120000_add_storyboard_coarse_groups/migration.sql --schema prisma/schema.prisma`
+  - Result: passed.
+  - Purpose: directly apply the new column to the existing non-empty local MySQL database.
+
+- `SHOW COLUMNS FROM novel_promotion_storyboards LIKE 'coarseGroupsJson'`
+  - Result: returned `coarseGroupsJson` as nullable `text`.
+
+- `npx prisma generate`
+  - Result: passed.

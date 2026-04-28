@@ -10,7 +10,7 @@ import {
 } from './image-generation-runtime'
 
 interface RegeneratePanelMutationLike {
-  mutateAsync: (payload: { panelId: string; count: number }) => Promise<unknown>
+  mutateAsync: (payload: { panelId: string; count: number } | { storyboardId: string; groupNumber: number; count: number }) => Promise<unknown>
 }
 
 interface UsePanelImageRegenerationParams {
@@ -103,8 +103,39 @@ export function usePanelImageRegeneration({
     await Promise.all(panelsToGenerate.map((panel) => regeneratePanelImage(panel.id)))
   }, [localStoryboards, regeneratePanelImage, submittingPanelImageIds])
 
+  const regenerateStoryboardGroupImage = useCallback(async (
+    storyboardId: string,
+    groupNumber: number,
+    count: number = 1,
+  ) => {
+    const data = await regeneratePanelMutation.mutateAsync({ storyboardId, groupNumber, count })
+    const result = (data || {}) as StoryboardImageMutationResult
+
+    if (result.async) {
+      _ulogInfo(`[regenerateStoryboardGroupImage] async submitted: ${storyboardId}:${groupNumber}`)
+      if (onSilentRefresh) {
+        await onSilentRefresh()
+      }
+      refreshEpisode()
+      refreshStoryboards()
+      return
+    }
+
+    if (onSilentRefresh) {
+      await onSilentRefresh()
+    }
+    refreshEpisode()
+    refreshStoryboards()
+  }, [
+    onSilentRefresh,
+    refreshEpisode,
+    refreshStoryboards,
+    regeneratePanelMutation,
+  ])
+
   return {
     regeneratePanelImage,
     regenerateAllPanelsIndividually,
+    regenerateStoryboardGroupImage,
   }
 }

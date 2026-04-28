@@ -11,15 +11,45 @@ interface UseStoryboardBatchPanelGenerationProps {
   sortedStoryboards: NovelPromotionStoryboard[]
   submittingPanelImageIds: Set<string>
   getTextPanels: (storyboard: NovelPromotionStoryboard) => StoryboardPanel[]
-  regeneratePanelImage: (panelId: string, count?: number, force?: boolean) => Promise<void>
+  regenerateStoryboardGroupImage: (storyboardId: string, groupNumber: number, count?: number) => Promise<void>
   setIsEpisodeBatchSubmitting: (value: boolean) => void
+}
+
+function parseGeneratedCoarseGroupNumbers(raw: string | null | undefined): Set<number> {
+  if (!raw) return new Set()
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.flatMap((item): number[] => {
+      if (
+        item
+        && typeof item === 'object'
+        && typeof (item as { groupNumber?: unknown }).groupNumber === 'number'
+        && typeof (item as { imageUrl?: unknown }).imageUrl === 'string'
+        && (item as { imageUrl: string }).imageUrl.trim().length > 0
+      ) {
+        return [(item as { groupNumber: number }).groupNumber]
+      }
+      return []
+    }))
+  } catch {
+    return new Set()
+  }
+}
+
+function collectCoarseGroupNumbers(panels: StoryboardPanel[]): number[] {
+  const groupNumbers = new Set<number>()
+  for (const panel of panels) {
+    groupNumbers.add(panel.parent_group_number ?? 1)
+  }
+  return Array.from(groupNumbers).sort((left, right) => left - right)
 }
 
 export function useStoryboardBatchPanelGeneration({
   sortedStoryboards,
   submittingPanelImageIds,
   getTextPanels,
-  regeneratePanelImage,
+  regenerateStoryboardGroupImage,
   setIsEpisodeBatchSubmitting,
 }: UseStoryboardBatchPanelGenerationProps) {
   const t = useTranslations('storyboard')
@@ -33,53 +63,48 @@ export function useStoryboardBatchPanelGeneration({
   const pendingPanelCount = useMemo(() => {
     return sortedStoryboards.reduce((count, storyboard) => {
       const panels = getTextPanels(storyboard)
-      return (
-        count +
-        panels.filter(
-          (panel) => !panel.imageUrl && !panel.imageTaskRunning && !submittingPanelImageIds.has(panel.id),
-        ).length
-      )
+      const generatedGroups = parseGeneratedCoarseGroupNumbers(storyboard.coarseGroupsJson)
+      const pendingGroups = collectCoarseGroupNumbers(panels).filter((groupNumber) => !generatedGroups.has(groupNumber))
+      return count + pendingGroups.length
     }, 0)
-  }, [getTextPanels, sortedStoryboards, submittingPanelImageIds])
+  }, [getTextPanels, sortedStoryboards])
 
   const handleGenerateAllPanels = useCallback(async () => {
     setIsEpisodeBatchSubmitting(true)
     try {
-      const panelsToGenerate: string[] = []
+      const groupsToGenerate: Array<{ storyboardId: string; groupNumber: number }> = []
       sortedStoryboards.forEach((storyboard) => {
         const panels = getTextPanels(storyboard)
-        panels.forEach((panel) => {
-          const isTaskRunning =
-            Boolean((panel as { imageTaskRunning?: boolean }).imageTaskRunning) ||
-            submittingPanelImageIds.has(panel.id)
-          if (!panel.imageUrl && !isTaskRunning) {
-            panelsToGenerate.push(panel.id)
+        const generatedGroups = parseGeneratedCoarseGroupNumbers(storyboard.coarseGroupsJson)
+        collectCoarseGroupNumbers(panels).forEach((groupNumber) => {
+          if (!generatedGroups.has(groupNumber)) {
+            groupsToGenerate.push({ storyboardId: storyboard.id, groupNumber })
           }
         })
       })
 
-      if (panelsToGenerate.length === 0) {
-        _ulogInfo('[批量生成] 没有需要生成的分镜图片')
+      if (groupsToGenerate.length === 0) {
+        _ulogInfo('[批量生成] 没有需要生成的粗镜头多宫格图片')
         return
       }
 
-      _ulogInfo(`[批量生成] 开始生成 ${panelsToGenerate.length} 个分镜图片`)
+      _ulogInfo(`[批量生成] 开始生成 ${groupsToGenerate.length} 个粗镜头多宫格分镜图片`)
 
-      const concurrencyLimit = 10
+      const concurrencyLimit = 4
       const results: Array<PromiseSettledResult<unknown>> = []
-      for (let index = 0; index < panelsToGenerate.length; index += concurrencyLimit) {
-        const batch = panelsToGenerate.slice(index, index + concurrencyLimit)
+      for (let index = 0; index < groupsToGenerate.length; index += concurrencyLimit) {
+        const batch = groupsToGenerate.slice(index, index + concurrencyLimit)
         const currentBatch = Math.floor(index / concurrencyLimit) + 1
-        const totalBatches = Math.ceil(panelsToGenerate.length / concurrencyLimit)
+        const totalBatches = Math.ceil(groupsToGenerate.length / concurrencyLimit)
         _ulogInfo(`[批量生成] 处理第 ${currentBatch}/${totalBatches} 批 (${batch.length} 个)`)
 
         const batchResults = await Promise.allSettled(
-          batch.map((panelId) => regeneratePanelImage(panelId, 1)),
+          batch.map((item) => regenerateStoryboardGroupImage(item.storyboardId, item.groupNumber, 1)),
         )
         results.push(...batchResults)
 
-        const completed = Math.min(index + concurrencyLimit, panelsToGenerate.length)
-        _ulogInfo(`[批量生成] 已完成 ${completed}/${panelsToGenerate.length}`)
+        const completed = Math.min(index + concurrencyLimit, groupsToGenerate.length)
+        _ulogInfo(`[批量生成] 已完成 ${completed}/${groupsToGenerate.length}`)
       }
 
       const succeeded = results.filter((result) => result.status === 'fulfilled').length
@@ -100,7 +125,7 @@ export function useStoryboardBatchPanelGeneration({
           }),
         )
       } else if (succeeded > 0) {
-        _ulogInfo(`[批量生成] 全部成功生成 ${succeeded} 个分镜图片`)
+        _ulogInfo(`[批量生成] 全部成功提交 ${succeeded} 个粗镜头多宫格分镜图片`)
       }
     } catch (error: unknown) {
       _ulogError('[批量生成] 发生意外错误:', error)
@@ -112,7 +137,7 @@ export function useStoryboardBatchPanelGeneration({
     } finally {
       setIsEpisodeBatchSubmitting(false)
     }
-  }, [getTextPanels, regeneratePanelImage, setIsEpisodeBatchSubmitting, sortedStoryboards, submittingPanelImageIds, t])
+  }, [getTextPanels, regenerateStoryboardGroupImage, setIsEpisodeBatchSubmitting, sortedStoryboards, t])
 
   return {
     runningCount,

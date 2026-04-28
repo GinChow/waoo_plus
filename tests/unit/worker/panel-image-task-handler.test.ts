@@ -7,6 +7,10 @@ const prismaMock = vi.hoisted(() => ({
     findUnique: vi.fn(),
     update: vi.fn(async () => ({})),
   },
+  novelPromotionStoryboard: {
+    findUnique: vi.fn(),
+    update: vi.fn(async () => ({})),
+  },
 }))
 
 const utilsMock = vi.hoisted(() => ({
@@ -76,7 +80,7 @@ vi.mock('@/lib/prompt-i18n', () => ({
   buildPrompt: promptMock.buildPrompt,
 }))
 
-import { handlePanelImageTask } from '@/lib/workers/handlers/panel-image-task-handler'
+import { handlePanelImageTask, handleStoryboardGroupImageTask } from '@/lib/workers/handlers/panel-image-task-handler'
 
 function buildJob(payload: Record<string, unknown>, targetId = 'panel-1'): Job<TaskJobData> {
   return {
@@ -123,6 +127,74 @@ describe('worker panel-image-task-handler behavior', () => {
     utilsMock.uploadImageSourceToCos
       .mockResolvedValueOnce('cos/panel-candidate-1.png')
       .mockResolvedValueOnce('cos/panel-candidate-2.png')
+
+    prismaMock.novelPromotionStoryboard.findUnique.mockResolvedValue({
+      id: 'storyboard-1',
+      storyboardTextJson: JSON.stringify([[1, 1], [2, 1], [3, 2]]),
+      coarseGroupsJson: null,
+      panels: [
+        {
+          id: 'panel-1',
+          storyboardId: 'storyboard-1',
+          panelIndex: 0,
+          panelNumber: 1,
+          shotType: 'close-up',
+          cameraMove: 'static',
+          description: 'hero close-up',
+          imagePrompt: 'panel anchor prompt',
+          videoPrompt: 'dramatic',
+          firstLastFramePrompt: null,
+          location: 'Old Town',
+          characters: JSON.stringify([{ name: 'Hero', appearance: 'default', slot: '街道左侧靠墙的留白位置' }]),
+          srtSegment: '台词片段',
+          photographyRules: null,
+          actingNotes: null,
+          sketchImageUrl: null,
+          imageUrl: null,
+          duration: 0.5,
+        },
+        {
+          id: 'panel-2',
+          storyboardId: 'storyboard-1',
+          panelIndex: 1,
+          panelNumber: 2,
+          shotType: 'wide',
+          cameraMove: 'push',
+          description: 'hero walks through rain',
+          imagePrompt: null,
+          videoPrompt: 'rain walk',
+          firstLastFramePrompt: 'wide rain frame',
+          location: 'Old Town',
+          characters: '[]',
+          srtSegment: null,
+          photographyRules: null,
+          actingNotes: null,
+          sketchImageUrl: null,
+          imageUrl: null,
+          duration: 1,
+        },
+        {
+          id: 'panel-3',
+          storyboardId: 'storyboard-1',
+          panelIndex: 2,
+          panelNumber: 3,
+          shotType: 'detail',
+          cameraMove: 'static',
+          description: 'another group',
+          imagePrompt: null,
+          videoPrompt: 'another',
+          firstLastFramePrompt: null,
+          location: 'Old Town',
+          characters: '[]',
+          srtSegment: null,
+          photographyRules: null,
+          actingNotes: null,
+          sketchImageUrl: null,
+          imageUrl: null,
+          duration: 0.5,
+        },
+      ],
+    })
   })
 
   it('missing panelId -> explicit error', async () => {
@@ -224,5 +296,41 @@ describe('worker panel-image-task-handler behavior', () => {
         candidateImages: JSON.stringify(['cos/panel-regenerated.png']),
       },
     })
+  })
+
+  it('storyboard group generation -> builds grid prompt and stores prompt bundle on storyboard', async () => {
+    utilsMock.resolveImageSourceFromGeneration.mockReset()
+    utilsMock.uploadImageSourceToCos.mockReset()
+    utilsMock.resolveImageSourceFromGeneration.mockResolvedValueOnce('generated-group-source')
+    utilsMock.uploadImageSourceToCos.mockResolvedValueOnce('cos/storyboard-group-1.png')
+
+    const job = buildJob({ storyboardId: 'storyboard-1', groupNumber: 1, candidateCount: 1 }, 'storyboard-1')
+    const result = await handleStoryboardGroupImageTask(job)
+
+    expect(result).toEqual({
+      storyboardId: 'storyboard-1',
+      groupNumber: 1,
+      candidateCount: 1,
+      imageUrl: 'cos/storyboard-group-1.png',
+    })
+    expect(promptMock.buildPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      variables: expect.objectContaining({
+        source_text: expect.stringContaining('多宫格分镜图片'),
+        storyboard_text_json_input: expect.stringContaining('"group_number": 1'),
+      }),
+    }))
+    const updateCalls = prismaMock.novelPromotionStoryboard.update.mock.calls as unknown as Array<[{
+      where: { id: string }
+      data: { coarseGroupsJson: string }
+    }]>
+    const updateCall = updateCalls[0][0]
+    expect(updateCall.where).toEqual({ id: 'storyboard-1' })
+    const stored = JSON.parse(updateCall.data.coarseGroupsJson)
+    expect(stored[0].groupNumber).toBe(1)
+    expect(stored[0].imagePrompt).toContain('panel anchor prompt')
+    expect(stored[0].imagePrompt).toContain('wide rain frame')
+    expect(stored[0].videoPrompt).toContain('[0.00秒]dramatic')
+    expect(stored[0].videoPrompt).toContain('[0.50秒]rain walk')
+    expect(stored[0].imageUrl).toBe('cos/storyboard-group-1.png')
   })
 })

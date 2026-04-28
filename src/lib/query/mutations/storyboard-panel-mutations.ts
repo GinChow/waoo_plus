@@ -16,11 +16,11 @@ import {
 export function useRegenerateProjectPanelImage(projectId: string) {
     const queryClient = useQueryClient()
     return useMutation({
-        mutationFn: async ({ panelId, count }: { panelId: string; count?: number }) => {
+        mutationFn: async (payload: { panelId: string; count?: number } | { storyboardId: string; groupNumber: number; count?: number }) => {
             const res = await apiFetch(`/api/novel-promotion/${projectId}/regenerate-panel-image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ panelId, count: count ?? 1 }),
+                body: JSON.stringify({ ...payload, count: payload.count ?? 1 }),
             })
             if (!res.ok) {
                 const error = await res.json().catch(() => ({}))
@@ -36,19 +36,19 @@ export function useRegenerateProjectPanelImage(projectId: string) {
             }
             return res.json()
         },
-        onMutate: ({ panelId }) => {
+        onMutate: (payload) => {
             upsertTaskTargetOverlay(queryClient, {
                 projectId,
-                targetType: 'NovelPromotionPanel',
-                targetId: panelId,
+                targetType: 'panelId' in payload ? 'NovelPromotionPanel' : 'NovelPromotionStoryboard',
+                targetId: 'panelId' in payload ? payload.panelId : payload.storyboardId,
                 intent: 'regenerate',
             })
         },
-        onError: (_error, { panelId }) => {
+        onError: (_error, payload) => {
             clearTaskTargetOverlay(queryClient, {
                 projectId,
-                targetType: 'NovelPromotionPanel',
-                targetId: panelId,
+                targetType: 'panelId' in payload ? 'NovelPromotionPanel' : 'NovelPromotionStoryboard',
+                targetId: 'panelId' in payload ? payload.panelId : payload.storyboardId,
             })
         },
         onSettled: () => {

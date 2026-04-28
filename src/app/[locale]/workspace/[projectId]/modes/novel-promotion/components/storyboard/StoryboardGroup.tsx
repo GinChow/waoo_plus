@@ -17,6 +17,75 @@ import type { StoryboardGroupProps } from './StoryboardGroup.types'
 import { AppIcon } from '@/components/ui/icons'
 import { MediaImageWithLoading } from '@/components/media/MediaImageWithLoading'
 
+type CoarseGroupImageState = {
+  groupNumber: number
+  imageUrl: string | null
+  imagePrompt: string
+  videoPrompt: string
+}
+
+function parseCoarseGroupStates(raw: string | null | undefined): Map<number, CoarseGroupImageState> {
+  if (!raw) return new Map()
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Map()
+    const map = new Map<number, CoarseGroupImageState>()
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object') continue
+      const groupNumber = (item as { groupNumber?: unknown }).groupNumber
+      if (typeof groupNumber !== 'number') continue
+      map.set(groupNumber, {
+        groupNumber,
+        imageUrl: typeof (item as { imageUrl?: unknown }).imageUrl === 'string'
+          ? (item as { imageUrl: string }).imageUrl
+          : null,
+        imagePrompt: typeof (item as { imagePrompt?: unknown }).imagePrompt === 'string'
+          ? (item as { imagePrompt: string }).imagePrompt
+          : '',
+        videoPrompt: typeof (item as { videoPrompt?: unknown }).videoPrompt === 'string'
+          ? (item as { videoPrompt: string }).videoPrompt
+          : '',
+      })
+    }
+    return map
+  } catch {
+    return new Map()
+  }
+}
+
+function buildPreviewImagePrompt(panels: StoryboardPanel[]) {
+  const sortedPanels = [...panels].sort((left, right) => left.panelIndex - right.panelIndex)
+  const countText = sortedPanels.length === 9 ? '九宫格' : `${sortedPanels.length}宫格`
+  const rows = sortedPanels.map((panel, index) => {
+    const prompt = panel.first_frame_image_prompt || panel.description || '无画面描述'
+    const tags = [
+      panel.shot_type,
+      panel.camera_move,
+      panel.location ? `场景：${panel.location}` : null,
+    ].filter(Boolean).join('/')
+    const promptText = tags ? `(${tags})${prompt}` : prompt
+    return `分镜${index + 1}: ${promptText}`
+  })
+  return [
+    `【${countText}版本分镜 提示词】：`,
+    '生成一张多宫格分镜图片，所有格子属于同一个粗镜头，必须保持角色外貌、服装、场景、光线、色彩和镜头连续性一致。',
+    '从左到右从上到下：',
+    ...rows,
+  ].join('\n')
+}
+
+function buildPreviewVideoPrompt(panels: StoryboardPanel[]) {
+  const sortedPanels = [...panels].sort((left, right) => left.panelIndex - right.panelIndex)
+  let cursor = 0
+  return sortedPanels.map((panel) => {
+    const current = cursor
+    cursor += typeof panel.duration === 'number' && Number.isFinite(panel.duration) && panel.duration > 0
+      ? panel.duration
+      : 0.5
+    return `[${current.toFixed(2)}秒]${panel.video_prompt || panel.description || '无视频描述'}`
+  }).join('\n')
+}
+
 export default function StoryboardGroup({
   storyboard,
   clip,
@@ -55,6 +124,7 @@ export default function StoryboardGroup({
   onRemoveLocation,
   onRetryPanelSave,
   onRegeneratePanelImage,
+  onRegenerateStoryboardGroupImage,
   onOpenEditModal,
   onOpenAIDataModal,
   getPanelCandidates,
@@ -135,6 +205,10 @@ export default function StoryboardGroup({
       .sort((left, right) => left[0] - right[0])
       .map(([groupNumber, panels]) => ({ groupNumber, panels }))
   }, [textPanels])
+  const coarseGroupStates = useMemo(
+    () => parseCoarseGroupStates(storyboard.coarseGroupsJson),
+    [storyboard.coarseGroupsJson],
+  )
 
   const activeFinePanels = useMemo(() => {
     if (activeCoarseGroupNumber === null) return []
@@ -207,9 +281,15 @@ export default function StoryboardGroup({
   const handleRegeneratePanelImage = useCallback(
     (panelId: string, count?: number, force?: boolean) => {
       clearPanelTaskError(panelId)
+      const panel = textPanels.find((item) => item.id === panelId)
+      const groupNumber = panel?.parent_group_number ?? 1
+      if (groupNumber > 0) {
+        onRegenerateStoryboardGroupImage(groupNumber, count)
+        return
+      }
       onRegeneratePanelImage(panelId, count, force)
     },
-    [clearPanelTaskError, onRegeneratePanelImage],
+    [clearPanelTaskError, onRegeneratePanelImage, onRegenerateStoryboardGroupImage, textPanels],
   )
 
   return (
@@ -285,46 +365,103 @@ export default function StoryboardGroup({
           <div className="text-xs text-[var(--glass-text-tertiary)]">{t('group.coarseGridPreview')}</div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {coarseGroups.map((coarseGroup) => {
+              const coarseGroupState = coarseGroupStates.get(coarseGroup.groupNumber) || null
+              const generatedImageUrl = coarseGroupState?.imageUrl || null
+              const imagePrompt = coarseGroupState?.imagePrompt || buildPreviewImagePrompt(coarseGroup.panels)
+              const videoPrompt = coarseGroupState?.videoPrompt || buildPreviewVideoPrompt(coarseGroup.panels)
               const previewImages = coarseGroup.panels
                 .map((panel) => panel.imageUrl)
                 .filter((url): url is string => typeof url === 'string' && url.length > 0)
                 .slice(0, 4)
               return (
-                <button
+                <div
                   key={`${storyboard.id}-coarse-${coarseGroup.groupNumber}`}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setActiveCoarseGroupNumber(coarseGroup.groupNumber)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      setActiveCoarseGroupNumber(coarseGroup.groupNumber)
+                    }
+                  }}
                   className="glass-surface-soft p-3 text-left hover:bg-[var(--glass-bg-muted)] transition-colors"
                 >
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-sm font-semibold text-[var(--glass-text-primary)]">
                       {t('group.coarseShotTitle', { number: coarseGroup.groupNumber })}
                     </span>
-                    <span className="text-xs text-[var(--glass-text-tertiary)]">
-                      {t('group.fineShotCount', { count: coarseGroup.panels.length })}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[var(--glass-text-tertiary)]">
+                        {t('group.fineShotCount', { count: coarseGroup.panels.length })}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onRegenerateStoryboardGroupImage(coarseGroup.groupNumber, 1)
+                        }}
+                        className="glass-btn-base glass-btn-primary rounded-lg px-2 py-1 text-xs"
+                      >
+                        {generatedImageUrl ? t('panel.regenerate') : t('panel.generateImage')}
+                      </button>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {Array.from({ length: 4 }).map((_, tileIndex) => {
-                      const imageUrl = previewImages[tileIndex]
-                      return (
-                        <div
-                          key={`${storyboard.id}-coarse-${coarseGroup.groupNumber}-tile-${tileIndex}`}
-                          className="h-20 w-full overflow-hidden rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)]"
-                        >
-                          {imageUrl ? (
-                            <MediaImageWithLoading
-                              src={imageUrl}
-                              alt={`shot-${tileIndex + 1}`}
-                              containerClassName="h-full w-full"
-                              className="h-full w-full object-cover"
-                            />
-                          ) : null}
-                        </div>
-                      )
-                    })}
+                  {generatedImageUrl ? (
+                    <div className="h-44 w-full overflow-hidden rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)]">
+                      <MediaImageWithLoading
+                        src={generatedImageUrl}
+                        alt={`coarse-shot-${coarseGroup.groupNumber}`}
+                        containerClassName="h-full w-full"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {Array.from({ length: 4 }).map((_, tileIndex) => {
+                        const imageUrl = previewImages[tileIndex]
+                        return (
+                          <div
+                            key={`${storyboard.id}-coarse-${coarseGroup.groupNumber}-tile-${tileIndex}`}
+                            className="h-20 w-full overflow-hidden rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)]"
+                          >
+                            {imageUrl ? (
+                              <MediaImageWithLoading
+                                src={imageUrl}
+                                alt={`shot-${tileIndex + 1}`}
+                                containerClassName="h-full w-full"
+                                className="h-full w-full object-cover"
+                              />
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  <div
+                    className="mt-3 grid gap-2"
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                    role="group"
+                  >
+                    <div className="rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)] p-2">
+                      <div className="mb-1 text-[11px] font-medium text-[var(--glass-text-tertiary)]">
+                        多宫格分镜提示词
+                      </div>
+                      <div className="max-h-24 cursor-text select-text overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-[var(--glass-text-secondary)]">
+                        {imagePrompt}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)] p-2">
+                      <div className="mb-1 text-[11px] font-medium text-[var(--glass-text-tertiary)]">
+                        视频提示词
+                      </div>
+                      <div className="max-h-24 cursor-text select-text overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-[var(--glass-text-secondary)]">
+                        {videoPrompt}
+                      </div>
+                    </div>
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>

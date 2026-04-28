@@ -12,6 +12,7 @@ import {
   handleLocationImageTask,
   handleModifyAssetImageTask,
   handlePanelImageTask,
+  handleStoryboardGroupImageTask,
   handlePanelVariantTask,
 } from './handlers/image-task-handlers'
 
@@ -39,6 +40,9 @@ async function processImageTask(job: Job<TaskJobData>) {
     case TASK_TYPE.ASSET_HUB_MODIFY:
       return await handleAssetHubModifyTask(job)
     case TASK_TYPE.IMAGE_PANEL:
+      if (job.data.targetType === 'NovelPromotionStoryboard') {
+        return await handleStoryboardGroupImageTask(job)
+      }
       return await handlePanelImageTask(job)
     case TASK_TYPE.PANEL_VARIANT:
       return await handlePanelVariantTask(job)

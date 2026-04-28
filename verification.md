@@ -51,3 +51,17 @@ phase4 续跑沿用现有 reconcile 规则，保留当前分镜的 `description/
 ## 2026-04-27 Progress Text Guard
 
 - TypeScript: `npm run typecheck` passed.
+
+## 2026-04-28 Coarse Grid Storyboard Images
+
+- `npx prisma generate` passed.
+- `npm run typecheck` passed.
+- `npx vitest run tests/unit/worker/panel-image-task-handler.test.ts tests/unit/worker/image-worker.test.ts` passed, 2 files and 7 tests.
+- `npm run lint:all` passed with existing warnings only: 0 errors, 44 warnings.
+- Full unit run was accidentally invoked via `npm run test:unit:all -- panel-image-task-handler image-worker`; changed tests passed, but the full suite had one unrelated existing failure in `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts` because the current request body includes `mode:"all"`.
+- Local database repair: `npx prisma db execute --file prisma/migrations/20260428120000_add_storyboard_coarse_groups/migration.sql --schema prisma/schema.prisma` passed, and `SHOW COLUMNS FROM novel_promotion_storyboards LIKE 'coarseGroupsJson'` confirmed the column exists.
+- Coarse card generate button: `npm run typecheck` passed; `npm run lint:all` passed with existing warnings only.
+- Coarse card prompt display: `npm run typecheck` passed.
+- Coarse card prompt preview before generation: `npm run typecheck` passed.
+- Coarse prompt item naming: `npm run typecheck` passed; `npx vitest run tests/unit/worker/panel-image-task-handler.test.ts` passed.
+- Coarse prompt selectable text interaction: `npm run typecheck` passed; `npm run lint:all` passed with existing warnings only.

@@ -48,6 +48,7 @@ export interface StoryboardLike {
   panels?: PanelLike[]
   imageHistory?: string | null
   storyboardImageUrl: string | null
+  coarseGroupsJson?: string | null
   [key: string]: unknown
 }
 
@@ -199,8 +200,35 @@ export function addSignedUrlsToStoryboard(storyboard: StoryboardLike) {
   return {
     ...storyboard,
     storyboardImageUrl: keyToSignedUrl(storyboard.storyboardImageUrl),
+    coarseGroupsJson: signStoryboardCoarseGroups(storyboard.coarseGroupsJson),
     panels,
     historyCount,
+  }
+}
+
+function signStoryboardCoarseGroups(raw: string | null | undefined) {
+  if (!raw) return raw || null
+  try {
+    const groups = JSON.parse(raw)
+    if (!Array.isArray(groups)) return raw
+    return JSON.stringify(groups.map((group) => {
+      if (!group || typeof group !== 'object') return group
+      const record = group as UnknownRecord
+      const candidateImages = Array.isArray(record.candidateImages)
+        ? record.candidateImages.map((candidate) => (
+          typeof candidate === 'string' && !candidate.startsWith('PENDING:')
+            ? keyToSignedUrl(candidate) || candidate
+            : candidate
+        ))
+        : record.candidateImages
+      return {
+        ...record,
+        imageUrl: typeof record.imageUrl === 'string' ? keyToSignedUrl(record.imageUrl) : record.imageUrl,
+        candidateImages,
+      }
+    }))
+  } catch {
+    return raw
   }
 }
 

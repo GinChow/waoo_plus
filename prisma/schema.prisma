@@ -315,6 +315,7 @@ model NovelPromotionStoryboard {
   updatedAt           DateTime              @default(now()) @updatedAt
   panelCount          Int                   @default(9)
   storyboardTextJson  String?               @db.Text
+  coarseGroupsJson    String?               @db.Text
   imageHistory        String?               @db.Text
   candidateImages     String?               @db.Text
   lastError           String?

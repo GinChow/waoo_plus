@@ -22,7 +22,7 @@ interface UseStoryboardPanelAssetActionsProps {
   getPanelEditData: (panel: StoryboardPanel) => PanelEditData
   updatePanelEdit: (panelId: string, panel: StoryboardPanel, updates: Partial<PanelEditData>) => void
   debouncedSave: (panelId: string, storyboardId: string) => void
-  regeneratePanelImage: (panelId: string, count?: number, force?: boolean) => Promise<void>
+  regenerateStoryboardGroupImage: (storyboardId: string, groupNumber: number, count?: number) => Promise<void>
   modifyPanelImage: (
     storyboardId: string,
     panelIndex: number,
@@ -72,7 +72,7 @@ export function useStoryboardPanelAssetActions({
   getPanelEditData,
   updatePanelEdit,
   debouncedSave,
-  regeneratePanelImage,
+  regenerateStoryboardGroupImage,
   modifyPanelImage,
   addCharacterToPanel,
   removeCharacterFromPanel,
@@ -171,7 +171,7 @@ export function useStoryboardPanelAssetActions({
       sortedStoryboards,
       submittingPanelImageIds,
       getTextPanels,
-      regeneratePanelImage,
+      regenerateStoryboardGroupImage,
       setIsEpisodeBatchSubmitting,
     })
 

@@ -130,6 +130,33 @@ async function attachMediaFieldsToPanel<T extends Record<string, unknown>>(panel
 
 async function attachMediaFieldsToStoryboard<T extends Record<string, unknown>>(storyboard: T) {
   const storyboardImageMedia = await resolveMediaRefFromLegacyValue(storyboard.storyboardImageUrl)
+  let coarseGroupsJson = storyboard.coarseGroupsJson
+  if (typeof storyboard.coarseGroupsJson === 'string' && storyboard.coarseGroupsJson.trim()) {
+    try {
+      const groups = JSON.parse(storyboard.coarseGroupsJson)
+      if (Array.isArray(groups)) {
+        const resolvedGroups = await Promise.all(groups.map(async (group) => {
+          if (!group || typeof group !== 'object') return group
+          const record = group as Record<string, unknown>
+          const imageMedia = await resolveMediaRefFromLegacyValue(record.imageUrl)
+          const candidates = parseStringArray(record.candidateImages)
+          const resolvedCandidates = await Promise.all(candidates.map(async (candidate) => {
+            if (candidate.startsWith('PENDING:')) return candidate
+            const media = await resolveMediaRefFromLegacyValue(candidate)
+            return media?.url || candidate
+          }))
+          return {
+            ...record,
+            imageUrl: imageMedia?.url || record.imageUrl || null,
+            candidateImages: candidates.length > 0 ? resolvedCandidates : record.candidateImages || null,
+          }
+        }))
+        coarseGroupsJson = JSON.stringify(resolvedGroups)
+      }
+    } catch {
+      coarseGroupsJson = storyboard.coarseGroupsJson
+    }
+  }
   const panels = await Promise.all(
     ((storyboard.panels as Array<Record<string, unknown>>) || []).map(attachMediaFieldsToPanel),
   )
@@ -139,6 +166,7 @@ async function attachMediaFieldsToStoryboard<T extends Record<string, unknown>>(
     media: storyboardImageMedia,
     storyboardImageMedia,
     storyboardImageUrl: storyboardImageMedia?.url || storyboard.storyboardImageUrl || null,
+    coarseGroupsJson,
     panels,
   }
 }

@@ -117,7 +117,7 @@ export function useStoryboardImageGeneration({
     setModifyingPanels((previousIds) => reconcileModifyingPanelIds(previousIds, localStoryboards))
   }, [localStoryboards, modifyingPanels.size])
 
-  const { regeneratePanelImage, regenerateAllPanelsIndividually } = usePanelImageRegeneration({
+  const { regeneratePanelImage, regenerateAllPanelsIndividually, regenerateStoryboardGroupImage } = usePanelImageRegeneration({
     localStoryboards,
     setLocalStoryboards,
     submittingPanelImageIds,
@@ -191,6 +191,7 @@ export function useStoryboardImageGeneration({
     setPreviewImage,
     regeneratePanelImage,
     regenerateAllPanelsIndividually,
+    regenerateStoryboardGroupImage,
     selectPanelCandidate: confirmPanelCandidate,
     selectPanelCandidateIndex,
     cancelPanelCandidate,
