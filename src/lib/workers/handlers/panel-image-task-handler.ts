@@ -125,6 +125,48 @@ function upsertCoarseGroupState(params: {
   return JSON.stringify(groups, null, 2)
 }
 
+const COARSE_GROUP_STATE_UPDATE_MAX_ATTEMPTS = 5
+
+async function persistCoarseGroupState(params: {
+  storyboardId: string
+  groupNumber: number
+  imagePrompt: string
+  videoPrompt: string
+  imageUrl: string | null
+  candidateImages: string[] | null
+}) {
+  for (let attempt = 1; attempt <= COARSE_GROUP_STATE_UPDATE_MAX_ATTEMPTS; attempt += 1) {
+    const latest = await prisma.novelPromotionStoryboard.findUnique({
+      where: { id: params.storyboardId },
+      select: { coarseGroupsJson: true },
+    })
+    if (!latest) throw new Error('Storyboard not found')
+
+    const coarseGroupsJson = upsertCoarseGroupState({
+      raw: latest.coarseGroupsJson,
+      groupNumber: params.groupNumber,
+      imagePrompt: params.imagePrompt,
+      videoPrompt: params.videoPrompt,
+      imageUrl: params.imageUrl,
+      candidateImages: params.candidateImages,
+    })
+
+    const result = await prisma.novelPromotionStoryboard.updateMany({
+      where: {
+        id: params.storyboardId,
+        coarseGroupsJson: latest.coarseGroupsJson,
+      },
+      data: {
+        coarseGroupsJson,
+      },
+    })
+
+    if (result.count === 1) return coarseGroupsJson
+  }
+
+  throw new Error('Failed to persist storyboard group image after concurrent updates')
+}
+
 function parseDescriptionList(raw: string | null | undefined): string[] {
   if (!raw) return []
   try {
@@ -695,19 +737,13 @@ export async function handleStoryboardGroupImageTask(job: Job<TaskJobData>) {
   }
 
   await assertTaskActive(job, 'persist_storyboard_group_image')
-  const coarseGroupsJson = upsertCoarseGroupState({
-    raw: storyboard.coarseGroupsJson,
+  await persistCoarseGroupState({
+    storyboardId: storyboard.id,
     groupNumber,
     imagePrompt,
     videoPrompt,
     imageUrl: candidates[0] || null,
     candidateImages: candidateCount > 1 ? candidates : null,
-  })
-  await prisma.novelPromotionStoryboard.update({
-    where: { id: storyboard.id },
-    data: {
-      coarseGroupsJson,
-    },
   })
 
   return {

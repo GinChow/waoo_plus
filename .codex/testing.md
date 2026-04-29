@@ -142,6 +142,21 @@ phase4 续跑沿用现有 reconcile 规则，保留当前分镜的 `description/
   - Result: passed with existing warnings.
   - Notes: 0 errors, 43 warnings. Warnings are unrelated existing unused variable / hook dependency warnings.
 
+## 2026-04-29 Storyboard Coarse Group Concurrent Persist
+
+- `npx vitest run tests/unit/worker/panel-image-task-handler.test.ts`
+  - Result: passed.
+  - Coverage: 1 file, 13 tests.
+  - Focus: coarse group image persistence merges against latest `coarseGroupsJson` so concurrent storyboard group tasks do not overwrite each other's generated images with stale snapshots.
+
+- `npm run typecheck`
+  - Result: passed.
+
+- `npm run test:unit:all -- tests/unit/worker/panel-image-task-handler.test.ts`
+  - Result: failed because the npm script also ran the whole `tests/unit` suite.
+  - Relevant changed test file passed in that run.
+  - Unrelated failure: `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts` expected request body `{"async":true}`, actual body included `{"async":true,"mode":"all"}`.
+
 ## 2026-04-29 Yunwu GPT Image 2 Compat Route
 
 - `npm run typecheck`

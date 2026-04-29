@@ -10,6 +10,7 @@ const prismaMock = vi.hoisted(() => ({
   novelPromotionStoryboard: {
     findUnique: vi.fn(),
     update: vi.fn(async () => ({})),
+    updateMany: vi.fn(async () => ({ count: 1 })),
   },
 }))
 
@@ -396,12 +397,12 @@ describe('worker panel-image-task-handler behavior', () => {
         multi_panel_image_prompt: expect.not.stringContaining('结构化粗镜头数据'),
       }),
     }))
-    const updateCalls = prismaMock.novelPromotionStoryboard.update.mock.calls as unknown as Array<[{
-      where: { id: string }
+    const updateManyCalls = prismaMock.novelPromotionStoryboard.updateMany.mock.calls as unknown as Array<[{
+      where: { id: string; coarseGroupsJson: string | null }
       data: { coarseGroupsJson: string }
     }]>
-    const updateCall = updateCalls[0][0]
-    expect(updateCall.where).toEqual({ id: 'storyboard-1' })
+    const updateCall = updateManyCalls[0][0]
+    expect(updateCall.where).toEqual({ id: 'storyboard-1', coarseGroupsJson: null })
     const stored = JSON.parse(updateCall.data.coarseGroupsJson)
     expect(stored[0].groupNumber).toBe(1)
     expect(stored[0].imagePrompt).toContain('panel anchor prompt')
@@ -409,6 +410,85 @@ describe('worker panel-image-task-handler behavior', () => {
     expect(stored[0].videoPrompt).toContain('[0.00秒]dramatic')
     expect(stored[0].videoPrompt).toContain('[0.50秒]rain walk')
     expect(stored[0].imageUrl).toBe('cos/storyboard-group-1.png')
+  })
+
+  it('storyboard group generation -> merges with latest coarseGroupsJson to avoid concurrent stale overwrite', async () => {
+    utilsMock.resolveImageSourceFromGeneration.mockReset()
+    utilsMock.uploadImageSourceToCos.mockReset()
+    utilsMock.resolveImageSourceFromGeneration.mockResolvedValueOnce('generated-group-source')
+    utilsMock.uploadImageSourceToCos.mockResolvedValueOnce('cos/storyboard-group-1-new.png')
+
+    const staleStartSnapshot = {
+      id: 'storyboard-1',
+      storyboardTextJson: JSON.stringify([[1, 1], [2, 1], [3, 2]]),
+      coarseGroupsJson: JSON.stringify([
+        {
+          groupNumber: 1,
+          imagePrompt: 'old group 1 prompt',
+          videoPrompt: 'old group 1 video',
+          imageUrl: 'cos/storyboard-group-1-old.png',
+          candidateImages: null,
+          updatedAt: '2026-04-29T00:00:00.000Z',
+        },
+        {
+          groupNumber: 2,
+          imagePrompt: 'old group 2 prompt',
+          videoPrompt: 'old group 2 video',
+          imageUrl: 'cos/storyboard-group-2-old.png',
+          candidateImages: null,
+          updatedAt: '2026-04-29T00:00:00.000Z',
+        },
+      ]),
+      panels: [
+        ...buildGroupPanels(2),
+        {
+          ...buildGroupPanels(1)[0],
+          id: 'panel-3',
+          panelIndex: 2,
+          panelNumber: 3,
+          description: 'other group panel',
+        },
+      ],
+    }
+    const latestSnapshotAfterAnotherTask = JSON.stringify([
+      {
+        groupNumber: 1,
+        imagePrompt: 'old group 1 prompt',
+        videoPrompt: 'old group 1 video',
+        imageUrl: 'cos/storyboard-group-1-old.png',
+        candidateImages: null,
+        updatedAt: '2026-04-29T00:00:00.000Z',
+      },
+      {
+        groupNumber: 2,
+        imagePrompt: 'new group 2 prompt',
+        videoPrompt: 'new group 2 video',
+        imageUrl: 'cos/storyboard-group-2-new.png',
+        candidateImages: null,
+        updatedAt: '2026-04-29T00:01:00.000Z',
+      },
+    ])
+
+    prismaMock.novelPromotionStoryboard.findUnique
+      .mockResolvedValueOnce(staleStartSnapshot)
+      .mockResolvedValueOnce({ coarseGroupsJson: latestSnapshotAfterAnotherTask })
+
+    const job = buildJob({ storyboardId: 'storyboard-1', groupNumber: 1, candidateCount: 1 }, 'storyboard-1')
+    await handleStoryboardGroupImageTask(job)
+
+    const updateManyCalls = prismaMock.novelPromotionStoryboard.updateMany.mock.calls as unknown as Array<[{
+      where: { id: string; coarseGroupsJson: string | null }
+      data: { coarseGroupsJson: string }
+    }]>
+    const persisted = JSON.parse(updateManyCalls[0][0].data.coarseGroupsJson)
+    expect(updateManyCalls[0][0].where).toEqual({
+      id: 'storyboard-1',
+      coarseGroupsJson: latestSnapshotAfterAnotherTask,
+    })
+    expect(persisted.find((group: { groupNumber: number }) => group.groupNumber === 1)?.imageUrl)
+      .toBe('cos/storyboard-group-1-new.png')
+    expect(persisted.find((group: { groupNumber: number }) => group.groupNumber === 2)?.imageUrl)
+      .toBe('cos/storyboard-group-2-new.png')
   })
 
   it.each([

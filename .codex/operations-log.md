@@ -56,3 +56,7 @@
 - 2026-04-29 Codex: 根据运行日志 `Unknown parameter: 'image'` 继续修复 `openai-compatible:*::gpt-image-2` 且 baseUrl 为 `yunwu.ai` 的配置，强制绕过 compat template，改道到 yunwu 官方 multipart generator，同时保留原 provider id 读取用户密钥。
 - 2026-04-29 Codex: 根据运行日志 `YUNWU_IMAGE_OPTION_UNSUPPORTED: customEndpoint` 继续修复，允许 yunwu 图片生成器接收模型级 `customEndpoint`，并用它参与 baseUrl 规范化。
 - 2026-04-29 Codex: 根据反馈修正粗镜头多宫格图片生成 size 推导。`resolveStoryboardGroupImageSize` 现在基于最终整张分镜图应用 gpt-image-2 约束：最长边 <=3840、两边 16 倍数、长短边 <=3:1、总像素 655360..8294400；同时按 `panel_layout`、`aspect_ratio` 和 16px 黑色分隔线推导尺寸，必要时用黑色外边距补足短边。
+- 2026-04-29 Codex: 分析并修复粗镜头多宫格图并发生成时新图被旧图覆盖的问题；sequential-thinking、shrimp-task-manager、code-index MCP 工具当前不可用，降级使用 `rg`、`sed`、`update_plan` 和本地测试。
+- 2026-04-29 Codex: 根因是 `handleStoryboardGroupImageTask` 在任务开始时读取 `coarseGroupsJson`，生成完成后基于旧快照整体写回，多个粗镜头并发完成时会丢失其他任务刚写入的新图。
+- 2026-04-29 Codex: 将粗镜头结果持久化改为保存前读取最新 `coarseGroupsJson`，通过 `updateMany where id + coarseGroupsJson` 做 CAS 合并写入，冲突时最多重试 5 次，避免旧快照覆盖新结果。
+- 2026-04-29 Codex: 新增 worker 回归测试，覆盖“任务启动快照旧、保存前数据库已有其他粗镜头新图”的场景，确认两个粗镜头的新图都会保留。
