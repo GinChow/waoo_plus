@@ -158,16 +158,21 @@ export function useStoryboardTaskAwareStoryboards({
           ? episodeTaskState
           : storyboardTaskState || episodeTaskState || null
       const storyboardImageTaskState = storyboardImageStates.getTaskState(`storyboard-image:${storyboard.id}`)
+      const isTextTaskRunning =
+        isRunningPhase(storyboardTaskState?.phase) ||
+        isRunningPhase(episodeTaskState?.phase)
+      const isImageTaskRunning = isRunningPhase(storyboardImageTaskState?.phase)
       const activeStoryboardTaskState = isRunningPhase(storyboardImageTaskState?.phase)
         ? storyboardImageTaskState
         : activeTextTaskState
 
       return {
         ...storyboard,
-        storyboardTaskRunning:
-          isRunningPhase(storyboardTaskState?.phase) ||
-          isRunningPhase(episodeTaskState?.phase) ||
-          isRunningPhase(storyboardImageTaskState?.phase),
+        storyboardTaskRunning: isTextTaskRunning || isImageTaskRunning,
+        storyboardTextTaskRunning: isTextTaskRunning,
+        storyboardImageTaskRunning: isImageTaskRunning,
+        storyboardImageTaskGroupNumber: storyboardImageTaskState?.groupNumber ?? null,
+        storyboardImageTaskGroups: storyboardImageTaskState?.activeGroupTasks || [],
         storyboardTaskProgress: activeStoryboardTaskState?.progress ?? null,
         storyboardTaskStageLabel: activeStoryboardTaskState?.stageLabel ?? null,
         storyboardTaskMessage: activeStoryboardTaskState?.message ?? null,

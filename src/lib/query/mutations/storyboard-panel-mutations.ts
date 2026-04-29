@@ -42,6 +42,7 @@ export function useRegenerateProjectPanelImage(projectId: string) {
                 targetType: 'panelId' in payload ? 'NovelPromotionPanel' : 'NovelPromotionStoryboard',
                 targetId: 'panelId' in payload ? payload.panelId : payload.storyboardId,
                 intent: 'regenerate',
+                ...('groupNumber' in payload ? { groupNumber: payload.groupNumber } : {}),
             })
         },
         onError: (_error, payload) => {

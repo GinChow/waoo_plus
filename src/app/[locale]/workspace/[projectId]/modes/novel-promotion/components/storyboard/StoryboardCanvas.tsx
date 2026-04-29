@@ -151,7 +151,7 @@ export default function StoryboardCanvas({
         const isSelectingCandidate = selectingCandidateIds.has(storyboard.id)
         const isSubmittingStoryboardTextTask =
           submittingStoryboardTextIds.has(storyboard.id) ||
-          Boolean(storyboard.storyboardTaskRunning)
+          Boolean(storyboard.storyboardTextTaskRunning)
         const hasAnyImage = textPanels.some((panel) => panel.imageUrl)
         const failedError = storyboard.lastError ?? null
 

@@ -98,7 +98,8 @@ export const POST = apiHandler(async (
     targetId: isStoryboardGroupTask ? storyboardId : panelId,
     payload: withTaskUiPayload(billingPayload, {
       intent: 'regenerate',
-      hasOutputAtStart}),
+      hasOutputAtStart,
+      ...(isStoryboardGroupTask ? { groupNumber } : {})}),
     dedupeKey: isStoryboardGroupTask
       ? `image_storyboard_group:${storyboardId}:${groupNumber}:${candidateCount}`
       : `image_panel:${panelId}:${candidateCount}`,

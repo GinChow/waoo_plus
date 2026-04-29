@@ -98,6 +98,64 @@ phase4 续跑沿用现有 reconcile 规则，保留当前分镜的 `description/
 - `npx prisma generate`
   - Result: passed.
 
+## 2026-04-29 Yunwu GPT Image 2
+
+- `npm run test:unit:all -- --run tests/unit/generators/yunwu-image.test.ts tests/unit/generator-api.test.ts tests/unit/generators/openai-compatible-image.test.ts`
+  - Result: failed as a command choice because the npm script still ran the whole `tests/unit` suite.
+  - Relevant changed tests passed inside the run.
+  - Unrelated failure: `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts` expected request body `{"async":true}`, actual body included `{"async":true,"mode":"all"}`.
+  - Sandbox noise: Redis connection attempts to `127.0.0.1:16379` emitted `EPERM`.
+
+- `npx vitest run tests/unit/generators/yunwu-image.test.ts tests/unit/generator-api.test.ts tests/unit/generators/openai-compatible-image.test.ts`
+  - Result: passed.
+  - Coverage: 3 files, 17 tests.
+  - Focus: yunwu image endpoint normalization, multipart payload, choices/data response extraction, generator-api routing.
+
+- `npm run typecheck`
+  - Result: passed.
+
+- `npm run lint:all`
+  - Result: passed with existing warnings.
+  - Notes: 0 errors, 43 warnings. Warnings are unrelated existing unused variable / hook dependency warnings.
+
+## 2026-04-29 Yunwu Custom Endpoint
+
+- `npm run typecheck`
+  - Result: passed.
+
+- `npx vitest run tests/unit/generators/yunwu-image.test.ts tests/unit/generator-api.test.ts`
+  - Result: passed.
+  - Coverage: 2 files, 15 tests.
+  - Focus: yunwu image generator accepts model-level `customEndpoint` and normalizes duplicate `/v1` image edit paths.
+
+## 2026-04-29 Storyboard Group Image Size
+
+- `npm run typecheck`
+  - Result: passed.
+
+- `npx vitest run tests/unit/worker/panel-image-task-handler.test.ts tests/unit/generators/yunwu-image.test.ts`
+  - Result: passed.
+  - Coverage: 2 files, 15 tests.
+  - Focus: final storyboard sheet size respects gpt-image-2 size constraints and accounts for panel layout, aspect ratio, and black separator width.
+
+- `npm run lint:all`
+  - Result: passed with existing warnings.
+  - Notes: 0 errors, 43 warnings. Warnings are unrelated existing unused variable / hook dependency warnings.
+
+## 2026-04-29 Yunwu GPT Image 2 Compat Route
+
+- `npm run typecheck`
+  - Result: passed.
+
+- `npx vitest run tests/unit/generator-api.test.ts tests/unit/generators/yunwu-image.test.ts tests/unit/generators/openai-compatible-image.test.ts`
+  - Result: passed.
+  - Coverage: 3 files, 18 tests.
+  - Focus: openai-compatible provider with `https://yunwu.ai/v1` baseUrl and `gpt-image-2` bypasses compat template and routes to yunwu official generator.
+
+- `npm run lint:all`
+  - Result: passed with existing warnings.
+  - Notes: 0 errors, 43 warnings. Warnings are unrelated existing unused variable / hook dependency warnings.
+
 ## 2026-04-28 Coarse Card Generate Button
 
 - `npm run typecheck`

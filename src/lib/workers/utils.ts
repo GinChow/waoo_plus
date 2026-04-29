@@ -183,6 +183,7 @@ export async function resolveImageSourceFromGeneration(
       aspectRatio?: string
       resolution?: string
       size?: string
+      quality?: string
       provider?: string
     }
     allowTaskExternalIdResume?: boolean
@@ -357,6 +358,7 @@ export async function resolveImageSourcesFromGeneration(
       aspectRatio?: string
       resolution?: string
       size?: string
+      quality?: string
       provider?: string
     }
     allowTaskExternalIdResume?: boolean

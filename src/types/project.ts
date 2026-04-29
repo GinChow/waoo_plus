@@ -209,6 +209,19 @@ export interface NovelPromotionStoryboard {
   storyboardImageUrl: string | null
   media?: MediaRef | null
   storyboardTaskRunning?: boolean
+  storyboardTextTaskRunning?: boolean
+  storyboardImageTaskRunning?: boolean
+  storyboardImageTaskGroupNumber?: number | null
+  storyboardImageTaskGroups?: Array<{
+    taskId: string
+    groupNumber: number
+    progress: number | null
+    stage: string | null
+    stageLabel: string | null
+    message: string | null
+    stepTitle: string | null
+    updatedAt: string | null
+  }>
   storyboardTaskProgress?: number | null
   storyboardTaskStageLabel?: string | null
   storyboardTaskMessage?: string | null

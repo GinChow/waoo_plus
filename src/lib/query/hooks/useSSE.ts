@@ -161,6 +161,11 @@ export function useSSE({ projectId, episodeId, enabled = true, onEvent }: UseSSE
           typeof payloadUi?.hasOutputAtStart === 'boolean'
             ? payloadUi.hasOutputAtStart
             : null
+        const groupNumberRaw = eventPayload?.groupNumber ?? payloadUi?.groupNumber
+        const groupNumber =
+          typeof groupNumberRaw === 'number' && Number.isFinite(groupNumberRaw)
+            ? Math.floor(groupNumberRaw)
+            : null
 
         applyTaskLifecycleToOverlay(queryClient, {
           projectId,
@@ -179,6 +184,7 @@ export function useSSE({ projectId, episodeId, enabled = true, onEvent }: UseSSE
           stepIndex: typeof eventPayload?.stepIndex === 'number' ? Math.floor(eventPayload.stepIndex) : null,
           stepTotal: typeof eventPayload?.stepTotal === 'number' ? Math.floor(eventPayload.stepTotal) : null,
           stepAttempt: typeof eventPayload?.stepAttempt === 'number' ? Math.floor(eventPayload.stepAttempt) : null,
+          groupNumber,
           eventTs: typeof payload.ts === 'string' ? payload.ts : null,
         })
 

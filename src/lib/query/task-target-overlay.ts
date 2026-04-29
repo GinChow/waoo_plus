@@ -23,6 +23,17 @@ export type TaskTargetOverlayState = {
   stepIndex: number | null
   stepTotal: number | null
   stepAttempt: number | null
+  groupNumber: number | null
+  activeGroupTasks?: Array<{
+    taskId: string
+    groupNumber: number
+    progress: number | null
+    stage: string | null
+    stageLabel: string | null
+    message: string | null
+    stepTitle: string | null
+    updatedAt: string | null
+  }>
   updatedAt: string | null
   lastError: null
   expiresAt: number
@@ -79,6 +90,7 @@ export function upsertTaskTargetOverlay(
     stepIndex?: number | null
     stepTotal?: number | null
     stepAttempt?: number | null
+    groupNumber?: number | null
     updatedAt?: string | null
   },
 ) {
@@ -94,6 +106,22 @@ export function upsertTaskTargetOverlay(
         || buildOptimisticTaskId(params.targetType, params.targetId, now)
       const runningTaskType = normalizeOptionalString(params.runningTaskType)
         || normalizeOptionalString(existing?.runningTaskType)
+      const groupNumber = normalizeOptionalPositiveInteger(params.groupNumber)
+      const activeGroupTasks = groupNumber
+        ? [
+          ...(existing?.activeGroupTasks || []).filter((task) => task.groupNumber !== groupNumber),
+          {
+            taskId: runningTaskId,
+            groupNumber,
+            progress: params.progress ?? null,
+            stage: params.stage ?? null,
+            stageLabel: params.stageLabel ?? null,
+            message: params.message ?? null,
+            stepTitle: params.stepTitle ?? null,
+            updatedAt: params.updatedAt || new Date(now).toISOString(),
+          },
+        ]
+        : existing?.activeGroupTasks || []
       next[key] = {
         targetType: params.targetType,
         targetId: params.targetId,
@@ -110,6 +138,8 @@ export function upsertTaskTargetOverlay(
         stepIndex: normalizeOptionalPositiveInteger(params.stepIndex),
         stepTotal: normalizeOptionalPositiveInteger(params.stepTotal),
         stepAttempt: normalizeOptionalPositiveInteger(params.stepAttempt),
+        groupNumber,
+        activeGroupTasks,
         updatedAt: params.updatedAt || new Date(now).toISOString(),
         lastError: null,
         expiresAt: now + TASK_TARGET_OVERLAY_TTL_MS,
@@ -158,6 +188,7 @@ export function applyTaskLifecycleToOverlay(
     stepIndex?: number | null
     stepTotal?: number | null
     stepAttempt?: number | null
+    groupNumber?: number | null
     eventTs: string | null
   },
 ) {
@@ -180,6 +211,7 @@ export function applyTaskLifecycleToOverlay(
       stepIndex: params.stepIndex,
       stepTotal: params.stepTotal,
       stepAttempt: params.stepAttempt,
+      groupNumber: params.groupNumber,
       updatedAt: params.eventTs,
     })
     return
@@ -203,6 +235,7 @@ export function applyTaskLifecycleToOverlay(
       stepIndex: params.stepIndex,
       stepTotal: params.stepTotal,
       stepAttempt: params.stepAttempt,
+      groupNumber: params.groupNumber,
       updatedAt: params.eventTs,
     })
     return

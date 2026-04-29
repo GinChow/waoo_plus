@@ -1,0 +1,41 @@
+{
+  "date": "2026-04-29",
+  "executor": "Codex",
+  "task": "修复 yunwu provider 调用 gpt-image-2 图片编辑失败",
+  "toolFallbacks": {
+    "sequentialThinking": "当前会话未暴露 sequential-thinking MCP 工具，降级为本地代码检索和内置推理。",
+    "shrimpTaskManager": "当前会话未暴露 shrimp-task-manager MCP 工具，降级为直接任务拆解。",
+    "codeIndex": "当前会话未暴露 code-index MCP 工具，使用 rg/sed 检索。"
+  },
+  "scan": {
+    "location": [
+      "src/lib/generator-api.ts",
+      "src/lib/generators/factory.ts",
+      "src/lib/model-gateway/openai-compat/image.ts",
+      "src/lib/generators/image/openai-compatible.ts"
+    ],
+    "currentBehavior": "yunwu 图片模型按 official 路由进入 createImageGenerator，但 factory 没有 yunwu 图片生成器；OpenAI compatible image 分支只适合 openai-compatible provider，并且标准 OpenAI SDK 响应解析只读取 data[]。",
+    "referenceScriptFindings": [
+      "yunwu gpt-image-2 图片编辑接口为 POST https://yunwu.ai/v1/images/edits。",
+      "请求使用 multipart FormData，字段包括 model、prompt、image、n、quality、response_format、size。",
+      "认证头为 Authorization: Bearer <key>。",
+      "响应可能是 OpenAI image data[]，也可能在 choices[].message.content 内返回 JSON、URL 或 base64。"
+    ],
+    "similarImplementations": [
+      "src/lib/generators/image/openai-compatible.ts 使用 BaseImageGenerator 包装 model gateway。",
+      "src/lib/generators/image/gemini-compatible.ts 处理 provider 自定义 baseUrl 和参考图注入。",
+      "src/lib/generators/ark.ts 使用 provider 专用官方图片生成器和 option 白名单。"
+    ],
+    "verificationPlan": [
+      "新增 yunwu 图片生成器单元测试，覆盖 endpoint、FormData 字段、choices 内容解析。",
+      "新增 generator-api 路由测试，确认 yunwu 图片走 official provider generator。",
+      "执行 typecheck、focused vitest、lint。"
+    ]
+  },
+  "sufficiencyCheck": {
+    "interfaceContractKnown": true,
+    "technicalChoiceUnderstood": true,
+    "majorRisksIdentified": true,
+    "verificationKnown": true
+  }
+}

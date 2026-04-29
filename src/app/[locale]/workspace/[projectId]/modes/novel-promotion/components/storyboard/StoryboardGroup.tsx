@@ -224,14 +224,14 @@ export default function StoryboardGroup({
         hasOutput: true,
       })
     }
-    if (!isSubmittingStoryboardTask && !isSelectingCandidate) return null
+    if (!isSelectingCandidate) return null
     return resolveTaskPresentationState({
       phase: 'processing',
-      intent: isSelectingCandidate ? 'process' : hasAnyImage ? 'regenerate' : 'generate',
+      intent: 'process',
       resource: 'image',
       hasOutput: hasAnyImage,
     })
-  }, [hasAnyImage, isSelectingCandidate, isSubmittingStoryboardTask, isSubmittingStoryboardTextTask])
+  }, [hasAnyImage, isSelectingCandidate, isSubmittingStoryboardTextTask])
 
   const resolveProgressText = useCallback((value: string | null | undefined) => {
     if (!value) return null
@@ -303,7 +303,7 @@ export default function StoryboardGroup({
         />
       )}
 
-      {(isSubmittingStoryboardTextTask || isSubmittingStoryboardTask || isSelectingCandidate) && (
+      {(isSubmittingStoryboardTextTask || isSelectingCandidate) && (
         <TaskStatusOverlay
           state={groupOverlayState}
           detailLabel={textTaskDetailLabel}
@@ -367,6 +367,22 @@ export default function StoryboardGroup({
             {coarseGroups.map((coarseGroup) => {
               const coarseGroupState = coarseGroupStates.get(coarseGroup.groupNumber) || null
               const generatedImageUrl = coarseGroupState?.imageUrl || null
+              const coarseGroupTask = (storyboard.storyboardImageTaskGroups || [])
+                .find((task) => task.groupNumber === coarseGroup.groupNumber) || null
+              const isGeneratingCoarseGroup =
+                Boolean(coarseGroupTask) ||
+                (
+                  Boolean(storyboard.storyboardImageTaskRunning) &&
+                  storyboard.storyboardImageTaskGroupNumber === coarseGroup.groupNumber
+                )
+              const coarseGroupOverlayState = isGeneratingCoarseGroup
+                ? resolveTaskPresentationState({
+                  phase: 'processing',
+                  intent: generatedImageUrl ? 'regenerate' : 'generate',
+                  resource: 'image',
+                  hasOutput: Boolean(generatedImageUrl),
+                })
+                : null
               const imagePrompt = coarseGroupState?.imagePrompt || buildPreviewImagePrompt(coarseGroup.panels)
               const videoPrompt = coarseGroupState?.videoPrompt || buildPreviewVideoPrompt(coarseGroup.panels)
               const previewImages = coarseGroup.panels
@@ -385,8 +401,22 @@ export default function StoryboardGroup({
                       setActiveCoarseGroupNumber(coarseGroup.groupNumber)
                     }
                   }}
-                  className="glass-surface-soft p-3 text-left hover:bg-[var(--glass-bg-muted)] transition-colors"
+                  className="glass-surface-soft relative overflow-hidden p-3 text-left hover:bg-[var(--glass-bg-muted)] transition-colors"
                 >
+                  {isGeneratingCoarseGroup && (
+                      <TaskStatusOverlay
+                        state={coarseGroupOverlayState}
+                      detailLabel={resolveProgressText(coarseGroupTask?.stepTitle)
+                        || resolveProgressText(coarseGroupTask?.message)
+                        || resolveProgressText(coarseGroupTask?.stageLabel)
+                        || textTaskDetailLabel}
+                      progress={coarseGroupTask?.progress ?? storyboard.storyboardTaskProgress}
+                      progressLabel={typeof coarseGroupTask?.progress === 'number'
+                        ? `${coarseGroupTask.progress}%`
+                        : textTaskProgressLabel}
+                        className="z-10 rounded-lg bg-[var(--glass-bg-surface-modal)]/80"
+                      />
+                  )}
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-sm font-semibold text-[var(--glass-text-primary)]">
                       {t('group.coarseShotTitle', { number: coarseGroup.groupNumber })}
@@ -408,12 +438,27 @@ export default function StoryboardGroup({
                     </div>
                   </div>
                   {generatedImageUrl ? (
-                    <div className="h-44 w-full overflow-hidden rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)]">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className="h-44 w-full overflow-hidden rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)]"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onPreviewImage(generatedImageUrl)
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Enter' && event.key !== ' ') return
+                        event.preventDefault()
+                        event.stopPropagation()
+                        onPreviewImage(generatedImageUrl)
+                      }}
+                    >
                       <MediaImageWithLoading
                         src={generatedImageUrl}
                         alt={`coarse-shot-${coarseGroup.groupNumber}`}
                         containerClassName="h-full w-full"
-                        className="h-full w-full object-cover"
+                        className="h-full w-full cursor-zoom-in object-cover"
+                        title={t('image.clickToPreview')}
                       />
                     </div>
                   ) : (

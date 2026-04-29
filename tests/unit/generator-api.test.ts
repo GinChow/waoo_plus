@@ -162,6 +162,77 @@ describe('generator-api gateway routing', () => {
     expect(result).toEqual({ success: true, imageUrl: 'official-image' })
   })
 
+  it('routes yunwu image requests to official provider generator', async () => {
+    resolveModelSelectionMock.mockResolvedValueOnce({
+      provider: 'yunwu',
+      modelId: 'gpt-image-2',
+      modelKey: 'yunwu::gpt-image-2',
+      mediaType: 'image',
+    })
+    getProviderConfigMock.mockResolvedValueOnce({
+      id: 'yunwu',
+      name: 'Yunwu',
+      apiKey: 'yunwu-key',
+      baseUrl: 'https://yunwu.ai',
+      apiMode: undefined,
+      gatewayRoute: undefined,
+    })
+
+    const result = await generateImage(
+      'user-1',
+      'yunwu::gpt-image-2',
+      'edit cat',
+      { referenceImages: ['data:image/png;base64,QQ=='], size: '1024x1024' },
+    )
+
+    expect(createImageGeneratorMock).toHaveBeenCalledWith('yunwu', 'gpt-image-2')
+    expect(generateImageViaOpenAICompatMock).not.toHaveBeenCalled()
+    expect(result).toEqual({ success: true, imageUrl: 'official-image' })
+  })
+
+  it('routes openai-compatible yunwu gpt-image-2 image requests to yunwu official generator', async () => {
+    resolveModelSelectionMock.mockResolvedValueOnce({
+      provider: 'openai-compatible:yunwu-1',
+      modelId: 'gpt-image-2',
+      modelKey: 'openai-compatible:yunwu-1::gpt-image-2',
+      mediaType: 'image',
+      compatMediaTemplate: {
+        version: 1,
+        mediaType: 'image',
+        mode: 'sync',
+        create: { method: 'POST', path: '/v1/images/edits' },
+        response: { outputUrlPath: 'data[0].url' },
+      },
+    })
+    getProviderConfigMock.mockResolvedValueOnce({
+      id: 'openai-compatible:yunwu-1',
+      name: 'Yunwu Compat',
+      apiKey: 'yunwu-key',
+      baseUrl: 'https://yunwu.ai/v1',
+      apiMode: undefined,
+      gatewayRoute: 'openai-compat',
+    })
+    resolveModelGatewayRouteMock.mockReturnValueOnce('openai-compat')
+
+    const result = await generateImage(
+      'user-1',
+      'openai-compatible:yunwu-1::gpt-image-2',
+      'edit cat',
+      { referenceImages: ['data:image/png;base64,QQ=='], aspectRatio: '16:9' },
+    )
+
+    expect(createImageGeneratorMock).toHaveBeenCalledWith('yunwu', 'gpt-image-2')
+    expect(imageGeneratorGenerateMock).toHaveBeenCalledWith(expect.objectContaining({
+      options: expect.objectContaining({
+        provider: 'openai-compatible:yunwu-1',
+        modelId: 'gpt-image-2',
+        modelKey: 'openai-compatible:yunwu-1::gpt-image-2',
+      }),
+    }))
+    expect(generateImageViaOpenAICompatTemplateMock).not.toHaveBeenCalled()
+    expect(result).toEqual({ success: true, imageUrl: 'official-image' })
+  })
+
   it('routes openai-compatible video requests to openai-compat gateway', async () => {
     resolveModelSelectionMock.mockResolvedValueOnce({
       provider: 'openai-compatible:oa-1',

@@ -26,6 +26,17 @@ export type TaskTargetState = {
   stepIndex: number | null
   stepTotal: number | null
   stepAttempt: number | null
+  groupNumber: number | null
+  activeGroupTasks?: Array<{
+    taskId: string
+    groupNumber: number
+    progress: number | null
+    stage: string | null
+    stageLabel: string | null
+    message: string | null
+    stepTitle: string | null
+    updatedAt: string | null
+  }>
   lastError: {
     code: string
     message: string
@@ -84,6 +95,7 @@ export function extractTaskStateFields(task: {
     stepIndex: toPositiveInteger(payload?.stepIndex),
     stepTotal: toPositiveInteger(payload?.stepTotal),
     stepAttempt: toPositiveInteger(payload?.stepAttempt),
+    groupNumber: toPositiveInteger(payload?.groupNumber ?? payloadUi?.groupNumber),
     hasOutputAtStart: asBoolean(payloadUi?.hasOutputAtStart),
     intent: coerceTaskIntent(payloadUi?.intent ?? payload?.intent, task.type),
     progress: toProgress(task.progress),
@@ -119,9 +131,37 @@ export function buildIdleState(target: TaskTargetQuery): TaskTargetState {
     stepIndex: null,
     stepTotal: null,
     stepAttempt: null,
+    groupNumber: null,
+    activeGroupTasks: [],
     lastError: null,
     updatedAt: null,
   }
+}
+
+function buildActiveGroupTasks(tasks: Array<{
+  id: string
+  type: string
+  status: string
+  progress: number
+  payload: unknown
+  updatedAt: Date
+}>) {
+  return tasks
+    .filter((task) => ACTIVE_STATUS.has(task.status))
+    .flatMap((task) => {
+      const fields = extractTaskStateFields(task)
+      if (!fields.groupNumber) return []
+      return [{
+        taskId: task.id,
+        groupNumber: fields.groupNumber,
+        progress: fields.progress,
+        stage: fields.stage,
+        stageLabel: fields.stageLabel,
+        message: fields.message,
+        stepTitle: fields.stepTitle,
+        updatedAt: task.updatedAt.toISOString(),
+      }]
+    })
 }
 
 export function resolveTargetState(
@@ -153,6 +193,7 @@ export function resolveTargetState(
   if (!latest) return buildIdleState(target)
 
   const latestFields = extractTaskStateFields(latest)
+  const activeGroupTasks = buildActiveGroupTasks(filtered)
 
   if (running) {
     const runningFields = extractTaskStateFields(running)
@@ -172,6 +213,8 @@ export function resolveTargetState(
       stepIndex: runningFields.stepIndex,
       stepTotal: runningFields.stepTotal,
       stepAttempt: runningFields.stepAttempt,
+      groupNumber: runningFields.groupNumber,
+      activeGroupTasks,
       lastError: null,
       updatedAt: running.updatedAt.toISOString(),
     }
@@ -194,6 +237,8 @@ export function resolveTargetState(
       stepIndex: latestFields.stepIndex,
       stepTotal: latestFields.stepTotal,
       stepAttempt: latestFields.stepAttempt,
+      groupNumber: latestFields.groupNumber,
+      activeGroupTasks,
       lastError: null,
       updatedAt: latest.updatedAt.toISOString(),
     }
@@ -215,6 +260,8 @@ export function resolveTargetState(
     stepIndex: latestFields.stepIndex,
     stepTotal: latestFields.stepTotal,
     stepAttempt: latestFields.stepAttempt,
+    groupNumber: latestFields.groupNumber,
+    activeGroupTasks,
     lastError: normalizeFailedError(latest),
     updatedAt: latest.updatedAt.toISOString(),
   }

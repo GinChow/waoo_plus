@@ -123,3 +123,28 @@ Pass.
 ## 2026-04-27 Phase Start Residual Risk
 
 - phase4 续跑沿用既有 reconcile 规则，不覆盖 `description/source_text`，主要刷新视频提示词、首帧提示、时长、镜头/运镜等 detail 字段。
+# 2026-04-29 Yunwu GPT Image 2 Review
+
+- Executor: Codex
+- Scope: `yunwu::gpt-image-2` image edit provider path.
+- Technical score: 92/100.
+- Strategic score: 91/100.
+- Overall score: 92/100.
+- Recommendation: pass.
+
+## Findings
+
+- No blocking findings in the scoped changes.
+- Residual risk: live yunwu behavior was inferred from the provided unit script and covered with mocked local tests; no real API call was executed because credentials/network access are not part of this validation turn.
+
+## Evidence
+
+- Added provider-specific implementation instead of changing shared OpenAI compatible behavior.
+- Local validation passed: typecheck, focused vitest, lint.
+- Full unit suite was accidentally invoked through the project script and surfaced one unrelated existing assertion failure in `project-global-analyze-mutation`.
+
+## Follow-up Fix 2026-04-29 14:40 CST
+
+- Finding: runtime log showed the actual configured model was still using `openai-compatible` template routing, causing `template-image.ts` to send JSON `image` and fail with `Unknown parameter: 'image'`.
+- Resolution: `generator-api` now detects `providerKey=openai-compatible`, `modelId=gpt-image-2`, and `baseUrl` host `yunwu.ai`, then forces official yunwu image generator routing.
+- Verification: typecheck, focused vitest, and lint passed.

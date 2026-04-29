@@ -48,3 +48,11 @@
 - 2026-04-28 Codex: 根据反馈将粗镜头提示词显示改为即时组织：优先显示 `coarseGroupsJson` 保存值，没有保存值时直接从该粗镜头下细镜头的首帧/描述/视频提示词现场聚合。
 - 2026-04-28 Codex: 根据反馈将多宫格图片提示词条目命名从 `细分镜N` 改为粗镜头内顺序 `分镜1:`、`分镜2:`，前端预览和后端保存逻辑保持一致。
 - 2026-04-28 Codex: 根据反馈调整粗镜头提示词文本区交互，文本区拦截点击/键盘事件并启用 `select-text`，避免选中文案时跳转到细分镜界面。
+- 2026-04-29 Codex: 接到反馈 yunwu provider 调用 `gpt-image-2` 报错；sequential-thinking、shrimp-task-manager、code-index MCP 工具在当前会话不可用，降级为 `rg`/`sed`/本地测试。
+- 2026-04-29 Codex: 定位到 yunwu 图片模型 official 路由缺少图片生成器，并且参考脚本要求直发 `https://yunwu.ai/v1/images/edits` multipart，而不是复用 OpenAI SDK 标准解析。
+- 2026-04-29 Codex: 新增 `YunwuImageGenerator`，支持 Bearer 认证、`image` 多文件 FormData、`quality/size/response_format/n` 参数、`aspectRatio` 到像素 size 映射，以及 `data[]`/`choices[].message.content` 图片提取。
+- 2026-04-29 Codex: 更新 image generator factory 和导出，让 `yunwu::gpt-image-2` 图片模型走 official provider generator。
+- 2026-04-29 Codex: 验证通过 `npm run typecheck`、`npx vitest run tests/unit/generators/yunwu-image.test.ts tests/unit/generator-api.test.ts tests/unit/generators/openai-compatible-image.test.ts`、`npm run lint:all`；lint 仍有 43 个既有 warning。
+- 2026-04-29 Codex: 根据运行日志 `Unknown parameter: 'image'` 继续修复 `openai-compatible:*::gpt-image-2` 且 baseUrl 为 `yunwu.ai` 的配置，强制绕过 compat template，改道到 yunwu 官方 multipart generator，同时保留原 provider id 读取用户密钥。
+- 2026-04-29 Codex: 根据运行日志 `YUNWU_IMAGE_OPTION_UNSUPPORTED: customEndpoint` 继续修复，允许 yunwu 图片生成器接收模型级 `customEndpoint`，并用它参与 baseUrl 规范化。
+- 2026-04-29 Codex: 根据反馈修正粗镜头多宫格图片生成 size 推导。`resolveStoryboardGroupImageSize` 现在基于最终整张分镜图应用 gpt-image-2 约束：最长边 <=3840、两边 16 倍数、长短边 <=3:1、总像素 655360..8294400；同时按 `panel_layout`、`aspect_ratio` 和 16px 黑色分隔线推导尺寸，必要时用黑色外边距补足短边。

@@ -43,6 +43,13 @@ type CoarseGroupImageState = {
   updatedAt: string
 }
 
+const STORYBOARD_GROUP_BORDER_PX = 16
+const IMAGE_GENERATION_MAX_SIDE = 3840
+const IMAGE_GENERATION_MAX_PIXELS = 8294400
+const IMAGE_GENERATION_MIN_PIXELS = 655360
+const IMAGE_GENERATION_MAX_LONG_SHORT_RATIO = 3
+const IMAGE_GENERATION_DIMENSION_STEP = 16
+
 function parseParentGroupByPanelNumber(raw: string | null | undefined): Map<number, number> {
   if (!raw) return new Map()
   try {
@@ -129,6 +136,140 @@ function parseDescriptionList(raw: string | null | undefined): string[] {
   }
 }
 
+function resolveImageGenerationQuality(payload: AnyObj): 'low' | 'medium' | 'high' | 'auto' {
+  const generationOptions = payload.generationOptions && typeof payload.generationOptions === 'object'
+    ? payload.generationOptions as Record<string, unknown>
+    : null
+  const quality = typeof generationOptions?.quality === 'string'
+    ? generationOptions.quality
+    : typeof payload.quality === 'string'
+      ? payload.quality
+      : ''
+  if (quality === 'low' || quality === 'medium' || quality === 'high' || quality === 'auto') {
+    return quality
+  }
+  return 'high'
+}
+
+function isSupportedImageGenerationSize(size: string) {
+  if (size === 'auto') return true
+  const match = size.match(/^(\d+)x(\d+)$/)
+  if (!match) return false
+  const width = Number(match[1])
+  const height = Number(match[2])
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return false
+  if (width <= 0 || height <= 0) return false
+  if (Math.max(width, height) > 3840) return false
+  if (width % 16 !== 0 || height % 16 !== 0) return false
+  if (Math.max(width, height) / Math.min(width, height) > 3) return false
+  const pixels = width * height
+  return pixels >= 655360 && pixels <= 8294400
+}
+
+function resolveImageGenerationSize(payload: AnyObj): string {
+  const generationOptions = payload.generationOptions && typeof payload.generationOptions === 'object'
+    ? payload.generationOptions as Record<string, unknown>
+    : null
+  const size = typeof generationOptions?.size === 'string'
+    ? generationOptions.size
+    : typeof payload.size === 'string'
+      ? payload.size
+      : ''
+  if (isSupportedImageGenerationSize(size)) return size
+  return '3840x2160'
+}
+
+function greatestCommonDivisor(left: number, right: number): number {
+  let a = Math.abs(left)
+  let b = Math.abs(right)
+  while (b !== 0) {
+    const next = a % b
+    a = b
+    b = next
+  }
+  return a || 1
+}
+
+function parsePositiveRatioPair(value: string): { width: number; height: number } | null {
+  const match = value.trim().match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/)
+  if (!match) return null
+  const left = Number(match[1])
+  const right = Number(match[2])
+  if (!Number.isFinite(left) || !Number.isFinite(right) || left <= 0 || right <= 0) return null
+
+  const leftDecimals = match[1].includes('.') ? match[1].split('.')[1].length : 0
+  const rightDecimals = match[2].includes('.') ? match[2].split('.')[1].length : 0
+  const scale = 10 ** Math.max(leftDecimals, rightDecimals)
+  const width = Math.round(left * scale)
+  const height = Math.round(right * scale)
+  const divisor = greatestCommonDivisor(width, height)
+  return {
+    width: width / divisor,
+    height: height / divisor,
+  }
+}
+
+function parsePanelLayout(value: string): { rows: number; columns: number } | null {
+  const match = value.trim().toLowerCase().match(/^(\d+)\s*x\s*(\d+)$/)
+  if (!match) return null
+  const rows = Number(match[1])
+  const columns = Number(match[2])
+  if (!Number.isInteger(rows) || !Number.isInteger(columns) || rows <= 0 || columns <= 0) return null
+  return { rows, columns }
+}
+
+export function resolveStoryboardGroupImageSize(params: {
+  aspectRatio: string
+  panelLayout: string
+  fallbackSize?: string
+}): string {
+  const ratio = parsePositiveRatioPair(params.aspectRatio)
+  const layout = parsePanelLayout(params.panelLayout)
+  const fallback = params.fallbackSize && isSupportedImageGenerationSize(params.fallbackSize)
+    ? params.fallbackSize
+    : '3840x2160'
+  if (!ratio || !layout) return fallback
+
+  let best: { width: number; height: number; longSide: number; pixels: number } | null = null
+  for (let scale = 1; scale <= 512; scale += 1) {
+    const childWidth = ratio.width * IMAGE_GENERATION_DIMENSION_STEP * scale
+    const childHeight = ratio.height * IMAGE_GENERATION_DIMENSION_STEP * scale
+    const gridWidth = layout.columns * childWidth + Math.max(0, layout.columns - 1) * STORYBOARD_GROUP_BORDER_PX
+    const gridHeight = layout.rows * childHeight + Math.max(0, layout.rows - 1) * STORYBOARD_GROUP_BORDER_PX
+    const gridLongSide = Math.max(gridWidth, gridHeight)
+    const minShortSide = Math.ceil(gridLongSide / IMAGE_GENERATION_MAX_LONG_SHORT_RATIO)
+    const width = gridWidth >= gridHeight
+      ? gridWidth
+      : Math.max(gridWidth, Math.ceil(minShortSide / IMAGE_GENERATION_DIMENSION_STEP) * IMAGE_GENERATION_DIMENSION_STEP)
+    const height = gridHeight >= gridWidth
+      ? gridHeight
+      : Math.max(gridHeight, Math.ceil(minShortSide / IMAGE_GENERATION_DIMENSION_STEP) * IMAGE_GENERATION_DIMENSION_STEP)
+    const longSide = Math.max(width, height)
+    const shortSide = Math.min(width, height)
+    const pixels = width * height
+    if (
+      width > IMAGE_GENERATION_MAX_SIDE
+      || height > IMAGE_GENERATION_MAX_SIDE
+      || pixels > IMAGE_GENERATION_MAX_PIXELS
+      || pixels < IMAGE_GENERATION_MIN_PIXELS
+      || longSide / shortSide > IMAGE_GENERATION_MAX_LONG_SHORT_RATIO
+    ) {
+      continue
+    }
+    if (!best || longSide > best.longSide || (longSide === best.longSide && pixels > best.pixels)) {
+      best = {
+        width,
+        height,
+        longSide,
+        pixels,
+      }
+    }
+  }
+
+  if (!best) return fallback
+  return `${best.width}x${best.height}`
+}
+
 function pickPanelImagePrompt(panel: {
   shotType: string | null
   cameraMove: string | null
@@ -191,6 +332,16 @@ function buildCoarseGroupVideoPrompt(panels: Array<{
       : 0.5
     return `[${current.toFixed(2)}秒]${pickPanelVideoPrompt(panel)}`
   }).join('\n')
+}
+
+function resolveCoarseGroupPanelLayout(panelCount: number) {
+  if (panelCount === 1) return '1x1'
+  if (panelCount === 2) return '1x2'
+  if (panelCount === 3) return '1x3'
+  if (panelCount === 4) return '2x2'
+  if (panelCount === 5 || panelCount === 6) return '2x3'
+  if (panelCount >= 7 && panelCount <= 9) return '3x3'
+  return 'auto'
 }
 
 function pickAppearanceDescription(appearance: {
@@ -305,6 +456,29 @@ function buildPanelPrompt(params: {
   })
 }
 
+function buildStoryboardGroupPrompt(params: {
+  locale: TaskJobData['locale']
+  aspectRatio: string
+  styleText: string
+  panelLayout: string
+  multiPanelImagePrompt: string
+}) {
+  const sanitizedMultiPanelImagePrompt = params.multiPanelImagePrompt
+    .split('\n结构化粗镜头数据：')[0]
+    .split('\nStructured coarse storyboard data:')[0]
+    .trim()
+  return buildPrompt({
+    promptId: PROMPT_IDS.NP_SINGLE_PANEL_IMAGE_V2,
+    locale: params.locale,
+    variables: {
+      aspect_ratio: params.aspectRatio,
+      panel_layout: params.panelLayout,
+      style: params.styleText,
+      multi_panel_image_prompt: sanitizedMultiPanelImagePrompt,
+    },
+  })
+}
+
 export async function handlePanelImageTask(job: Job<TaskJobData>) {
   const payload = (job.data.payload || {}) as AnyObj
   const panelId = pickFirstString(payload.panelId, job.data.targetId)
@@ -322,6 +496,8 @@ export async function handlePanelImageTask(job: Job<TaskJobData>) {
   if (!modelKey) throw new Error('Storyboard model not configured')
 
   const candidateCount = clampCount(payload.candidateCount ?? payload.count, 1, 4, 1)
+  const quality = resolveImageGenerationQuality(payload)
+  const size = resolveImageGenerationSize(payload)
   const refs = await collectPanelReferenceImages(projectData, panel)
   const normalizedRefs = await normalizeReferenceImagesForGeneration(refs)
 
@@ -398,6 +574,8 @@ export async function handlePanelImageTask(job: Job<TaskJobData>) {
       options: {
         referenceImages: normalizedRefs,
         aspectRatio,
+        quality,
+        size,
       },
       // 单个任务内会串行生成多候选，若允许按 task.externalId 续接会复用上一候选外部任务结果。
       allowTaskExternalIdResume: candidateCount === 1,
@@ -466,6 +644,7 @@ export async function handleStoryboardGroupImageTask(job: Job<TaskJobData>) {
   if (!modelKey) throw new Error('Storyboard model not configured')
 
   const candidateCount = clampCount(payload.candidateCount ?? payload.count, 1, 4, 1)
+  const quality = resolveImageGenerationQuality(payload)
   const rawRefs = (await Promise.all(groupPanels.map((panel) => collectPanelReferenceImages(projectData, panel)))).flat()
   const refs = Array.from(new Set(rawRefs))
   const normalizedRefs = await normalizeReferenceImagesForGeneration(refs)
@@ -475,21 +654,18 @@ export async function handleStoryboardGroupImageTask(job: Job<TaskJobData>) {
   const aspectRatio = projectData.videoRatio
   const imagePrompt = buildCoarseGroupImagePrompt(groupPanels)
   const videoPrompt = buildCoarseGroupVideoPrompt(groupPanels)
-  const contextJson = JSON.stringify({
-    coarse_group: {
-      storyboard_id: storyboard.id,
-      group_number: groupNumber,
-      image_prompt: imagePrompt,
-      video_prompt: videoPrompt,
-      panels: groupPanels.map((panel) => buildPanelPromptContext({ panel, projectData }).panel),
-    },
-  }, null, 2)
-  const prompt = buildPanelPrompt({
+  const panelLayout = resolveCoarseGroupPanelLayout(groupPanels.length)
+  const size = resolveStoryboardGroupImageSize({
+    aspectRatio,
+    panelLayout,
+    fallbackSize: resolveImageGenerationSize(payload),
+  })
+  const prompt = buildStoryboardGroupPrompt({
     locale: job.data.locale,
     aspectRatio,
     styleText: artStyle || '与参考图风格一致',
-    sourceText: imagePrompt,
-    contextJson,
+    panelLayout,
+    multiPanelImagePrompt: imagePrompt,
   })
 
   const candidates: string[] = []
@@ -507,6 +683,8 @@ export async function handleStoryboardGroupImageTask(job: Job<TaskJobData>) {
       options: {
         referenceImages: normalizedRefs,
         aspectRatio,
+        quality,
+        size,
       },
       allowTaskExternalIdResume: candidateCount === 1,
       pollProgress: { start: 30, end: 90 },

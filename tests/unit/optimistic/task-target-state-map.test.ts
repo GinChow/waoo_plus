@@ -15,6 +15,16 @@ const runtime = vi.hoisted(() => ({
     progress: number | null
     stage: string | null
     stageLabel: string | null
+    activeGroupTasks?: Array<{
+      taskId: string
+      groupNumber: number
+      progress: number | null
+      stage: string | null
+      stageLabel: string | null
+      message: string | null
+      stepTitle: string | null
+      updatedAt: string | null
+    }>
     updatedAt: string | null
     lastError: null
     expiresAt: number
@@ -282,5 +292,74 @@ describe('task target state map behavior', () => {
     expect(state?.phase).toBe('processing')
     expect(state?.runningTaskType).toBe('VIDEO_PANEL')
     expect(state?.runningTaskId).toBe('task-overlay-upper')
+  })
+
+  it('keeps multiple active storyboard group image overlays on one storyboard target', async () => {
+    runtime.apiStates = [
+      {
+        targetType: 'NovelPromotionStoryboard',
+        targetId: 'storyboard-1',
+        phase: 'completed',
+        runningTaskId: null,
+        runningTaskType: 'image_panel',
+        intent: 'regenerate',
+        hasOutputAtStart: true,
+        progress: 100,
+        stage: null,
+        stageLabel: null,
+        activeGroupTasks: [],
+        lastError: null,
+        updatedAt: '2026-02-27T00:00:00.000Z',
+      },
+    ]
+    runtime.overlayStates = {
+      'NovelPromotionStoryboard:storyboard-1': {
+        targetType: 'NovelPromotionStoryboard',
+        targetId: 'storyboard-1',
+        phase: 'processing',
+        runningTaskId: 'task-storyboard-group-2',
+        runningTaskType: 'image_panel',
+        intent: 'regenerate',
+        hasOutputAtStart: true,
+        progress: 18,
+        stage: 'generate_storyboard_group_candidate',
+        stageLabel: '生成中',
+        activeGroupTasks: [
+          {
+            taskId: 'task-storyboard-group-1',
+            groupNumber: 1,
+            progress: 30,
+            stage: 'generate_storyboard_group_candidate',
+            stageLabel: '生成中',
+            message: null,
+            stepTitle: null,
+            updatedAt: overlayNow,
+          },
+          {
+            taskId: 'task-storyboard-group-2',
+            groupNumber: 2,
+            progress: 18,
+            stage: 'generate_storyboard_group_candidate',
+            stageLabel: '生成中',
+            message: null,
+            stepTitle: null,
+            updatedAt: overlayNow,
+          },
+        ],
+        updatedAt: overlayNow,
+        lastError: null,
+        expiresAt: Date.now() + 30_000,
+      },
+    }
+
+    const { useTaskTargetStateMap } = await import('@/lib/query/hooks/useTaskTargetStateMap')
+
+    const result = useTaskTargetStateMap('project-1', [
+      { targetType: 'NovelPromotionStoryboard', targetId: 'storyboard-1', types: ['image_panel'] },
+    ])
+
+    const state = result.getState('NovelPromotionStoryboard', 'storyboard-1')
+    expect(state?.phase).toBe('processing')
+    expect(state?.activeGroupTasks?.map((task) => task.groupNumber)).toEqual([1, 2])
   })
 })

@@ -50,6 +50,35 @@ const promptMock = vi.hoisted(() => ({
   buildPrompt: vi.fn(() => 'panel-image-prompt'),
 }))
 
+function buildGroupPanels(count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `panel-${index + 1}`,
+    storyboardId: 'storyboard-1',
+    panelIndex: index,
+    panelNumber: index + 1,
+    shotType: index === 0 ? 'close-up' : 'wide',
+    cameraMove: index === 0 ? 'static' : 'push',
+    description: `group panel ${index + 1}`,
+    imagePrompt: index === 0 ? 'panel anchor prompt' : null,
+    videoPrompt: `video ${index + 1}`,
+    firstLastFramePrompt: index === 1 ? 'wide rain frame' : null,
+    location: 'Old Town',
+    characters: index === 0
+      ? JSON.stringify([{ name: 'Hero', appearance: 'default', slot: '街道左侧靠墙的留白位置' }])
+      : '[]',
+    srtSegment: index === 0 ? '台词片段' : null,
+    photographyRules: null,
+    actingNotes: null,
+    sketchImageUrl: null,
+    imageUrl: null,
+    duration: index === 0 ? 0.5 : 1,
+  }))
+}
+
+function buildGroupMapping(count: number) {
+  return JSON.stringify(Array.from({ length: count }, (_, index) => [index + 1, 1]))
+}
+
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }))
 vi.mock('@/lib/workers/utils', () => utilsMock)
 vi.mock('@/lib/media/outbound-image', () => outboundMock)
@@ -76,11 +105,18 @@ vi.mock('@/lib/workers/handlers/image-task-handler-shared', async () => {
   }
 })
 vi.mock('@/lib/prompt-i18n', () => ({
-  PROMPT_IDS: { NP_SINGLE_PANEL_IMAGE: 'np_single_panel_image' },
+  PROMPT_IDS: {
+    NP_SINGLE_PANEL_IMAGE: 'np_single_panel_image',
+    NP_SINGLE_PANEL_IMAGE_V2: 'np_single_panel_image_v2',
+  },
   buildPrompt: promptMock.buildPrompt,
 }))
 
-import { handlePanelImageTask, handleStoryboardGroupImageTask } from '@/lib/workers/handlers/panel-image-task-handler'
+import {
+  handlePanelImageTask,
+  handleStoryboardGroupImageTask,
+  resolveStoryboardGroupImageSize,
+} from '@/lib/workers/handlers/panel-image-task-handler'
 
 function buildJob(payload: Record<string, unknown>, targetId = 'panel-1'): Job<TaskJobData> {
   return {
@@ -221,6 +257,8 @@ describe('worker panel-image-task-handler behavior', () => {
         options: expect.objectContaining({
           referenceImages: ['normalized-ref-1'],
           aspectRatio: '16:9',
+          quality: 'high',
+          size: '3840x2160',
         }),
       }),
     )
@@ -253,6 +291,25 @@ describe('worker panel-image-task-handler behavior', () => {
     expect(call).toBeTruthy()
     const params = call[1]
     expect(params.options.referenceImages).toEqual(['norm-ref-1', 'norm-ref-2'])
+    expect(params.options.quality).toBe('high')
+    expect(params.options.size).toBe('3840x2160')
+  })
+
+  it('passes explicit image quality and size through when payload overrides defaults', async () => {
+    const job = buildJob({ candidateCount: 1, generationOptions: { quality: 'medium', size: '2048x1152' } })
+    await handlePanelImageTask(job)
+
+    const call = utilsMock.resolveImageSourceFromGeneration.mock.calls[0]
+    expect(call[1].options.quality).toBe('medium')
+    expect(call[1].options.size).toBe('2048x1152')
+  })
+
+  it('falls back to default image size when payload size violates size rules', async () => {
+    const job = buildJob({ candidateCount: 1, generationOptions: { size: '4096x2160' } })
+    await handlePanelImageTask(job)
+
+    const call = utilsMock.resolveImageSourceFromGeneration.mock.calls[0]
+    expect(call[1].options.size).toBe('3840x2160')
   })
 
   it('regeneration branch -> keeps old image in previousImageUrl and stores candidates only', async () => {
@@ -314,9 +371,29 @@ describe('worker panel-image-task-handler behavior', () => {
       imageUrl: 'cos/storyboard-group-1.png',
     })
     expect(promptMock.buildPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      promptId: 'np_single_panel_image_v2',
       variables: expect.objectContaining({
-        source_text: expect.stringContaining('多宫格分镜图片'),
-        storyboard_text_json_input: expect.stringContaining('"group_number": 1'),
+        panel_layout: '1x2',
+        multi_panel_image_prompt: expect.stringContaining('多宫格分镜图片'),
+      }),
+    }))
+    expect(utilsMock.resolveImageSourceFromGeneration).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        options: expect.objectContaining({
+          quality: 'high',
+          size: '3600x1200',
+        }),
+      }),
+    )
+    expect(promptMock.buildPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      variables: expect.objectContaining({
+        multi_panel_image_prompt: expect.not.stringContaining('"group_number"'),
+      }),
+    }))
+    expect(promptMock.buildPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      variables: expect.objectContaining({
+        multi_panel_image_prompt: expect.not.stringContaining('结构化粗镜头数据'),
       }),
     }))
     const updateCalls = prismaMock.novelPromotionStoryboard.update.mock.calls as unknown as Array<[{
@@ -332,5 +409,60 @@ describe('worker panel-image-task-handler behavior', () => {
     expect(stored[0].videoPrompt).toContain('[0.00秒]dramatic')
     expect(stored[0].videoPrompt).toContain('[0.50秒]rain walk')
     expect(stored[0].imageUrl).toBe('cos/storyboard-group-1.png')
+  })
+
+  it.each([
+    [5, '2x3', '3104x1168'],
+    [7, '3x3', '3104x1760'],
+    [8, '3x3', '3104x1760'],
+  ])('storyboard group generation -> maps %s panels to %s layout and derived size', async (panelCount, expectedLayout, expectedSize) => {
+    utilsMock.resolveImageSourceFromGeneration.mockReset()
+    utilsMock.uploadImageSourceToCos.mockReset()
+    utilsMock.resolveImageSourceFromGeneration.mockResolvedValueOnce('generated-group-source')
+    utilsMock.uploadImageSourceToCos.mockResolvedValueOnce('cos/storyboard-group-1.png')
+    prismaMock.novelPromotionStoryboard.findUnique.mockResolvedValueOnce({
+      id: 'storyboard-1',
+      storyboardTextJson: buildGroupMapping(panelCount),
+      coarseGroupsJson: null,
+      panels: buildGroupPanels(panelCount),
+    })
+
+    const job = buildJob({ storyboardId: 'storyboard-1', groupNumber: 1, candidateCount: 1 }, 'storyboard-1')
+    await handleStoryboardGroupImageTask(job)
+
+    expect(promptMock.buildPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      promptId: 'np_single_panel_image_v2',
+      variables: expect.objectContaining({
+        panel_layout: expectedLayout,
+      }),
+    }))
+    const call = utilsMock.resolveImageSourceFromGeneration.mock.calls[0]
+    expect(call[1].options.size).toBe(expectedSize)
+  })
+
+  it('storyboard group size calculation -> preserves child aspect ratio and border gaps', () => {
+    expect(resolveStoryboardGroupImageSize({
+      aspectRatio: '16:9',
+      panelLayout: '1x1',
+    })).toBe('3840x2160')
+    expect(resolveStoryboardGroupImageSize({
+      aspectRatio: '16:9',
+      panelLayout: '1x2',
+    })).toBe('3600x1200')
+    expect(resolveStoryboardGroupImageSize({
+      aspectRatio: '16:9',
+      panelLayout: '2x3',
+    })).toBe('3104x1168')
+    expect(resolveStoryboardGroupImageSize({
+      aspectRatio: '16:9',
+      panelLayout: '3x3',
+    })).toBe('3104x1760')
+  })
+
+  it('storyboard group size calculation -> respects pixel cap for vertical child panels', () => {
+    expect(resolveStoryboardGroupImageSize({
+      aspectRatio: '9:16',
+      panelLayout: '1x2',
+    })).toBe('2896x2560')
   })
 })
