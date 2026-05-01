@@ -1,1 +1,1 @@
-ALTER TABLE `novel_promotion_storyboards` ADD COLUMN `coarseGroupsJson` TEXT;
+ALTER TABLE `novel_promotion_storyboards` ADD COLUMN `coarseGroupsJson` LONGTEXT;

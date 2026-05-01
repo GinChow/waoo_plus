@@ -20,6 +20,53 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
 }
 
+function parseParentGroupByPanelNumber(raw: string | null | undefined): Map<number, number> {
+  if (!raw) return new Map()
+  try {
+    const parsed = JSON.parse(raw)
+    const mapping = new Map<number, number>()
+    if (!Array.isArray(parsed)) return mapping
+    for (const item of parsed) {
+      if (
+        isRecord(item)
+        && typeof item.panel_number === 'number'
+        && typeof item.parent_group_number === 'number'
+      ) {
+        mapping.set(item.panel_number, item.parent_group_number)
+      }
+      if (Array.isArray(item) && typeof item[0] === 'number' && typeof item[1] === 'number') {
+        mapping.set(item[0], item[1])
+      }
+    }
+    return mapping
+  } catch {
+    return new Map()
+  }
+}
+
+function parseCoarseGroupImageNumbers(raw: string | null | undefined): Set<number> {
+  if (!raw) return new Set()
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Set()
+    const groups = new Set<number>()
+    for (const item of parsed) {
+      if (!isRecord(item) || typeof item.groupNumber !== 'number') continue
+      if (typeof item.imageUrl === 'string' && item.imageUrl.trim()) {
+        groups.add(item.groupNumber)
+      }
+    }
+    return groups
+  } catch {
+    return new Set()
+  }
+}
+
+function readPositiveGroupNumber(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null
+  return Math.trunc(value)
+}
+
 function toVideoRuntimeSelections(value: unknown): Record<string, CapabilityValue> {
   if (!isRecord(value)) return {}
   const selections: Record<string, CapabilityValue> = {}
@@ -209,24 +256,53 @@ export const POST = apiHandler(async (
       throw new ApiError('INVALID_PARAMS')
     }
 
-    const panels = await prisma.novelPromotionPanel.findMany({
+    const storyboards = await prisma.novelPromotionStoryboard.findMany({
       where: {
-        storyboard: { episodeId },
-        imageUrl: { not: null },
-        OR: [
-          { videoUrl: null },
-          { videoUrl: '' },
-        ],
+        episodeId,
       },
-      select: { id: true },
+      select: {
+        id: true,
+        storyboardTextJson: true,
+        coarseGroupsJson: true,
+        panels: {
+          orderBy: { panelIndex: 'asc' },
+          select: {
+            id: true,
+            panelIndex: true,
+            panelNumber: true,
+            imageUrl: true,
+            videoUrl: true,
+          },
+        },
+      },
     })
 
-    if (panels.length === 0) {
+    const taskTargets = storyboards.flatMap((storyboard) => {
+      const parentGroupMap = parseParentGroupByPanelNumber(storyboard.storyboardTextJson)
+      const groupsWithImage = parseCoarseGroupImageNumbers(storyboard.coarseGroupsJson)
+      const grouped = new Map<number, typeof storyboard.panels>()
+      for (const panel of storyboard.panels) {
+        const panelNumber = panel.panelNumber ?? panel.panelIndex + 1
+        const groupNumber = parentGroupMap.get(panelNumber) || 1
+        const current = grouped.get(groupNumber) || []
+        current.push(panel)
+        grouped.set(groupNumber, current)
+      }
+      return Array.from(grouped.entries()).flatMap(([groupNumber, panels]) => {
+        const representative = panels[0]
+        if (!representative) return []
+        if (representative.videoUrl && representative.videoUrl.trim()) return []
+        if (!groupsWithImage.has(groupNumber) && !representative.imageUrl) return []
+        return [{ panelId: representative.id, groupNumber }]
+      })
+    })
+
+    if (taskTargets.length === 0) {
       return NextResponse.json({ tasks: [], total: 0 })
     }
 
     const results = await Promise.all(
-      panels.map(async (panel) =>
+      taskTargets.map(async (target) =>
         submitTask({
           userId: session.user.id,
           locale,
@@ -235,17 +311,20 @@ export const POST = apiHandler(async (
           episodeId,
           type: TASK_TYPE.VIDEO_PANEL,
           targetType: 'NovelPromotionPanel',
-          targetId: panel.id,
-          payload: withTaskUiPayload(body, {
-            hasOutputAtStart: await hasPanelVideoOutput(panel.id),
+          targetId: target.panelId,
+          payload: withTaskUiPayload({
+            ...body,
+            groupNumber: target.groupNumber,
+          }, {
+            hasOutputAtStart: await hasPanelVideoOutput(target.panelId),
           }),
-          dedupeKey: `video_panel:${panel.id}`,
+          dedupeKey: `video_panel:${target.panelId}`,
           billingInfo: buildVideoPanelBillingInfoOrThrow(body),
         }),
       ),
     )
 
-    return NextResponse.json({ tasks: results, total: panels.length })
+    return NextResponse.json({ tasks: results, total: taskTargets.length })
   }
 
   const storyboardId = body?.storyboardId
@@ -271,7 +350,10 @@ export const POST = apiHandler(async (
     type: TASK_TYPE.VIDEO_PANEL,
     targetType: 'NovelPromotionPanel',
     targetId: panel.id,
-    payload: withTaskUiPayload(body, {
+    payload: withTaskUiPayload({
+      ...body,
+      groupNumber: readPositiveGroupNumber(body?.groupNumber) || undefined,
+    }, {
       hasOutputAtStart: await hasPanelVideoOutput(panel.id),
     }),
     dedupeKey: `video_panel:${panel.id}`,

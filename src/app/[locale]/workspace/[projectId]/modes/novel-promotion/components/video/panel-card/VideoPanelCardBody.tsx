@@ -115,7 +115,7 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
                 </div>
               </div>
             ) : (
-              <div onClick={promptEditor.handleStartEdit} className="text-xs p-2 border border-[var(--glass-stroke-base)] rounded-lg bg-[var(--glass-bg-muted)] text-[var(--glass-text-secondary)] cursor-pointer">
+              <div onClick={promptEditor.handleStartEdit} className="text-xs p-2 border border-[var(--glass-stroke-base)] rounded-lg bg-[var(--glass-bg-muted)] text-[var(--glass-text-secondary)] cursor-pointer whitespace-pre-wrap break-words">
                 {promptEditor.localPrompt || <span className="text-[var(--glass-text-tertiary)] italic">{t('panelCard.clickToEditPrompt')}</span>}
               </div>
             )}
@@ -176,6 +176,8 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
                         undefined,
                         videoModel.generationOptions,
                         panel.panelId,
+                        panel.videoTargetGroupNumber,
+                        promptEditor.localPrompt,
                       )}
                     disabled={
                       taskStatus.isVideoTaskRunning

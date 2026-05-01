@@ -65,3 +65,11 @@ phase4 续跑沿用现有 reconcile 规则，保留当前分镜的 `description/
 - Coarse card prompt preview before generation: `npm run typecheck` passed.
 - Coarse prompt item naming: `npm run typecheck` passed; `npx vitest run tests/unit/worker/panel-image-task-handler.test.ts` passed.
 - Coarse prompt selectable text interaction: `npm run typecheck` passed; `npm run lint:all` passed with existing warnings only.
+
+## 2026-04-30 Coarse Group Video Generation
+
+- TypeScript: `npm run typecheck` passed.
+- Focused unit tests: `npx vitest run tests/unit/worker/video-worker.test.ts` passed, 7 tests.
+- Lint: `npm run lint:all` passed with existing warnings only.
+- System route test command was attempted with `tests/system/generate-video.system.test.ts`, but local MySQL test database `localhost:13306` was not reachable, so those DB-backed tests could not execute in this environment.
+- Coarse group prompt display fix: `npm run typecheck`, `npm run lint:all`, and `npx vitest run tests/unit/worker/video-worker.test.ts` passed.

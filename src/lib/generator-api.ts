@@ -26,8 +26,12 @@ const OFFICIAL_ONLY_PROVIDER_KEYS = new Set(['bailian', 'siliconflow'])
 // 视频场景：Vidu/Yunwu 只能走官方实现（有专门的 VideoGenerator），不能走 openai-compat 模板
 const OFFICIAL_ONLY_VIDEO_PROVIDER_KEYS = new Set(['bailian', 'siliconflow', 'vidu', 'yunwu'])
 
-function isYunwuGptImage2CompatRoute(providerKey: string, modelId: string, baseUrl: string | undefined): boolean {
-    if (modelId.trim() !== 'gpt-image-2') return false
+function isYunwuImageOfficialRoute(providerKey: string, modelId: string, baseUrl: string | undefined): boolean {
+    const normalizedModelId = modelId.trim()
+    const isYunwuNativeImageModel =
+        normalizedModelId === 'gpt-image-2' ||
+        /^gemini-.+image/i.test(normalizedModelId)
+    if (!isYunwuNativeImageModel) return false
     if (providerKey === 'yunwu') return true
     if (providerKey !== 'openai-compatible') return false
     if (!baseUrl) return false
@@ -115,8 +119,8 @@ export async function generateImage(
         // Runtime now resolves route by apiMode to avoid requiring data migration SQL.
         gatewayRoute = providerConfig.apiMode === 'openai-official' ? 'openai-compat' : 'official'
     }
-    if (isYunwuGptImage2CompatRoute(providerKey, selection.modelId, providerConfig.baseUrl)) {
-        // yunwu 的 gpt-image-2 图片编辑不是 JSON 模板协议，必须走 multipart /v1/images/edits。
+    if (isYunwuImageOfficialRoute(providerKey, selection.modelId, providerConfig.baseUrl)) {
+        // yunwu 的原生图片模型不是 OpenAI 兼容模板协议，必须走对应 official generator 分支。
         gatewayRoute = 'official'
     }
 
@@ -174,7 +178,7 @@ export async function generateImage(
         })
     }
 
-    const generatorProvider = isYunwuGptImage2CompatRoute(providerKey, selection.modelId, providerConfig.baseUrl)
+    const generatorProvider = isYunwuImageOfficialRoute(providerKey, selection.modelId, providerConfig.baseUrl)
         ? 'yunwu'
         : selection.provider
     const generator = createImageGenerator(generatorProvider, selection.modelId)

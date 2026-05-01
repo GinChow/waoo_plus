@@ -76,7 +76,7 @@ export default function VideoPanelCardHeader({ runtime }: VideoPanelCardHeaderPr
 
       {/* 镜头编号 */}
       <div className="absolute top-2 left-2 bg-[var(--glass-overlay)] text-white px-2 py-0.5 rounded text-xs font-medium">
-        {panelIndex + 1}
+        {panel.videoTargetGroupNumber ?? panelIndex + 1}
       </div>
 
       {/* 两卡片中间唯一的链接/断开按钮 */}

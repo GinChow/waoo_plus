@@ -233,6 +233,49 @@ describe('generator-api gateway routing', () => {
     expect(result).toEqual({ success: true, imageUrl: 'official-image' })
   })
 
+  it('routes openai-compatible yunwu gemini image requests to yunwu official generator', async () => {
+    resolveModelSelectionMock.mockResolvedValueOnce({
+      provider: 'openai-compatible:yunwu-1',
+      modelId: 'gemini-3-pro-image-preview',
+      modelKey: 'openai-compatible:yunwu-1::gemini-3-pro-image-preview',
+      mediaType: 'image',
+      compatMediaTemplate: {
+        version: 1,
+        mediaType: 'image',
+        mode: 'sync',
+        create: { method: 'POST', path: '/v1/chat/completions' },
+        response: { outputUrlPath: 'data[0].url' },
+      },
+    })
+    getProviderConfigMock.mockResolvedValueOnce({
+      id: 'openai-compatible:yunwu-1',
+      name: 'Yunwu Compat',
+      apiKey: 'yunwu-key',
+      baseUrl: 'https://yunwu.ai/v1',
+      apiMode: undefined,
+      gatewayRoute: 'openai-compat',
+    })
+    resolveModelGatewayRouteMock.mockReturnValueOnce('openai-compat')
+
+    const result = await generateImage(
+      'user-1',
+      'openai-compatible:yunwu-1::gemini-3-pro-image-preview',
+      'draw cyberpunk city',
+      { aspectRatio: '9:16', resolution: '1K' },
+    )
+
+    expect(createImageGeneratorMock).toHaveBeenCalledWith('yunwu', 'gemini-3-pro-image-preview')
+    expect(imageGeneratorGenerateMock).toHaveBeenCalledWith(expect.objectContaining({
+      options: expect.objectContaining({
+        provider: 'openai-compatible:yunwu-1',
+        modelId: 'gemini-3-pro-image-preview',
+        modelKey: 'openai-compatible:yunwu-1::gemini-3-pro-image-preview',
+      }),
+    }))
+    expect(generateImageViaOpenAICompatTemplateMock).not.toHaveBeenCalled()
+    expect(result).toEqual({ success: true, imageUrl: 'official-image' })
+  })
+
   it('routes openai-compatible video requests to openai-compat gateway', async () => {
     resolveModelSelectionMock.mockResolvedValueOnce({
       provider: 'openai-compatible:oa-1',

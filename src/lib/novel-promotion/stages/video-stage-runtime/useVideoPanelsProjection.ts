@@ -23,6 +23,36 @@ interface UseVideoPanelsProjectionParams {
   panelLipStates: TaskPresentationLike
 }
 
+interface CoarseGroupState {
+  imageUrl: string | null
+  videoPrompt: string | null
+}
+
+function parseCoarseGroupStates(raw: string | null | undefined): Map<number, CoarseGroupState> {
+  if (!raw) return new Map()
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Map()
+    const states = new Map<number, CoarseGroupState>()
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object') continue
+      const groupNumber = (item as { groupNumber?: unknown }).groupNumber
+      if (typeof groupNumber !== 'number') continue
+      states.set(groupNumber, {
+        imageUrl: typeof (item as { imageUrl?: unknown }).imageUrl === 'string'
+          ? (item as { imageUrl: string }).imageUrl
+          : null,
+        videoPrompt: typeof (item as { videoPrompt?: unknown }).videoPrompt === 'string'
+          ? (item as { videoPrompt: string }).videoPrompt
+          : null,
+      })
+    }
+    return states
+  } catch {
+    return new Map()
+  }
+}
+
 function parseParentGroupByPanelNumber(raw: string | null | undefined): Map<number, number> {
   if (!raw) return new Map()
   try {
@@ -82,6 +112,7 @@ export function useVideoPanelsProjection({
     const panels: VideoPanel[] = []
     sortedStoryboards.forEach((storyboard) => {
       const parentGroupMap = parseParentGroupByPanelNumber(storyboard.storyboardTextJson)
+      const coarseGroupStates = parseCoarseGroupStates(storyboard.coarseGroupsJson)
       const storyboardPanels = storyboard.panels || []
       storyboardPanels.forEach((panel, index) => {
         const actualPanelIndex = panel.panelIndex ?? index
@@ -100,12 +131,16 @@ export function useVideoPanelsProjection({
         const panelId = panel.id
         const panelVideoState = panelId ? panelVideoStates.getTaskState(`panel-video:${panelId}`) : null
         const panelLipState = panelId ? panelLipStates.getTaskState(`panel-lip:${panelId}`) : null
+        const coarseGroupState = parentGroupNumber ? coarseGroupStates.get(parentGroupNumber) : null
 
         panels.push({
           panelId,
           storyboardId: storyboard.id,
           panelIndex: actualPanelIndex,
           parentGroupNumber,
+          videoTargetGroupNumber: parentGroupNumber,
+          coarseGroupImageUrl: coarseGroupState?.imageUrl || null,
+          coarseGroupVideoPrompt: coarseGroupState?.videoPrompt || null,
           textPanel: {
             panel_number: panelNumber,
             parent_group_number: parentGroupNumber,

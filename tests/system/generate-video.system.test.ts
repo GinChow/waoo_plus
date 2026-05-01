@@ -118,4 +118,48 @@ describe('system - generate video', () => {
     const eventTypes = await listTaskEventTypes(json.taskId)
     expectLifecycleEvents(eventTypes, 'completed')
   })
+
+  it('batch route creates one video task per coarse shot group', async () => {
+    const seeded = await seedMinimalDomainState()
+    mockAuthenticated(seeded.user.id)
+
+    await prisma.novelPromotionPanel.update({
+      where: { id: seeded.secondaryPanel.id },
+      data: { imageUrl: 'https://provider.example/panel-2.jpg' },
+    })
+    await prisma.novelPromotionStoryboard.update({
+      where: { id: seeded.storyboard.id },
+      data: {
+        storyboardTextJson: JSON.stringify([
+          { panel_number: 1, parent_group_number: 1 },
+          { panel_number: 2, parent_group_number: 1 },
+        ]),
+        coarseGroupsJson: JSON.stringify([
+          {
+            groupNumber: 1,
+            imageUrl: 'https://provider.example/coarse-group-1.jpg',
+            videoPrompt: 'coarse group prompt',
+          },
+        ]),
+      },
+    })
+
+    const mod = await import('@/app/api/novel-promotion/[projectId]/generate-video/route')
+    const response = await callRoute(
+      mod.POST,
+      'POST',
+      {
+        locale: 'zh',
+        all: true,
+        episodeId: seeded.episode.id,
+        videoModel: 'fal::seedance/video',
+      },
+      { params: { projectId: seeded.project.id } },
+    )
+
+    expect(response.status).toBe(200)
+    const json = await response.json() as { total: number; tasks: Array<{ taskId?: string; id?: string }> }
+    expect(json.total).toBe(1)
+    expect(json.tasks).toHaveLength(1)
+  })
 })

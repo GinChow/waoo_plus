@@ -50,6 +50,8 @@ export interface VideoStageShellProps {
     firstLastFrame?: FirstLastFrameParams,
     generationOptions?: VideoGenerationOptions,
     panelId?: string,
+    groupNumber?: number,
+    customPrompt?: string,
   ) => Promise<void>
   onGenerateAllVideos: (options?: BatchVideoGenerationParams) => Promise<void>
   onBack: () => void

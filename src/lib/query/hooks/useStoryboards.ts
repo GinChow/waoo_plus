@@ -159,6 +159,8 @@ export function useGenerateVideo(projectId: string | null, episodeId: string | n
             panelId?: string
             videoModel: string
             generationOptions?: VideoGenerationOptions
+            groupNumber?: number
+            customPrompt?: string
             firstLastFrame?: {
                 lastFrameStoryboardId: string
                 lastFramePanelIndex: number
@@ -180,6 +182,8 @@ export function useGenerateVideo(projectId: string | null, episodeId: string | n
                 }
                 videoModel: string
                 generationOptions?: VideoGenerationOptions
+                groupNumber?: number
+                customPrompt?: string
             } = {
                 storyboardId: params.storyboardId,
                 panelIndex: params.panelIndex,
@@ -193,6 +197,12 @@ export function useGenerateVideo(projectId: string | null, episodeId: string | n
 
             if (params.generationOptions && typeof params.generationOptions === 'object') {
                 requestBody.generationOptions = params.generationOptions
+            }
+            if (typeof params.groupNumber === 'number' && Number.isFinite(params.groupNumber) && params.groupNumber > 0) {
+                requestBody.groupNumber = params.groupNumber
+            }
+            if (typeof params.customPrompt === 'string' && params.customPrompt.trim()) {
+                requestBody.customPrompt = params.customPrompt.trim()
             }
 
             const res = await apiFetch(`/api/novel-promotion/${projectId}/generate-video`, {

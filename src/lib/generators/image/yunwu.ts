@@ -23,12 +23,15 @@ type YunwuImageSize =
 
 type YunwuImageQuality = 'low' | 'medium' | 'high' | 'auto'
 type YunwuImageResponseFormat = 'url' | 'b64_json'
+type YunwuGeminiAspectRatio = '1:1' | '3:4' | '4:3' | '16:9' | '9:16'
+type YunwuGeminiImageSize = '1K' | '2K' | '4K'
 
 interface YunwuImageOptions {
   provider?: string
   modelId?: string
   modelKey?: string
   size?: string
+  imageSize?: string
   resolution?: string
   quality?: string
   responseFormat?: string
@@ -42,15 +45,18 @@ interface YunwuImageOptions {
 interface ExtractedImage {
   url?: string
   b64Json?: string
+  mimeType?: string
 }
 
 const YUNWU_IMAGE_DEFAULT_BASE_URL = 'https://yunwu.ai/v1'
+const YUNWU_GEMINI_IMAGE_DEFAULT_BASE_URL = 'https://yunwu.ai/v1beta/models'
 const YUNWU_IMAGE_ENDPOINT_PATH = '/images/edits'
 const ALLOWED_OPTION_KEYS = new Set([
   'provider',
   'modelId',
   'modelKey',
   'size',
+  'imageSize',
   'resolution',
   'quality',
   'responseFormat',
@@ -81,10 +87,16 @@ const ASPECT_RATIO_SIZE_MAP: Record<string, YunwuImageSize> = {
   '3:2': '1536x1024',
   '2:3': '1024x1536',
 }
+const YUNWU_GEMINI_ASPECT_RATIOS = new Set(['1:1', '3:4', '4:3', '16:9', '9:16'])
+const YUNWU_GEMINI_IMAGE_SIZES = new Set(['1K', '2K', '4K'])
 
 function toAbsoluteUrlIfNeeded(value: string): string {
   if (!value.startsWith('/')) return value
   return `${getInternalBaseUrl()}${value}`
+}
+
+function isYunwuGeminiImageModel(model: string): boolean {
+  return /^gemini-.+image/i.test(model)
 }
 
 export function normalizeYunwuImageBaseUrl(rawBaseUrl: string | undefined): string {
@@ -106,6 +118,29 @@ export function normalizeYunwuImageBaseUrl(rawBaseUrl: string | undefined): stri
   }
 
   parsed.pathname = `${parsed.pathname === '/' ? '' : parsed.pathname}/v1`
+  return parsed.toString().replace(/\/+$/, '')
+}
+
+function normalizeYunwuGeminiImageBaseUrl(rawBaseUrl: string | undefined): string {
+  const raw = (rawBaseUrl || YUNWU_GEMINI_IMAGE_DEFAULT_BASE_URL).trim().replace(/\/+$/, '')
+  if (!raw) return YUNWU_GEMINI_IMAGE_DEFAULT_BASE_URL
+
+  const parsed = new URL(raw)
+  parsed.search = ''
+  parsed.hash = ''
+  parsed.pathname = parsed.pathname
+    .replace(/\/+$/, '')
+    .replace(/\/[^/]+:generateContent$/, '')
+
+  const segments = parsed.pathname.split('/').filter(Boolean)
+  const v1BetaIndex = segments.indexOf('v1beta')
+  if (v1BetaIndex !== -1) {
+    const nextSegments = ['v1beta', 'models']
+    parsed.pathname = `/${nextSegments.join('/')}`
+    return parsed.toString().replace(/\/+$/, '')
+  }
+
+  parsed.pathname = '/v1beta/models'
   return parsed.toString().replace(/\/+$/, '')
 }
 
@@ -144,12 +179,49 @@ function normalizeSize(value: string | undefined, aspectRatio: string | undefine
   return value as YunwuImageSize
 }
 
+function normalizeGeminiAspectRatio(value: string | undefined): YunwuGeminiAspectRatio {
+  const normalized = value?.trim() || '1:1'
+  if (YUNWU_GEMINI_ASPECT_RATIOS.has(normalized)) {
+    return normalized as YunwuGeminiAspectRatio
+  }
+  throw new Error(`YUNWU_GEMINI_IMAGE_OPTION_UNSUPPORTED: aspectRatio=${normalized}`)
+}
+
+function normalizeGeminiImageSize(value: string | undefined): YunwuGeminiImageSize {
+  const normalized = value?.trim() || '1K'
+  if (YUNWU_GEMINI_IMAGE_SIZES.has(normalized)) {
+    return normalized as YunwuGeminiImageSize
+  }
+  const sizeMatch = /^(\d+)x(\d+)$/.exec(normalized)
+  if (sizeMatch) {
+    const width = Number(sizeMatch[1])
+    const height = Number(sizeMatch[2])
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      throw new Error(`YUNWU_GEMINI_IMAGE_OPTION_UNSUPPORTED: imageSize=${normalized}`)
+    }
+    const longSide = Math.max(width, height)
+    if (longSide <= 1024) return '1K'
+    if (longSide <= 2048) return '2K'
+    return '4K'
+  }
+  throw new Error(`YUNWU_GEMINI_IMAGE_OPTION_UNSUPPORTED: imageSize=${normalized}`)
+}
+
 function resolveRawSize(options: YunwuImageOptions): string | undefined {
   const size = readStringOption(options.size, 'size')
   const resolution = readStringOption(options.resolution, 'resolution')
   if (size && resolution && size !== resolution) {
     throw new Error('YUNWU_IMAGE_OPTION_CONFLICT: size and resolution must match')
   }
+  return size || resolution
+}
+
+function resolveGeminiRawImageSize(options: YunwuImageOptions): string | undefined {
+  const imageSize = readStringOption(options.imageSize, 'imageSize')
+  if (imageSize) return imageSize
+  const resolution = readStringOption(options.resolution, 'resolution')
+  if (resolution && YUNWU_GEMINI_IMAGE_SIZES.has(resolution)) return resolution
+  const size = readStringOption(options.size, 'size')
   return size || resolution
 }
 
@@ -212,6 +284,20 @@ function collectImagesFromUnknown(payload: unknown): ExtractedImage[] {
     }
 
     const obj = cur as Record<string, unknown>
+    const inlineData = obj.inline_data as Record<string, unknown> | undefined
+    const inlineDataAlt = obj.inlineData as Record<string, unknown> | undefined
+    const inlineCandidate = inlineData ?? inlineDataAlt
+    if (inlineCandidate && typeof inlineCandidate === 'object') {
+      const mime = inlineCandidate.mime_type ?? inlineCandidate.mimeType
+      const data = inlineCandidate.data
+      if (typeof data === 'string' && data.trim()) {
+        images.push({
+          b64Json: stripDataUrlPrefix(data.trim()),
+          mimeType: typeof mime === 'string' && mime.trim() ? mime.trim() : 'image/png',
+        })
+      }
+    }
+
     const url = obj.url ?? obj.image_url ?? obj.imageUrl
     const b64 = obj.b64_json ?? obj.b64Json ?? obj.base64 ?? obj.image_base64 ?? obj.imageBase64
     if (typeof url === 'string' && /^https?:\/\//.test(url)) {
@@ -258,6 +344,8 @@ function extractImagesFromText(content: string): ExtractedImage[] {
 function extractImages(response: unknown): ExtractedImage[] {
   const images: ExtractedImage[] = []
   if (!response || typeof response !== 'object') return images
+
+  images.push(...collectImagesFromUnknown(response))
 
   const data = (response as { data?: unknown }).data
   if (Array.isArray(data)) {
@@ -310,12 +398,13 @@ async function buildImageBlob(imageSource: string, index: number): Promise<{ blo
 }
 
 function toImageResult(images: ExtractedImage[]): GenerateResult {
-  const firstB64 = images.find((item) => item.b64Json)?.b64Json
-  if (firstB64) {
+  const firstInline = images.find((item) => item.b64Json)
+  if (firstInline?.b64Json) {
+    const mimeType = firstInline.mimeType || 'image/png'
     return {
       success: true,
-      imageBase64: firstB64,
-      imageUrl: `data:image/png;base64,${firstB64}`,
+      imageBase64: firstInline.b64Json,
+      imageUrl: `data:${mimeType};base64,${firstInline.b64Json}`,
     }
   }
 
@@ -346,10 +435,6 @@ export class YunwuImageGenerator extends BaseImageGenerator {
     const typedOptions = options as YunwuImageOptions
     assertAllowedOptions(options)
 
-    if (referenceImages.length === 0) {
-      throw new Error('YUNWU_IMAGE_REFERENCE_REQUIRED: gpt-image-2 requires at least one image')
-    }
-
     const providerId = typedOptions.provider || this.providerId || 'yunwu'
     const providerConfig = await getProviderConfig(userId, providerId)
     if (!providerConfig.apiKey) {
@@ -357,6 +442,20 @@ export class YunwuImageGenerator extends BaseImageGenerator {
     }
 
     const model = this.modelId || typedOptions.modelId || 'gpt-image-2'
+    if (isYunwuGeminiImageModel(model)) {
+      return this.generateGeminiImage({
+        prompt,
+        referenceImages,
+        options: typedOptions,
+        providerConfig,
+        model,
+      })
+    }
+
+    if (referenceImages.length === 0) {
+      throw new Error('YUNWU_IMAGE_REFERENCE_REQUIRED: gpt-image-2 requires at least one image')
+    }
+
     const customEndpoint = readCustomEndpoint(options)
     const baseUrl = normalizeYunwuImageBaseUrl(resolveCustomBaseUrl(providerConfig.baseUrl, customEndpoint))
     const endpoint = `${baseUrl}${YUNWU_IMAGE_ENDPOINT_PATH}`
@@ -391,6 +490,70 @@ export class YunwuImageGenerator extends BaseImageGenerator {
       const errorObj = json as { error?: { message?: string }; message?: string }
       const message = errorObj.error?.message ?? errorObj.message ?? 'unknown error'
       throw new Error(`YUNWU_IMAGE_REQUEST_FAILED: HTTP ${res.status} - ${message}`)
+    }
+
+    return toImageResult(extractImages(json))
+  }
+
+  private async generateGeminiImage(params: {
+    prompt: string
+    referenceImages: string[]
+    options: YunwuImageOptions
+    providerConfig: Awaited<ReturnType<typeof getProviderConfig>>
+    model: string
+  }): Promise<GenerateResult> {
+    const customEndpoint = readCustomEndpoint(params.options as Record<string, unknown>)
+    const baseUrl = normalizeYunwuGeminiImageBaseUrl(resolveCustomBaseUrl(params.providerConfig.baseUrl, customEndpoint))
+    const endpoint = `${baseUrl}/${encodeURIComponent(params.model)}:generateContent?key=${encodeURIComponent(params.providerConfig.apiKey)}`
+    const aspectRatio = normalizeGeminiAspectRatio(params.options.aspectRatio)
+    const imageSize = normalizeGeminiImageSize(resolveGeminiRawImageSize(params.options))
+    const parts: Array<{
+      text?: string
+      inline_data?: {
+        mime_type: string
+        data: string
+      }
+    }> = [{ text: params.prompt }]
+
+    const imageFiles = await Promise.all(params.referenceImages.slice(0, 14).map((image, index) => buildImageBlob(image, index)))
+    for (const image of imageFiles) {
+      parts.push({
+        inline_data: {
+          mime_type: image.blob.type || 'image/png',
+          data: Buffer.from(await image.blob.arrayBuffer()).toString('base64'),
+        },
+      })
+    }
+
+    const body = {
+      contents: [
+        {
+          role: 'user',
+          parts,
+        },
+      ],
+      generationConfig: {
+        responseModalities: ['TEXT', 'IMAGE'],
+        imageConfig: {
+          aspectRatio,
+          imageSize,
+        },
+      },
+    }
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${params.providerConfig.apiKey}`,
+      },
+      body: JSON.stringify(body),
+    })
+    const json = await res.json() as unknown
+    if (!res.ok) {
+      const errorObj = json as { error?: { message?: string }; message?: string }
+      const message = errorObj.error?.message ?? errorObj.message ?? 'unknown error'
+      throw new Error(`YUNWU_GEMINI_IMAGE_REQUEST_FAILED: HTTP ${res.status} - ${message}`)
     }
 
     return toImageResult(extractImages(json))

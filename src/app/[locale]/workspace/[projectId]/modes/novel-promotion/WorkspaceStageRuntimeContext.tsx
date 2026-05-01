@@ -46,6 +46,8 @@ export interface WorkspaceStageRuntimeValue {
     },
     generationOptions?: VideoGenerationOptions,
     panelId?: string,
+    groupNumber?: number,
+    customPrompt?: string,
   ) => Promise<void>
   onGenerateAllVideos: (options?: BatchVideoGenerationParams) => Promise<void>
   onUpdateVideoPrompt: (

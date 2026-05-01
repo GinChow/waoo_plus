@@ -32,6 +32,11 @@ class SharedSubscriber {
 
     client.on('error', (error) => {
       _ulogError(`[SSE:shared] redis error: ${error?.message || 'unknown'}`)
+      if (client !== this.subscriber || !this.shouldRecover(error)) return
+      void this.recoverSubscriberConnection().catch((recoverError) => {
+        const message = recoverError instanceof Error ? recoverError.message : String(recoverError)
+        _ulogError(`[SSE:shared] redis recover failed: ${message}`)
+      })
     })
   }
 

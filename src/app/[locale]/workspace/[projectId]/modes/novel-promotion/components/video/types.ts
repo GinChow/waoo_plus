@@ -65,6 +65,7 @@ export interface Storyboard {
   id: string
   clipId?: string | null
   storyboardTextJson?: string | null
+  coarseGroupsJson?: string | null
   panels?: Panel[]
   clip?: {
     start: number
@@ -85,6 +86,9 @@ export interface VideoPanel {
   storyboardId: string
   panelIndex: number
   parentGroupNumber?: number
+  videoTargetGroupNumber?: number
+  coarseGroupImageUrl?: string | null
+  coarseGroupVideoPrompt?: string | null
   textPanel?: TextPanel
   firstLastFramePrompt?: string
   imageUrl?: string

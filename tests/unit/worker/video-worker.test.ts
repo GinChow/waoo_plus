@@ -6,6 +6,7 @@ type WorkerProcessor = (job: Job<TaskJobData>) => Promise<unknown>
 
 type PanelRow = {
   id: string
+  storyboardId: string
   videoUrl: string | null
   imageUrl: string | null
   videoPrompt: string | null
@@ -51,6 +52,9 @@ const prismaMock = vi.hoisted(() => ({
     update: vi.fn(async () => undefined),
   },
   novelPromotionVoiceLine: {
+    findUnique: vi.fn(),
+  },
+  novelPromotionStoryboard: {
     findUnique: vi.fn(),
   },
 }))
@@ -102,6 +106,7 @@ vi.mock('@/lib/workers/user-concurrency-gate', () => concurrencyGateMock)
 function buildPanel(overrides?: Partial<PanelRow>): PanelRow {
   return {
     id: 'panel-1',
+    storyboardId: 'storyboard-1',
     videoUrl: 'cos/base-video.mp4',
     imageUrl: 'cos/panel-image.png',
     videoPrompt: 'panel prompt',
@@ -140,6 +145,7 @@ describe('worker video processor behavior', () => {
 
     prismaMock.novelPromotionPanel.findUnique.mockResolvedValue(buildPanel())
     prismaMock.novelPromotionPanel.findFirst.mockResolvedValue(buildPanel())
+    prismaMock.novelPromotionStoryboard.findUnique.mockResolvedValue(null)
     prismaMock.novelPromotionVoiceLine.findUnique.mockResolvedValue({
       id: 'line-1',
       audioUrl: 'cos/line-1.mp3',
@@ -222,6 +228,64 @@ describe('worker video processor behavior', () => {
       videoUrl: 'cos/lip-sync/video.mp4',
       actualVideoTokens: 108000,
     })
+  })
+
+  it('VIDEO_PANEL: 粗镜头组任务使用组级图片和视频提示词', async () => {
+    const processor = workerState.processor
+    expect(processor).toBeTruthy()
+
+    prismaMock.novelPromotionStoryboard.findUnique.mockResolvedValueOnce({
+      storyboardTextJson: JSON.stringify([
+        { panel_number: 1, parent_group_number: 1 },
+        { panel_number: 2, parent_group_number: 1 },
+      ]),
+      coarseGroupsJson: JSON.stringify([
+        {
+          groupNumber: 1,
+          imageUrl: 'cos/coarse-group-1.png',
+          videoPrompt: 'coarse group video prompt',
+        },
+      ]),
+      panels: [
+        {
+          panelIndex: 0,
+          panelNumber: 1,
+          description: 'panel 1',
+          videoPrompt: 'panel prompt 1',
+          imageUrl: 'cos/panel-1.png',
+          duration: 1.5,
+        },
+        {
+          panelIndex: 1,
+          panelNumber: 2,
+          description: 'panel 2',
+          videoPrompt: 'panel prompt 2',
+          imageUrl: 'cos/panel-2.png',
+          duration: 2.5,
+        },
+      ],
+    })
+
+    const job = buildJob({
+      type: TASK_TYPE.VIDEO_PANEL,
+      payload: {
+        videoModel: 'fal::seedance/video',
+        groupNumber: 1,
+      },
+    })
+
+    await processor!(job)
+
+    expect(utilsMock.resolveVideoSourceFromGeneration).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        imageUrl: 'https://signed.example/cos/coarse-group-1.png',
+        options: expect.objectContaining({
+          prompt: 'coarse group video prompt',
+          duration: 4,
+        }),
+      }),
+    )
   })
 
   it('LIP_SYNC: 缺少 panel 时显式失败', async () => {

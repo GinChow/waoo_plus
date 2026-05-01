@@ -60,3 +60,15 @@
 - 2026-04-29 Codex: 根因是 `handleStoryboardGroupImageTask` 在任务开始时读取 `coarseGroupsJson`，生成完成后基于旧快照整体写回，多个粗镜头并发完成时会丢失其他任务刚写入的新图。
 - 2026-04-29 Codex: 将粗镜头结果持久化改为保存前读取最新 `coarseGroupsJson`，通过 `updateMany where id + coarseGroupsJson` 做 CAS 合并写入，冲突时最多重试 5 次，避免旧快照覆盖新结果。
 - 2026-04-29 Codex: 新增 worker 回归测试，覆盖“任务启动快照旧、保存前数据库已有其他粗镜头新图”的场景，确认两个粗镜头的新图都会保留。
+- 2026-04-30 Codex: 根据用户提供的 Yunwu Gemini 图片测试脚本，调整 `YunwuImageGenerator`：`gemini-*image*` 模型改走 `https://yunwu.ai/v1beta/models/{model}:generateContent?key=...` JSON 调用，保留 `gpt-image-2` multipart `/v1/images/edits` 分支。
+- 2026-04-30 Codex: 新增 Yunwu Gemini 图片请求体与响应解析单测，覆盖无参考图基础生成、参考图转 `inline_data`、`generationConfig.imageConfig.aspectRatio/imageSize` 和 `inline_data/inlineData` 图片提取。
+- 2026-04-30 Codex: 根据运行错误 `not supported model for image generation` 继续修复 `generator-api` 路由：openai-compatible 且 baseUrl 为 `yunwu.ai` 的 `gemini-*image*` 模型现在与 `gpt-image-2` 一样强制改道 Yunwu official generator，避免进入 openai-compat template。
+- 2026-04-30 Codex: 根据运行错误 `YUNWU_GEMINI_IMAGE_OPTION_UNSUPPORTED: imageSize=3104x1760` 继续修复 Yunwu Gemini 图片参数适配：Gemini 分支现在把 storyboard/gpt 派生的像素尺寸按长边映射为 `1K/2K/4K`，并优先使用合法 `resolution`。
+- 2026-04-30 Codex: 根据运行错误 `Invalid URL (POST /v1/v1beta/models/...)` 修复 Yunwu Gemini baseUrl 规范化：当 provider baseUrl 已含 `/v1` 且模型 customEndpoint 为 `/v1beta/models` 时，最终请求路径强制规范为 `/v1beta/models/{model}:generateContent`。
+- 2026-04-30 Codex: 根据用户确认 Yunwu Gemini 图片模型无 `quality` 参数且使用 `imageSize` 参数，新增 `imageSize` 选项支持并设为 Gemini 分支最高优先级；`quality` 仍允许从通用上游传入但不会写入 Gemini 请求体。
+- 2026-04-30 Codex: 修复重启服务后 Redis shared SSE subscriber 可能输出 `Connection in subscriber mode, only subscriber commands may be used` 的问题；shared subscriber 现在在当前订阅连接触发 subscriber-mode error event 时会主动创建替代订阅连接并重新订阅现有频道。
+- 2026-04-30 Codex: 根据运行错误 `coarseGroupsJson` column too long，将 `NovelPromotionStoryboard.coarseGroupsJson` 从 MySQL `TEXT` 扩容到 `LONGTEXT`，更新原新增列迁移并新增扩容迁移 `20260430193000_widen_storyboard_coarse_groups`；本地执行 `prisma db execute` 后确认列类型为 `longtext`。
+- 2026-04-30 Codex: 根据成片面板反馈，将视频阶段从“每个细镜头生成一个视频”改为“每个粗镜头组生成一个视频”；前端成片列表按粗镜头组合成单张视频卡片，单卡提交 `groupNumber`。
+- 2026-04-30 Codex: 调整 `generate-video` 批量接口，批量生成按 `storyboardTextJson.parent_group_number` 聚合，只为每个粗镜头组的代表 panel 创建一个 `video_panel` 任务。
+- 2026-04-30 Codex: 调整 video worker，收到 `groupNumber` 时优先读取 `coarseGroupsJson` 中的组级 `imageUrl/videoPrompt` 作为视频生成输入，并将组内细镜头时长求和作为视频时长。
+- 2026-04-30 Codex: 修复成片粗镜头组卡片误复用首个细镜头 prompt 状态的问题；组级视频提示词现在按分镜面板相同的 `[时间秒]细镜头视频提示词` 格式现场组织，并用独立粗镜头 key 保存本地编辑态。

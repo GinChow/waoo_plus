@@ -50,6 +50,8 @@ export function useWorkspaceVideoActions({
     },
     generationOptions?: VideoGenerationOptions,
     panelId?: string,
+    groupNumber?: number,
+    customPrompt?: string,
   ) => {
     const normalizedVideoModel = typeof videoModel === 'string' ? videoModel.trim() : ''
     if (!normalizedVideoModel) {
@@ -64,6 +66,8 @@ export function useWorkspaceVideoActions({
         videoModel: normalizedVideoModel,
         firstLastFrame,
         generationOptions,
+        groupNumber,
+        customPrompt,
       })
     } catch (err: unknown) {
       if (isAbortError(err)) {

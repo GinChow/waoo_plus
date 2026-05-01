@@ -98,6 +98,29 @@ phase4 续跑沿用现有 reconcile 规则，保留当前分镜的 `description/
 - `npx prisma generate`
   - Result: passed.
 
+## 2026-04-30 Coarse Group Video Generation
+
+- `npm run typecheck`
+  - Result: passed.
+
+- `npx vitest run tests/unit/worker/video-worker.test.ts`
+  - Result: passed.
+  - Coverage: 1 file, 7 tests.
+  - Focus: group-level video task reads `coarseGroupsJson.imageUrl/videoPrompt` and aggregates fine-shot duration.
+
+- `npm run lint:all`
+  - Result: passed with existing warnings.
+  - Notes: 0 errors, 43 existing warnings after removing the new unused prop.
+
+- `npx vitest run tests/unit/worker/video-worker.test.ts tests/system/generate-video.system.test.ts`
+  - Result: unit file passed; system file blocked before execution because local MySQL test database at `localhost:13306` was unavailable.
+  - Failure class: `PrismaClientInitializationError` from `tests/helpers/db-reset.ts`.
+
+- Coarse group prompt display follow-up:
+  - `npm run typecheck` passed.
+  - `npm run lint:all` passed with existing warnings.
+  - `npx vitest run tests/unit/worker/video-worker.test.ts` passed.
+
 ## 2026-04-29 Yunwu GPT Image 2
 
 - `npm run test:unit:all -- --run tests/unit/generators/yunwu-image.test.ts tests/unit/generator-api.test.ts tests/unit/generators/openai-compatible-image.test.ts`
@@ -156,6 +179,49 @@ phase4 续跑沿用现有 reconcile 规则，保留当前分镜的 `description/
   - Result: failed because the npm script also ran the whole `tests/unit` suite.
   - Relevant changed test file passed in that run.
   - Unrelated failure: `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts` expected request body `{"async":true}`, actual body included `{"async":true,"mode":"all"}`.
+
+## 2026-04-30 Yunwu Gemini Image GenerateContent
+
+- `npx vitest run tests/unit/generators/yunwu-image.test.ts tests/unit/generator-api.test.ts`
+  - Result: passed.
+  - Coverage: 2 files, 21 tests.
+  - Focus: Yunwu Gemini image models use JSON `v1beta/models/{model}:generateContent?key=...`, preserve prompt-first parts order, convert references to `inline_data`, parse inline image responses, openai-compatible Yunwu Gemini models route to the Yunwu official generator instead of openai-compat template, storyboard pixel sizes such as `3104x1760` map to supported Gemini `imageSize` values, baseUrl/customEndpoint combinations do not produce `/v1/v1beta/models`, explicit `imageSize` wins over compatibility fields, and `quality` is not sent in Gemini requests.
+
+- `npm run typecheck`
+  - Result: passed.
+
+- `npm run lint:all`
+  - Result: passed with existing warnings.
+  - Notes: 0 errors, 43 warnings. Warnings are unrelated existing unused variable / hook dependency warnings.
+
+## 2026-04-30 Shared Redis Subscriber Recovery
+
+- `npx vitest run tests/unit/helpers/shared-subscriber.test.ts`
+  - Result: passed.
+  - Coverage: 1 file, 1 test.
+  - Focus: shared SSE subscriber replaces the current Redis subscriber connection and resubscribes active channels when subscriber-mode Redis errors are emitted asynchronously.
+
+- `npm run typecheck`
+  - Result: passed.
+
+## 2026-04-30 Storyboard Coarse Groups LongText
+
+- `npx prisma db execute --file prisma/migrations/20260430193000_widen_storyboard_coarse_groups/migration.sql --schema prisma/schema.prisma`
+  - Result: passed.
+  - Purpose: widen local `novel_promotion_storyboards.coarseGroupsJson` from `TEXT` to `LONGTEXT`.
+
+- `SHOW COLUMNS FROM novel_promotion_storyboards LIKE 'coarseGroupsJson'`
+  - Result: returned `Type: longtext`.
+
+- `npx prisma generate`
+  - Result: passed.
+
+- `npm run typecheck`
+  - Result: passed.
+
+- `npx vitest run tests/unit/worker/panel-image-task-handler.test.ts`
+  - Result: passed.
+  - Coverage: 1 file, 13 tests.
 
 ## 2026-04-29 Yunwu GPT Image 2 Compat Route
 

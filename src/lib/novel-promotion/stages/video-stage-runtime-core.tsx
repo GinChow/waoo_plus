@@ -31,7 +31,6 @@ import {
 import { projectVideoPricingTiersByFixedSelections } from '@/lib/model-pricing/video-tier'
 import { useVideoTaskStates } from './video-stage-runtime/useVideoTaskStates'
 import { useVideoPanelsProjection } from './video-stage-runtime/useVideoPanelsProjection'
-import { useVideoPromptState } from './video-stage-runtime/useVideoPromptState'
 import { useVideoPanelLinking } from './video-stage-runtime/useVideoPanelLinking'
 import { useVideoVoiceLines } from './video-stage-runtime/useVideoVoiceLines'
 import { useVideoDownloadAll } from './video-stage-runtime/useVideoDownloadAll'
@@ -75,7 +74,6 @@ export function useVideoStageRuntime({
   onGenerateVideo,
   onGenerateAllVideos,
   onBack,
-  onUpdateVideoPrompt,
   onUpdatePanelVideoModel,
   onOpenAssetLibraryForCharacter,
   onEnterEditor,
@@ -113,16 +111,6 @@ export function useVideoStageRuntime({
     clips,
     panelVideoStates,
     panelLipStates,
-  })
-
-  const {
-    savingPrompts,
-    getLocalPrompt,
-    updateLocalPrompt,
-    savePrompt,
-  } = useVideoPromptState({
-    allPanels,
-    onUpdateVideoPrompt,
   })
 
   const { linkedPanels, handleToggleLink } = useVideoPanelLinking({
@@ -338,6 +326,8 @@ export function useVideoStageRuntime({
     },
     generationOptions?: VideoGenerationOptions,
     panelId?: string,
+    groupNumber?: number,
+    customPrompt?: string,
   ) => {
     if (isSubmittingVideoBatch) return
 
@@ -360,7 +350,7 @@ export function useVideoStageRuntime({
     }
 
     try {
-      await onGenerateVideo(storyboardId, panelIndex, videoModel, firstLastFrame, generationOptions, panelId)
+      await onGenerateVideo(storyboardId, panelIndex, videoModel, firstLastFrame, generationOptions, panelId, groupNumber, customPrompt)
     } catch (error) {
       setSubmittingVideoPanelKeys((previous) => {
         if (!previous.has(panelKey)) return previous
@@ -482,8 +472,12 @@ export function useVideoStageRuntime({
     return Array.from(groups.values())
   }, [projectedPanels])
 
-  const runningCount = projectedPanels.filter((panel) => panel.videoTaskRunning || panel.lipSyncTaskRunning).length
-  const failedCount = allPanels.filter((panel) => !!panel.videoErrorMessage || !!panel.lipSyncErrorMessage).length
+  const runningCount = projectedCoarseGroups.filter((group) =>
+    group.some((panel) => panel.videoTaskRunning || panel.lipSyncTaskRunning),
+  ).length
+  const failedCount = projectedCoarseGroups.filter((group) =>
+    group.some((panel) => !!panel.videoErrorMessage || !!panel.lipSyncErrorMessage),
+  ).length
   const isAnyTaskRunning = runningCount > 0 || isSubmittingVideoBatch
   const canSubmitBatchGenerate = !!batchSelectedModel && batchMissingCapabilityFields.length === 0
 
@@ -548,7 +542,6 @@ export function useVideoStageRuntime({
 
       <VideoRenderPanel
         allPanels={projectedPanels}
-        linkedPanels={linkedPanels}
         highlightedPanelKey={highlightedPanelKey}
         panelRefs={panelRefs}
         videoRatio={videoRatio}
@@ -560,7 +553,6 @@ export function useVideoStageRuntime({
         runningVoiceLineIds={runningVoiceLineIds}
         panelVoiceLines={panelVoiceLines}
         panelVideoPreference={panelVideoPreference}
-        savingPrompts={savingPrompts}
         flModel={flModel}
         flModelOptions={flModelOptions}
         flGenerationOptions={flGenerationOptions}
@@ -579,9 +571,6 @@ export function useVideoStageRuntime({
         onPreviewImage={setPreviewImage}
         onToggleLipSyncVideo={toggleLipSyncVideo}
         getDefaultFlPrompt={getDefaultFlPrompt}
-        getLocalPrompt={getLocalPrompt}
-        updateLocalPrompt={updateLocalPrompt}
-        savePrompt={savePrompt}
       />
 
       {isBatchConfigOpen && (
