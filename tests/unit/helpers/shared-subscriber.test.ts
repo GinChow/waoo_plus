@@ -28,6 +28,7 @@ vi.mock('@/lib/redis', () => ({
 }))
 
 vi.mock('@/lib/logging/core', () => ({
+  logDebug: vi.fn(),
   logError: vi.fn(),
 }))
 
@@ -39,6 +40,7 @@ describe('shared redis subscriber', () => {
   })
 
   it('recovers when current subscriber emits subscriber-mode redis error', async () => {
+    const logging = await import('@/lib/logging/core')
     const { getSharedSubscriber } = await import('@/lib/sse/shared-subscriber')
     const sharedSubscriber = getSharedSubscriber()
     const unsubscribe = await sharedSubscriber.addChannelListener('project:1', vi.fn())
@@ -51,6 +53,7 @@ describe('shared redis subscriber', () => {
       expect(clients[1].subscribed).toEqual(['project:1'])
     })
     expect(clients[0].quit).toHaveBeenCalledTimes(1)
+    expect(logging.logError).not.toHaveBeenCalled()
 
     await unsubscribe()
     expect(clients[1].unsubscribed).toEqual(['project:1'])

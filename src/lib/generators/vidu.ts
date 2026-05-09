@@ -126,6 +126,30 @@ function pickFirstDefined<T>(...values: Array<T | undefined>): T | undefined {
     return undefined
 }
 
+function sanitizeRequestBodyForLog(value: unknown): unknown {
+    if (typeof value === 'string') {
+        const dataUrlMatch = value.match(/^(data:[^,]+,)([\s\S]*)$/)
+        if (dataUrlMatch) {
+            return `${dataUrlMatch[1]}[base64 omitted length=${dataUrlMatch[2].length}]`
+        }
+        return value
+    }
+
+    if (Array.isArray(value)) {
+        return value.map((item) => sanitizeRequestBodyForLog(item))
+    }
+
+    if (value && typeof value === 'object') {
+        const next: Record<string, unknown> = {}
+        for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+            next[key] = sanitizeRequestBodyForLog(item)
+        }
+        return next
+    }
+
+    return value
+}
+
 function buildUniformModeSpec(input: {
     durationOptions: readonly number[]
     defaultDuration: number
@@ -723,7 +747,7 @@ export class ViduVideoGenerator extends BaseVideoGenerator {
             payloadLength: payload?.length ?? 0,
             hasCallbackUrl: Boolean(callbackUrl),
         })
-        _ulogInfo(`${logPrefix} - 完整请求体:`, JSON.stringify(requestBody, null, 2))
+        _ulogInfo(`${logPrefix} - 完整请求体:`, JSON.stringify(sanitizeRequestBodyForLog(requestBody), null, 2))
 
         try {
             const authHeader = this.buildAuthHeader(apiKey)

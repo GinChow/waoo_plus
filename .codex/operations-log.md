@@ -1,74 +1,38 @@
 # Operations Log
 
-- 2026-04-24 Codex: Received request to parallelize storyboard phase2/phase3/phase4 per coarse shot.
-- 2026-04-24 Codex: sequential-thinking, shrimp-task-manager, code-index MCP tools unavailable; used local rg/sed and built-in planning fallback.
-- 2026-04-24 Codex: Identified serial group loops in src/lib/novel-promotion/script-to-storyboard/orchestrator.ts.
-- 2026-04-24 Codex: Replaced serial coarse group split, guidance, and detail loops with bounded mapWithConcurrency while preserving result order.
-- 2026-04-24 Codex: Added unit coverage for bounded group concurrency and ordered final panels.
-- 2026-04-26 Codex: Received report that phase3 acting guidance is lost during merged JSON output.
-- 2026-04-26 Codex: sequential-thinking, shrimp-task-manager, code-index MCP tools unavailable; used rg/sed and local test commands as fallback.
-- 2026-04-26 Codex: Updated main storyboard orchestrator and atomic retry merge paths to emit final acting guidance as both actingNotes and acting_notes arrays.
-- 2026-04-26 Codex: Added normalization for old nested acting guidance artifact shape in atomic retry.
-- 2026-04-26 Codex: Verified focused worker tests and typecheck pass; full unit suite has one unrelated project-global-analyze-mutation assertion failure and is not used as this task's acceptance gate.
-- 2026-04-26 Codex: 使用 `rg` 定位“重新生成文字”前端、API、worker 与分镜编排器链路；`sequential-thinking`、`shrimp-task-manager`、`code-index` 在当前会话不可用，已降级为本地检索。
-- 2026-04-26 Codex: 确认根因是 `regenerate_storyboard_text` 仍使用旧三阶段分镜流程，写入 `storyboardTextJson` 时缺失 `parent_group_number`，导致所有细镜头归入粗镜头 1。
-- 2026-04-26 Codex: 修改 `src/lib/workers/text.worker.ts`，让重新生成文字复用新版 `runScriptToStoryboardOrchestrator` 与 `persistStoryboardsAndPanels`，保持与首次生成一致的粗分镜拆细和分组映射。
-- 2026-04-26 Codex: 执行 `npm run typecheck` 通过。
-- 2026-04-26 Codex: 执行 `npm run lint:all` 通过，无错误；仓库存在 44 个既有 warning。
-- 2026-04-26 Codex: 误执行 `npm run test:unit:all -- ...`，该脚本实际跑完整 `tests/unit`，发现 1 个无关失败：`tests/unit/novel-promotion/project-global-analyze-mutation.test.ts` 期望 body 为 `{\"async\":true}`，实际为 `{\"async\":true,\"mode\":\"all\"}`。
-- 2026-04-26 Codex: 精确执行 `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts tests/unit/worker/script-to-storyboard.test.ts`，2 个文件 17 个用例通过。
-- 2026-04-27 Codex: 收到反馈 `photography_rules.characters` 中 `screen_position/posture/facing` 仍为空；确认主链路与 atomic retry 只保留 acting_notes，没有把 acting direction 合并进摄影角色约束。
-- 2026-04-27 Codex: 更新主编排器与 atomic retry：`buildUnifiedPhotographyPlan` 接收 acting notes，优先用 acting 的 `screen_position/posture/facing`，再用 slot、composition、description、acting 文本兜底，并兼容 `screen_postion` 拼写。
-- 2026-04-27 Codex: 更新 `agent_acting_direction_v2.zh.txt`，要求 acting director 输出 `screen_position/posture/facing/acting` 五字段，且前三项必须非空。
-- 2026-04-27 Codex: 执行 `npm run typecheck` 通过；执行 `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts tests/unit/worker/script-to-storyboard-atomic-retry.test.ts tests/unit/worker/script-to-storyboard.test.ts` 通过，3 个文件 20 个用例。
-- 2026-04-27 Codex: 接到需求：分镜面板重新生成文字支持选择从 phase1/phase2/phase3/phase4 开始，避免无条件全量重跑。
-- 2026-04-27 Codex: 降级说明：当前会话没有 sequential-thinking、shrimp-task-manager、code-index MCP 工具，使用 `rg`、`sed`、`update_plan` 和本地补丁替代。
-- 2026-04-27 Codex: 实现 `startPhase` 合同、当前 panel seed 转换、orchestrator phase2/3/4 续跑分支和前端选择器。
-- 2026-04-27 Codex: 验证通过 `npm run typecheck`、`npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts`、`npm run lint:all`。
-- 2026-04-27 Codex: 修复 phase4 续跑中当前 `actingNotes` 为数组时被 seed/collector 过滤，导致 `Missing acting direction` 的问题。
-- 2026-04-27 Codex: 继续修复 phase4 续跑中当前 panel 完全缺少 `actingNotes` 或 `photographyPlan` 时的兜底 guidance，避免旧数据阻断细节重生成。
-- 2026-04-27 Codex: 将兜底逻辑下沉到 `reconcilePhase3Panels` 与 `buildFinePanelsWithCinematography` 最终合并层，确保上游传空 guidance 时也不会抛 `Missing acting direction`。
-- 2026-04-27 Codex: 修复 `mergePanelsWithRules` 最终合并层缺 `photographyRules` 时的兜底，覆盖 phase4 输出 panel_number 与当前 guidance 不匹配的情况。
-- 2026-04-27 Codex: 将 `regenerate_storyboard_text` 的 orchestrator 并发从固定 1 改为读取用户 `workflowConcurrency.analysis` 配置。
-- 2026-04-27 Codex: 修复 phase4 detail 输出 `duration_final` 未被解析，以及重新生成 seed 未保留 `duration_base` 导致导出 JSON 时长为 null 的问题。
-- 2026-04-27 Codex: 修复分镜任务进度中文明文被当作 `progress` i18n key 翻译，导致 `MISSING_MESSAGE` 控制台错误的问题。
-- 2026-04-28 Codex: 接到需求：分镜图片生成从细分镜单张生成改为按粗镜头分组生成一张多宫格分镜图，并把细分镜图片/视频提示词聚合存入粗镜头产物。
-- 2026-04-28 Codex: 降级说明：当前会话没有 sequential-thinking、shrimp-task-manager、code-index MCP 工具，使用 `rg`、`sed`、`update_plan` 和 `.codex/context-scan-storyboard-grid.json` 替代。
-- 2026-04-28 Codex: 新增 `NovelPromotionStoryboard.coarseGroupsJson` 字段和迁移 `20260428120000_add_storyboard_coarse_groups`，用于保存 `groupNumber/imagePrompt/videoPrompt/imageUrl/candidateImages`。
-- 2026-04-28 Codex: 扩展 `regenerate-panel-image` 接口，支持 `storyboardId + groupNumber` 提交 `image_panel` 任务；image worker 对 `NovelPromotionStoryboard` target 改走粗镜头多宫格生成路径。
-- 2026-04-28 Codex: `handleStoryboardGroupImageTask` 会按 `storyboardTextJson` 的 `parent_group_number` 聚合细分镜，生成多宫格图片提示词和时间轴视频提示词，并写回 `coarseGroupsJson`。
-- 2026-04-28 Codex: 前端批量生成按钮改为按粗镜头分组提交任务；粗镜头卡片优先展示已生成的多宫格图，未生成时保留细分镜缩略预览。
-- 2026-04-28 Codex: 执行 `npx prisma generate` 刷新 Prisma Client 类型。
-- 2026-04-28 Codex: 验证通过 `npm run typecheck`、`npx vitest run tests/unit/worker/panel-image-task-handler.test.ts tests/unit/worker/image-worker.test.ts`、`npm run lint:all`。
-- 2026-04-28 Codex: 误执行 `npm run test:unit:all -- panel-image-task-handler image-worker`，该脚本实际跑完整 `tests/unit`；唯一失败为既有无关断言 `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts` 期望 body 不含 `mode:"all"`。
-- 2026-04-28 Codex: 修复本地开发库缺列错误。将新增迁移 SQL 从双引号改为 MySQL 反引号，因当前库非空且无 migration baseline，使用 `npx prisma db execute --file prisma/migrations/20260428120000_add_storyboard_coarse_groups/migration.sql --schema prisma/schema.prisma` 直接补列。
-- 2026-04-28 Codex: 验证 `SHOW COLUMNS FROM novel_promotion_storyboards LIKE 'coarseGroupsJson'` 返回 `text nullable`，并重新执行 `npx prisma generate`。
-- 2026-04-28 Codex: 根据反馈在每个粗镜头预览卡片右上角新增“生成/重新生成”按钮，直接触发该粗镜头多宫格分镜图片生成；卡片本体改为 `div role=button` 避免按钮嵌套。
-- 2026-04-28 Codex: 根据反馈在每个粗镜头预览卡片内展示保存的 `imagePrompt` 与 `videoPrompt`，从 `coarseGroupsJson` 按 `groupNumber` 读取，生成前显示空状态。
-- 2026-04-28 Codex: 根据反馈将粗镜头提示词显示改为即时组织：优先显示 `coarseGroupsJson` 保存值，没有保存值时直接从该粗镜头下细镜头的首帧/描述/视频提示词现场聚合。
-- 2026-04-28 Codex: 根据反馈将多宫格图片提示词条目命名从 `细分镜N` 改为粗镜头内顺序 `分镜1:`、`分镜2:`，前端预览和后端保存逻辑保持一致。
-- 2026-04-28 Codex: 根据反馈调整粗镜头提示词文本区交互，文本区拦截点击/键盘事件并启用 `select-text`，避免选中文案时跳转到细分镜界面。
-- 2026-04-29 Codex: 接到反馈 yunwu provider 调用 `gpt-image-2` 报错；sequential-thinking、shrimp-task-manager、code-index MCP 工具在当前会话不可用，降级为 `rg`/`sed`/本地测试。
-- 2026-04-29 Codex: 定位到 yunwu 图片模型 official 路由缺少图片生成器，并且参考脚本要求直发 `https://yunwu.ai/v1/images/edits` multipart，而不是复用 OpenAI SDK 标准解析。
-- 2026-04-29 Codex: 新增 `YunwuImageGenerator`，支持 Bearer 认证、`image` 多文件 FormData、`quality/size/response_format/n` 参数、`aspectRatio` 到像素 size 映射，以及 `data[]`/`choices[].message.content` 图片提取。
-- 2026-04-29 Codex: 更新 image generator factory 和导出，让 `yunwu::gpt-image-2` 图片模型走 official provider generator。
-- 2026-04-29 Codex: 验证通过 `npm run typecheck`、`npx vitest run tests/unit/generators/yunwu-image.test.ts tests/unit/generator-api.test.ts tests/unit/generators/openai-compatible-image.test.ts`、`npm run lint:all`；lint 仍有 43 个既有 warning。
-- 2026-04-29 Codex: 根据运行日志 `Unknown parameter: 'image'` 继续修复 `openai-compatible:*::gpt-image-2` 且 baseUrl 为 `yunwu.ai` 的配置，强制绕过 compat template，改道到 yunwu 官方 multipart generator，同时保留原 provider id 读取用户密钥。
-- 2026-04-29 Codex: 根据运行日志 `YUNWU_IMAGE_OPTION_UNSUPPORTED: customEndpoint` 继续修复，允许 yunwu 图片生成器接收模型级 `customEndpoint`，并用它参与 baseUrl 规范化。
-- 2026-04-29 Codex: 根据反馈修正粗镜头多宫格图片生成 size 推导。`resolveStoryboardGroupImageSize` 现在基于最终整张分镜图应用 gpt-image-2 约束：最长边 <=3840、两边 16 倍数、长短边 <=3:1、总像素 655360..8294400；同时按 `panel_layout`、`aspect_ratio` 和 16px 黑色分隔线推导尺寸，必要时用黑色外边距补足短边。
-- 2026-04-29 Codex: 分析并修复粗镜头多宫格图并发生成时新图被旧图覆盖的问题；sequential-thinking、shrimp-task-manager、code-index MCP 工具当前不可用，降级使用 `rg`、`sed`、`update_plan` 和本地测试。
-- 2026-04-29 Codex: 根因是 `handleStoryboardGroupImageTask` 在任务开始时读取 `coarseGroupsJson`，生成完成后基于旧快照整体写回，多个粗镜头并发完成时会丢失其他任务刚写入的新图。
-- 2026-04-29 Codex: 将粗镜头结果持久化改为保存前读取最新 `coarseGroupsJson`，通过 `updateMany where id + coarseGroupsJson` 做 CAS 合并写入，冲突时最多重试 5 次，避免旧快照覆盖新结果。
-- 2026-04-29 Codex: 新增 worker 回归测试，覆盖“任务启动快照旧、保存前数据库已有其他粗镜头新图”的场景，确认两个粗镜头的新图都会保留。
-- 2026-04-30 Codex: 根据用户提供的 Yunwu Gemini 图片测试脚本，调整 `YunwuImageGenerator`：`gemini-*image*` 模型改走 `https://yunwu.ai/v1beta/models/{model}:generateContent?key=...` JSON 调用，保留 `gpt-image-2` multipart `/v1/images/edits` 分支。
-- 2026-04-30 Codex: 新增 Yunwu Gemini 图片请求体与响应解析单测，覆盖无参考图基础生成、参考图转 `inline_data`、`generationConfig.imageConfig.aspectRatio/imageSize` 和 `inline_data/inlineData` 图片提取。
-- 2026-04-30 Codex: 根据运行错误 `not supported model for image generation` 继续修复 `generator-api` 路由：openai-compatible 且 baseUrl 为 `yunwu.ai` 的 `gemini-*image*` 模型现在与 `gpt-image-2` 一样强制改道 Yunwu official generator，避免进入 openai-compat template。
-- 2026-04-30 Codex: 根据运行错误 `YUNWU_GEMINI_IMAGE_OPTION_UNSUPPORTED: imageSize=3104x1760` 继续修复 Yunwu Gemini 图片参数适配：Gemini 分支现在把 storyboard/gpt 派生的像素尺寸按长边映射为 `1K/2K/4K`，并优先使用合法 `resolution`。
-- 2026-04-30 Codex: 根据运行错误 `Invalid URL (POST /v1/v1beta/models/...)` 修复 Yunwu Gemini baseUrl 规范化：当 provider baseUrl 已含 `/v1` 且模型 customEndpoint 为 `/v1beta/models` 时，最终请求路径强制规范为 `/v1beta/models/{model}:generateContent`。
-- 2026-04-30 Codex: 根据用户确认 Yunwu Gemini 图片模型无 `quality` 参数且使用 `imageSize` 参数，新增 `imageSize` 选项支持并设为 Gemini 分支最高优先级；`quality` 仍允许从通用上游传入但不会写入 Gemini 请求体。
-- 2026-04-30 Codex: 修复重启服务后 Redis shared SSE subscriber 可能输出 `Connection in subscriber mode, only subscriber commands may be used` 的问题；shared subscriber 现在在当前订阅连接触发 subscriber-mode error event 时会主动创建替代订阅连接并重新订阅现有频道。
-- 2026-04-30 Codex: 根据运行错误 `coarseGroupsJson` column too long，将 `NovelPromotionStoryboard.coarseGroupsJson` 从 MySQL `TEXT` 扩容到 `LONGTEXT`，更新原新增列迁移并新增扩容迁移 `20260430193000_widen_storyboard_coarse_groups`；本地执行 `prisma db execute` 后确认列类型为 `longtext`。
-- 2026-04-30 Codex: 根据成片面板反馈，将视频阶段从“每个细镜头生成一个视频”改为“每个粗镜头组生成一个视频”；前端成片列表按粗镜头组合成单张视频卡片，单卡提交 `groupNumber`。
-- 2026-04-30 Codex: 调整 `generate-video` 批量接口，批量生成按 `storyboardTextJson.parent_group_number` 聚合，只为每个粗镜头组的代表 panel 创建一个 `video_panel` 任务。
-- 2026-04-30 Codex: 调整 video worker，收到 `groupNumber` 时优先读取 `coarseGroupsJson` 中的组级 `imageUrl/videoPrompt` 作为视频生成输入，并将组内细镜头时长求和作为视频时长。
-- 2026-04-30 Codex: 修复成片粗镜头组卡片误复用首个细镜头 prompt 状态的问题；组级视频提示词现在按分镜面板相同的 `[时间秒]细镜头视频提示词` 格式现场组织，并用独立粗镜头 key 保存本地编辑态。
+Date: 2026-05-01
+Executor: Codex
+
+## Task
+
+为分镜面板粗镜头卡片增加每次生成图片的历史记录，下拉预览历史图片，并支持选择历史图片作为当前粗镜头分镜图。
+
+## Notes
+
+- 使用 `rg` 定位粗镜头 UI、生成 worker、API 与 `coarseGroupsJson` 数据流。
+- 采用扩展 `coarseGroupsJson` 的方式保存 `imageHistory`，避免新增数据库迁移。
+- 新增 `storyboard-group/select-image` API 负责验证并切换当前粗镜头图片。
+- 更新媒体附加逻辑，确保历史图片中的存储 key 会转换为可预览 URL。
+- 追加历史图片删除能力：从 `imageHistory` 和候选列表移除目标图；删除当前图时回退到剩余历史最后一张。
+
+## Task: Yunwu Kling Omni Video
+
+Date: 2026-05-01 16:37:50 +0800
+Executor: Codex
+
+- 工具降级：当前会话未暴露 sequential-thinking、shrimp-task-manager、code-index、exa；使用 `rg`、`sed`、本地测试和结构化记录替代。
+- 使用 `rg` 定位视频生成入口、Yunwu/Vidu generator、async-poll、preset model 和 capabilities catalog。
+- 在 `YunwuVideoGenerator` 中仅对 `kling-video-o1`、`kling-v3-omni` 增加 `/videos/omni-video` 分支，保留其他 Yunwu Vidu 模型原路径。
+- 新增 `YUNWUOMNI:VIDEO` externalId 格式，支持 `ep_` token 保存自定义 baseUrl，并在 async-poll 中查询 `/videos/omni-video/{taskId}`。
+- 新增 Yunwu preset 模型与 capabilities 声明，补充 focused unit tests。
+
+## Task: Panel Video Outbound Request Logging
+
+Date: 2026-05-07 17:34:00 +0800
+Executor: Codex
+
+- 工具降级：当前会话未暴露 sequential-thinking、shrimp-task-manager、code-index、exa；使用 `rg`、`sed`、本地测试和结构化记录替代。
+- 定位成片阶段视频任务入口为 `src/lib/workers/video.worker.ts` 调用 `resolveVideoSourceFromGeneration`，最终进入统一 `generateVideo`。
+- 在 `src/lib/workers/utils.ts` 为通用视频生成调用增加 audit 日志，并追加写入 `/tmp/wao-panel-video-outbound-requests.ndjson`。
+- 日志与临时文件中的图片 data URL / base64-like 字符串仅保留长度占位，实际传给 `generateVideo` 的参数保持原值。
+- 调整 `src/lib/generators/vidu.ts` 的完整请求体日志，避免 `images` 中的 base64 原文刷满日志。

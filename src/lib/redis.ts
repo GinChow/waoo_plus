@@ -33,9 +33,20 @@ function buildBaseConfig() {
   }
 }
 
-function onConnectLog(scope: string, client: Redis) {
+function isSubscriberModeCommandError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  const lower = message.toLowerCase()
+  return lower.includes('subscriber mode') || lower.includes('only subscriber commands may be used')
+}
+
+function onConnectLog(scope: string, client: Redis, options?: {
+  ignoreError?: (error: unknown) => boolean
+}) {
   client.on('connect', () => _ulogDebug(`[Redis:${scope}] connected ${REDIS_HOST}:${REDIS_PORT}`))
-  client.on('error', (err) => _ulogError(`[Redis:${scope}] error:`, err.message))
+  client.on('error', (err) => {
+    if (options?.ignoreError?.(err)) return
+    _ulogError(`[Redis:${scope}] error:`, err.message)
+  })
 }
 
 function createAppRedis() {
@@ -70,6 +81,6 @@ export function createSubscriber() {
     ...buildBaseConfig(),
     maxRetriesPerRequest: null,
   })
-  onConnectLog('sub', client)
+  onConnectLog('sub', client, { ignoreError: isSubscriberModeCommandError })
   return client
 }

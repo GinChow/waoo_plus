@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import type { CapabilitySelections, CapabilityValue } from '@/lib/model-config-contract'
 import { VideoPanelCard, type VideoPanel, type VideoModelOption, type MatchedVoiceLine, type FirstLastFrameParams, type VideoGenerationOptions } from '../video'
+import { useUpdateProjectPanelVideoPrompt } from '@/lib/query/hooks'
 
 interface VideoRenderPanelProps {
   allPanels: VideoPanel[]
@@ -107,6 +108,7 @@ export default function VideoRenderPanel({
 }: VideoRenderPanelProps) {
   const t = useTranslations('video')
   const [groupPromptOverrides, setGroupPromptOverrides] = useState<Map<string, string>>(new Map())
+  const updatePanelVideoPromptMutation = useUpdateProjectPanelVideoPrompt(projectId)
   const groupedPanels = useMemo(() => allPanels.reduce<Array<{
     storyboardId: string
     groupNumber: number
@@ -130,10 +132,13 @@ export default function VideoRenderPanel({
     const firstPanel = firstEntry.panel
     const groupImageUrl = firstPanel.coarseGroupImageUrl || firstPanel.imageUrl
     const groupVideoPrompt = firstPanel.coarseGroupVideoPrompt || buildCoarseGroupVideoPrompt(group.entries)
-    const totalDuration = group.entries.reduce((sum, { panel }) => {
+    const calculatedDuration = group.entries.reduce((sum, { panel }) => {
       const duration = panel.textPanel?.duration
       return sum + (typeof duration === 'number' && Number.isFinite(duration) && duration > 0 ? duration : 0)
     }, 0)
+    const totalDuration = firstPanel.coarseGroupDuration && firstPanel.coarseGroupDuration > 0
+      ? firstPanel.coarseGroupDuration
+      : calculatedDuration
     const hasRunning = group.entries.some(({ panel }) => panel.videoTaskRunning)
     const failedPanel = group.entries.find(({ panel }) => panel.videoErrorMessage || panel.videoErrorCode)?.panel
 
@@ -239,6 +244,12 @@ export default function VideoRenderPanel({
                   const next = new Map(previous)
                   next.set(groupPromptKey, value)
                   return next
+                })
+                await updatePanelVideoPromptMutation.mutateAsync({
+                  storyboardId: group.storyboardId,
+                  panelIndex: panel.panelIndex,
+                  groupNumber: group.groupNumber,
+                  value,
                 })
               }}
               onGenerateVideo={onGenerateVideo}

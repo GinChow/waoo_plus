@@ -55,11 +55,13 @@ export function useUpdateProjectPanelVideoPrompt(projectId: string) {
     mutationFn: async ({
       storyboardId,
       panelIndex,
+      groupNumber,
       value,
       field = 'videoPrompt',
     }: {
       storyboardId: string
       panelIndex: number
+      groupNumber?: number
       value: string
       field?: 'videoPrompt' | 'firstLastFramePrompt'
     }) =>
@@ -71,6 +73,7 @@ export function useUpdateProjectPanelVideoPrompt(projectId: string) {
           body: JSON.stringify({
             storyboardId,
             panelIndex,
+            ...(groupNumber !== undefined ? { groupNumber } : {}),
             ...(field === 'firstLastFramePrompt'
               ? { firstLastFramePrompt: value }
               : { videoPrompt: value }),
@@ -94,10 +97,12 @@ export function useUpdateProjectPanelDuration(projectId: string) {
     mutationFn: async ({
       storyboardId,
       panelIndex,
+      groupNumber,
       duration,
     }: {
       storyboardId: string
       panelIndex: number
+      groupNumber?: number
       duration: number | null
     }) =>
       await requestJsonWithError(
@@ -105,7 +110,12 @@ export function useUpdateProjectPanelDuration(projectId: string) {
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ storyboardId, panelIndex, duration }),
+          body: JSON.stringify({
+            storyboardId,
+            panelIndex,
+            ...(groupNumber !== undefined ? { groupNumber } : {}),
+            duration,
+          }),
         },
         'update duration failed',
       ),

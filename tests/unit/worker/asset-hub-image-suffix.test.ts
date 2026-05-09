@@ -1,6 +1,6 @@
 import type { Job } from 'bullmq'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CHARACTER_ASSET_IMAGE_RATIO, CHARACTER_PROMPT_SUFFIX, PROP_IMAGE_RATIO, PROP_PROMPT_SUFFIX } from '@/lib/constants'
+import { CHARACTER_ASSET_IMAGE_RATIO, CHARACTER_PROMPT_SUFFIX, LOCATION_IMAGE_RATIO, LOCATION_PROMPT_SUFFIX, PROP_IMAGE_RATIO, PROP_PROMPT_SUFFIX } from '@/lib/constants'
 import { TASK_TYPE, type TaskJobData } from '@/lib/task/types'
 
 const workersUtilsMock = vi.hoisted(() => ({
@@ -131,6 +131,15 @@ describe('asset hub character image prompt suffix regression', () => {
       imageCount: 1,
     })
     expect(sharedMock.generateCleanImageToStorage).toHaveBeenCalledTimes(1)
+    const generationCall = sharedMock.generateCleanImageToStorage.mock.calls[0] as unknown as [{
+      prompt?: string
+      options?: { aspectRatio?: string }
+    }] | undefined
+    const callArg = generationCall?.[0]
+    const prompt = callArg?.prompt || ''
+    expect(prompt).toContain(LOCATION_PROMPT_SUFFIX)
+    expect(countOccurrences(prompt, LOCATION_PROMPT_SUFFIX)).toBe(1)
+    expect(callArg?.options).toEqual(expect.objectContaining({ aspectRatio: LOCATION_IMAGE_RATIO }))
     expect(prismaMock.globalLocationImage.update).toHaveBeenCalledTimes(1)
     expect(prismaMock.globalLocationImage.update).toHaveBeenCalledWith({
       where: { id: 'global-location-image-1' },

@@ -145,10 +145,23 @@ async function attachMediaFieldsToStoryboard<T extends Record<string, unknown>>(
             const media = await resolveMediaRefFromLegacyValue(candidate)
             return media?.url || candidate
           }))
+          const history = Array.isArray(record.imageHistory) ? record.imageHistory : []
+          const resolvedHistory = await Promise.all(history.map(async (entry) => {
+            if (!entry || typeof entry !== 'object') return entry
+            const historyRecord = entry as Record<string, unknown>
+            const imageUrl = typeof historyRecord.imageUrl === 'string' ? historyRecord.imageUrl : ''
+            if (!imageUrl || imageUrl.startsWith('PENDING:')) return historyRecord
+            const media = await resolveMediaRefFromLegacyValue(imageUrl)
+            return {
+              ...historyRecord,
+              imageUrl: media?.url || imageUrl,
+            }
+          }))
           return {
             ...record,
             imageUrl: imageMedia?.url || record.imageUrl || null,
             candidateImages: candidates.length > 0 ? resolvedCandidates : record.candidateImages || null,
+            imageHistory: history.length > 0 ? resolvedHistory : record.imageHistory || [],
           }
         }))
         coarseGroupsJson = JSON.stringify(resolvedGroups)

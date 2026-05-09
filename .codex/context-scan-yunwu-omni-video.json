@@ -1,0 +1,50 @@
+{
+  "date": "2026-05-01",
+  "executor": "Codex",
+  "task": "为视频生成模型添加 Yunwu provider kling-omni-video 调用逻辑",
+  "toolFallbacks": {
+    "sequentialThinking": "当前会话未暴露 sequential-thinking MCP 工具，使用本地代码检索和人工结构化分析替代。",
+    "shrimpTaskManager": "当前会话未暴露 shrimp-task-manager MCP 工具，使用本地计划和验证流程替代。",
+    "codeIndex": "当前会话未暴露 code-index MCP 工具，使用 rg/sed 检索替代。",
+    "exa": "本任务以本地脚本和仓库代码为依据，未进行网络搜索。"
+  },
+  "location": {
+    "generator": "src/lib/generators/yunwu.ts",
+    "polling": "src/lib/async-poll.ts",
+    "presetModels": "src/app/[locale]/profile/components/api-config/types.ts",
+    "capabilities": "standards/capabilities/image-video.catalog.json"
+  },
+  "currentImplementation": {
+    "yunwuVideo": "YunwuVideoGenerator 原先继承 ViduVideoGenerator，仅支持 Vidu 兼容 /img2video 与 /start-end2video。",
+    "asyncPolling": "async-poll 已支持 VIDU/YUNWU externalId，并通过 Vidu /tasks/{taskId}/creations 查询。",
+    "modelEntry": "Yunwu preset 仅包含 vidu 系列视频模型。"
+  },
+  "similarPatterns": [
+    "ViduVideoGenerator 的 provider 配置、baseUrl 规范化、Bearer/Token 认证和 async externalId 模式",
+    "OpenAI/OCOMPAT async poll 的 externalId token 化 custom baseUrl 模式",
+    "YunwuImageGenerator 对 yunwu 原生接口的 baseUrl 规范化和 Bearer 鉴权模式"
+  ],
+  "keyQuestions": [
+    {
+      "priority": "high",
+      "question": "kling-video-o1/kling-v3-omni 是否能复用 Vidu 兼容端点？",
+      "answer": "不能。用户提供的脚本使用 /videos/omni-video 创建任务和 /videos/omni-video/{taskId} 查询，需独立分支。"
+    },
+    {
+      "priority": "high",
+      "question": "现有视频流程的 imageUrl 如何映射到 Omni 请求？",
+      "answer": "VideoGenerateParams 必带 imageUrl；Omni 支持 image_list，默认转为纯 base64 first_frame，lastFrameImageUrl 转为 end_frame。"
+    },
+    {
+      "priority": "medium",
+      "question": "如何避免破坏现有 yunwu Vidu 模型？",
+      "answer": "仅当 modelId 为 kling-video-o1 或 kling-v3-omni 时走 Omni 分支，其余继续调用 super.doGenerate。"
+    }
+  ],
+  "sufficiencyCheck": {
+    "interfaceContract": true,
+    "technicalChoice": true,
+    "riskIdentified": true,
+    "verificationKnown": true
+  }
+}

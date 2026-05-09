@@ -50,4 +50,14 @@ describe('async poll externalId contract', () => {
     expect(parsed.type).toBe('IMAGE')
     expect(parsed.requestId).toBe('task_456')
   })
+
+  it('parses YUNWUOMNI externalId with custom endpoint token', () => {
+    const token = Buffer.from('https://proxy.example/yunwu', 'utf8').toString('base64url')
+    const parsed = parseExternalId(`YUNWUOMNI:VIDEO:ep_${token}:task_omni`)
+
+    expect(parsed.provider).toBe('YUNWUOMNI')
+    expect(parsed.type).toBe('VIDEO')
+    expect(parsed.requestId).toBe('task_omni')
+    expect(parsed.customBaseUrl).toBe('https://proxy.example/yunwu')
+  })
 })

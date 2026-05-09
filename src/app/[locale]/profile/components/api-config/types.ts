@@ -195,6 +195,8 @@ export const PRESET_MODELS: PresetModel[] = [
     { modelId: 'viduq1', name: 'Vidu Q1', type: 'video', provider: 'yunwu' },
     { modelId: 'viduq1-classic', name: 'Vidu Q1 Classic', type: 'video', provider: 'yunwu' },
     { modelId: 'vidu2.0', name: 'Vidu 2.0', type: 'video', provider: 'yunwu' },
+    { modelId: 'kling-video-o1', name: 'Kling Omni O1', type: 'video', provider: 'yunwu' },
+    { modelId: 'kling-v3-omni', name: 'Kling V3 Omni', type: 'video', provider: 'yunwu' },
 ]
 
 const PRESET_COMING_SOON_MODEL_KEYS = new Set<string>([])

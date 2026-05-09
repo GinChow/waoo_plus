@@ -1,120 +1,38 @@
 {
-  "entries": [
+  "date": "2026-05-01",
+  "executor": "Codex",
+  "task": "为粗镜头卡片增加粗镜头分镜图生成历史下拉预览与选择当前图功能",
+  "location": {
+    "ui": "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/storyboard/StoryboardGroup.tsx",
+    "generationWorker": "src/lib/workers/handlers/panel-image-task-handler.ts",
+    "stateField": "NovelPromotionStoryboard.coarseGroupsJson"
+  },
+  "currentImplementation": {
+    "storage": "coarseGroupsJson 原本按 groupNumber 保存单个 imageUrl/candidateImages/imagePrompt/videoPrompt",
+    "rendering": "StoryboardGroup 解析 coarseGroupsJson 并展示当前粗镜头 imageUrl",
+    "generation": "handleStoryboardGroupImageTask 每次生成后覆盖对应 group 的 imageUrl"
+  },
+  "similarPatterns": [
+    "panel/select-candidate 使用候选图选择并写回当前图片",
+    "MediaImageWithLoading 用于分镜图片预览",
+    "coarseGroupsJson 已在 media attach 阶段解析并转换可访问 URL"
+  ],
+  "questions": [
     {
-      "date": "2026-04-26",
-      "executor": "Codex",
-      "task": "修复 phase3 合并 JSON 时演技指导结果丢失或结构错误",
-      "tooling_fallback": {
-        "sequential_thinking": "当前会话未提供该 MCP 工具，已使用本地代码检索与测试降级处理",
-        "shrimp_task_manager": "当前会话未提供该 MCP 工具，使用内置计划与执行流程降级处理",
-        "code_index": "当前会话未提供该 MCP 工具，使用 rg/sed 本地检索降级处理"
-      },
-      "location": [
-        "src/lib/novel-promotion/script-to-storyboard/orchestrator.ts",
-        "src/lib/workers/handlers/script-to-storyboard-atomic-retry.ts",
-        "src/lib/storyboard-phases.ts"
-      ],
-      "current_behavior": "最终 mergePanelsWithRules 只稳定写入 camelCase actingNotes；snake_case acting_notes 继承中间 panel 的旧对象结构，在部分合并 JSON 消费方中表现为演技指导缺失或结构不符合预期。",
-      "similar_cases": [
-        "AIDataModal.tsx 导出合并 AI 数据时使用 acting_notes 数组",
-        "panel-image-task-handler.ts 读取 panel.actingNotes 后写入 acting_notes 给下游提示",
-        "script-to-storyboard-orchestrator.retry.test.ts 已覆盖 phase3 分组演技不串组"
-      ],
-      "sufficiency_check": {
-        "interface_contract": true,
-        "technical_choice": true,
-        "risk_points": true,
-        "verification_path": true
-      }
+      "priority": "high",
+      "question": "历史记录是否需要新增表或字段？",
+      "answer": "不需要；coarseGroupsJson 已是 LONGTEXT，适合在每个 group 内扩展 imageHistory，避免数据库迁移。"
     },
     {
-      "date": "2026-04-26",
-      "executor": "Codex",
-      "task": "检查分镜界面点击重新生成文字后只生成一个粗镜头的问题",
-      "toolFallbacks": [
-        {
-          "tool": "sequential-thinking",
-          "status": "unavailable",
-          "note": "当前会话未暴露该 MCP 工具，改用本地代码检索和测试验证。"
-        },
-        {
-          "tool": "shrimp-task-manager",
-          "status": "unavailable",
-          "note": "当前会话未暴露该 MCP 工具，使用内置计划与本地验证替代。"
-        },
-        {
-          "tool": "code-index",
-          "status": "unavailable",
-          "note": "当前会话未暴露该 MCP 工具，使用 rg 检索替代。"
-        }
-      ],
-      "scan": {
-        "frontendEntry": "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/storyboard/hooks/useStoryboardGroupActions.ts",
-        "apiEntry": "src/app/api/novel-promotion/[projectId]/regenerate-storyboard-text/route.ts",
-        "workerEntry": "src/lib/workers/text.worker.ts",
-        "canonicalPipeline": "src/lib/workers/handlers/script-to-storyboard.ts",
-        "orchestrator": "src/lib/novel-promotion/script-to-storyboard/orchestrator.ts",
-        "persistence": "src/lib/workers/handlers/script-to-storyboard-helpers.ts"
-      },
-      "finding": {
-        "symptom": "重新生成文字后界面只剩一个粗镜头分组。",
-        "rootCause": "regenerate_storyboard_text worker 使用旧版 executePhase1/2/3 流程，没有走新版 V4 粗分镜拆细编排器；旧持久化在缺少 parent_group_number 时将 storyboardTextJson 全部写成粗分组 1。",
-        "evidence": [
-          "完整 script_to_storyboard_run 使用 NP_AGENT_STORYBOARD_PLAN_V4、NP_AGENT_STORYBOARD_GROUP_SPLIT，并在 orchestrator 中给细镜头补 parent_group_number。",
-          "旧 regenerate_storyboard_text 使用 runStoryboardPhasesForClip 和本地 buildParentGroupMappingCompact，缺失 parent_group_number 时默认 1。",
-          "前端 useStoryboardState 从 storyboardTextJson 解析 parent_group_number 来组织粗镜头。"
-        ]
-      },
-      "sufficiency": {
-        "interfaceContractKnown": true,
-        "technicalChoiceKnown": true,
-        "mainRisksIdentified": true,
-        "verificationKnown": true
-      }
-    },
-    {
-      "date": "2026-04-27",
-      "executor": "Codex",
-      "task": "分镜面板重新生成文字支持选择从不同 phase 基于当前结果继续生成",
-      "toolFallbacks": [
-        {
-          "tool": "sequential-thinking",
-          "status": "unavailable",
-          "note": "当前会话未暴露该 MCP 工具，改用本地代码检索和测试验证。"
-        },
-        {
-          "tool": "shrimp-task-manager",
-          "status": "unavailable",
-          "note": "当前会话未暴露该 MCP 工具，使用内置计划与本地验证替代。"
-        },
-        {
-          "tool": "code-index",
-          "status": "unavailable",
-          "note": "当前会话未暴露该 MCP 工具，使用 rg 检索替代。"
-        }
-      ],
-      "scan": {
-        "apiEntry": "src/app/api/novel-promotion/[projectId]/regenerate-storyboard-text/route.ts",
-        "workerEntry": "src/lib/workers/text.worker.ts",
-        "orchestrator": "src/lib/novel-promotion/script-to-storyboard/orchestrator.ts",
-        "clientMutation": "src/lib/query/mutations/storyboard-panel-mutations.ts",
-        "uiEntry": "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/storyboard/StoryboardGroupActions.tsx"
-      },
-      "finding": {
-        "symptom": "分镜面板重新生成文字会从 phase1 到 phase4 全部执行，耗时较长。",
-        "rootCause": "regenerate_storyboard_text 任务只接收 storyboardId，worker 对单个 clip 调用完整 orchestrator，没有起始 phase 或当前结果 seed。",
-        "evidence": [
-          "API 原请求体只传 storyboardId 和 async。",
-          "text.worker.ts 的 handleRegenerateStoryboardTextTask 直接调用 runScriptToStoryboardOrchestrator。",
-          "orchestrator 原实现每个 clip 固定执行 phase1、phase2 split、phase3 摄影/演技、phase4 detail。"
-        ]
-      },
-      "sufficiency": {
-        "interfaceContractKnown": true,
-        "technicalChoiceKnown": true,
-        "mainRisksIdentified": true,
-        "verificationKnown": true
-      }
+      "priority": "high",
+      "question": "选择历史图片如何持久化？",
+      "answer": "新增 storyboard-group/select-image API，仅验证并切换指定 group 的 imageUrl。"
     }
-  ]
+  ],
+  "sufficiencyCheck": {
+    "interfaceContract": true,
+    "technicalChoice": true,
+    "riskIdentified": true,
+    "verificationKnown": true
+  }
 }

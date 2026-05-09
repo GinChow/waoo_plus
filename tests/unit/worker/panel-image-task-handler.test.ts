@@ -410,6 +410,12 @@ describe('worker panel-image-task-handler behavior', () => {
     expect(stored[0].videoPrompt).toContain('[0.00秒]dramatic')
     expect(stored[0].videoPrompt).toContain('[0.50秒]rain walk')
     expect(stored[0].imageUrl).toBe('cos/storyboard-group-1.png')
+    expect(stored[0].imageHistory).toEqual([
+      expect.objectContaining({
+        imageUrl: 'cos/storyboard-group-1.png',
+        imagePrompt: expect.stringContaining('panel anchor prompt'),
+      }),
+    ])
   })
 
   it('storyboard group generation -> merges with latest coarseGroupsJson to avoid concurrent stale overwrite', async () => {
@@ -487,6 +493,9 @@ describe('worker panel-image-task-handler behavior', () => {
     })
     expect(persisted.find((group: { groupNumber: number }) => group.groupNumber === 1)?.imageUrl)
       .toBe('cos/storyboard-group-1-new.png')
+    expect(persisted.find((group: { groupNumber: number }) => group.groupNumber === 1)?.imageHistory.map(
+      (entry: { imageUrl: string }) => entry.imageUrl,
+    )).toContain('cos/storyboard-group-1-new.png')
     expect(persisted.find((group: { groupNumber: number }) => group.groupNumber === 2)?.imageUrl)
       .toBe('cos/storyboard-group-2-new.png')
   })

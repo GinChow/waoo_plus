@@ -24,6 +24,7 @@ import { buildPrompt, PROMPT_IDS } from '@/lib/prompt-i18n'
 import {
   parseLocationAvailableSlots,
 } from '@/lib/location-available-slots'
+import { upsertCoarseGroupState } from '@/lib/novel-promotion/coarse-group-image-state'
 
 function parseJsonUnknown(raw: string | null | undefined): unknown | null {
   if (!raw) return null
@@ -32,15 +33,6 @@ function parseJsonUnknown(raw: string | null | undefined): unknown | null {
   } catch {
     return null
   }
-}
-
-type CoarseGroupImageState = {
-  groupNumber: number
-  imagePrompt: string
-  videoPrompt: string
-  imageUrl: string | null
-  candidateImages: string[] | null
-  updatedAt: string
 }
 
 const STORYBOARD_GROUP_BORDER_PX = 16
@@ -77,52 +69,6 @@ function parseParentGroupByPanelNumber(raw: string | null | undefined): Map<numb
   } catch {
     return new Map()
   }
-}
-
-function parseCoarseGroupsJson(raw: string | null | undefined): CoarseGroupImageState[] {
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.flatMap((item): CoarseGroupImageState[] => {
-      if (!item || typeof item !== 'object') return []
-      const record = item as Partial<CoarseGroupImageState>
-      if (typeof record.groupNumber !== 'number') return []
-      return [{
-        groupNumber: record.groupNumber,
-        imagePrompt: typeof record.imagePrompt === 'string' ? record.imagePrompt : '',
-        videoPrompt: typeof record.videoPrompt === 'string' ? record.videoPrompt : '',
-        imageUrl: typeof record.imageUrl === 'string' ? record.imageUrl : null,
-        candidateImages: Array.isArray(record.candidateImages)
-          ? record.candidateImages.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-          : null,
-        updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : '',
-      }]
-    })
-  } catch {
-    return []
-  }
-}
-
-function upsertCoarseGroupState(params: {
-  raw: string | null | undefined
-  groupNumber: number
-  imagePrompt: string
-  videoPrompt: string
-  imageUrl: string | null
-  candidateImages: string[] | null
-}) {
-  const groups = parseCoarseGroupsJson(params.raw).filter((group) => group.groupNumber !== params.groupNumber)
-  groups.push({
-    groupNumber: params.groupNumber,
-    imagePrompt: params.imagePrompt,
-    videoPrompt: params.videoPrompt,
-    imageUrl: params.imageUrl,
-    candidateImages: params.candidateImages,
-    updatedAt: new Date().toISOString(),
-  })
-  groups.sort((left, right) => left.groupNumber - right.groupNumber)
-  return JSON.stringify(groups, null, 2)
 }
 
 const COARSE_GROUP_STATE_UPDATE_MAX_ATTEMPTS = 5

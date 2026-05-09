@@ -282,6 +282,7 @@ describe('generator-api gateway routing', () => {
       modelId: 'sora-2',
       modelKey: 'openai-compatible:oa-1::sora-2',
       mediaType: 'video',
+      customEndpoint: '/kling/v1/videos/omni-video',
       compatMediaTemplate: {
         version: 1,
         mediaType: 'video',
@@ -302,6 +303,52 @@ describe('generator-api gateway routing', () => {
     expect(generateVideoViaOpenAICompatTemplateMock).toHaveBeenCalledTimes(1)
     expect(createVideoGeneratorMock).not.toHaveBeenCalled()
     expect(result).toEqual({ success: true, videoUrl: 'compat-template-video' })
+  })
+
+  it('routes openai-compatible yunwu kling omni video requests to yunwu official generator', async () => {
+    resolveModelSelectionMock.mockResolvedValueOnce({
+      provider: 'openai-compatible:yunwu-1',
+      modelId: 'kling-omni-video',
+      modelKey: 'openai-compatible:yunwu-1::kling-omni-video',
+      mediaType: 'video',
+      customEndpoint: '/kling/v1/videos/omni-video',
+      compatMediaTemplate: {
+        version: 1,
+        mediaType: 'video',
+        mode: 'async',
+        create: { method: 'POST', path: '/videos/omni-video' },
+        response: { taskIdPath: '$.data.task_id' },
+      },
+    })
+    getProviderConfigMock.mockResolvedValueOnce({
+      id: 'openai-compatible:yunwu-1',
+      name: 'Yunwu Compat',
+      apiKey: 'yunwu-key',
+      baseUrl: 'https://yunwu.ai',
+      apiMode: undefined,
+      gatewayRoute: 'openai-compat',
+    })
+    resolveModelGatewayRouteMock.mockReturnValueOnce('openai-compat')
+
+    const result = await generateVideo(
+      'user-1',
+      'openai-compatible:yunwu-1::kling-omni-video',
+      'https://example.com/source.png',
+      { prompt: 'animate', duration: 5, aspectRatio: '16:9' },
+    )
+
+    expect(createVideoGeneratorMock).toHaveBeenCalledWith('yunwu')
+    expect(videoGeneratorGenerateMock).toHaveBeenCalledWith(expect.objectContaining({
+      options: expect.objectContaining({
+        provider: 'openai-compatible:yunwu-1',
+        modelId: 'kling-v3-omni',
+        modelKey: 'openai-compatible:yunwu-1::kling-omni-video',
+        customEndpoint: '/kling/v1/videos/omni-video',
+      }),
+    }))
+    expect(generateVideoViaOpenAICompatTemplateMock).not.toHaveBeenCalled()
+    expect(generateVideoViaOpenAICompatMock).not.toHaveBeenCalled()
+    expect(result).toEqual({ success: true, videoUrl: 'official-video' })
   })
 
   it('routes gemini-compatible video to official provider generator', async () => {

@@ -89,6 +89,7 @@ export interface VideoPanel {
   videoTargetGroupNumber?: number
   coarseGroupImageUrl?: string | null
   coarseGroupVideoPrompt?: string | null
+  coarseGroupDuration?: number | null
   textPanel?: TextPanel
   firstLastFramePrompt?: string
   imageUrl?: string

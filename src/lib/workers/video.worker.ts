@@ -89,6 +89,7 @@ function parseParentGroupByPanelNumber(raw: string | null | undefined): Map<numb
 function parseCoarseGroupVideoState(raw: string | null | undefined, groupNumber: number): {
   imageUrl: string | null
   videoPrompt: string | null
+  duration: number | null
 } | null {
   if (!raw) return null
   try {
@@ -103,6 +104,11 @@ function parseCoarseGroupVideoState(raw: string | null | undefined, groupNumber:
           : null,
         videoPrompt: typeof (item as { videoPrompt?: unknown }).videoPrompt === 'string'
           ? (item as { videoPrompt: string }).videoPrompt
+          : null,
+        duration: typeof (item as { duration?: unknown }).duration === 'number'
+          && Number.isFinite((item as { duration: number }).duration)
+          && (item as { duration: number }).duration > 0
+          ? (item as { duration: number }).duration
           : null,
       }
     }
@@ -152,9 +158,10 @@ async function resolveCoarseGroupVideoSource(panel: PanelRecord, groupNumber: nu
     || panel.description
   if (!prompt) return null
 
-  const duration = groupPanels.reduce((sum, item) => {
+  const calculatedDuration = groupPanels.reduce((sum, item) => {
     return sum + (typeof item.duration === 'number' && Number.isFinite(item.duration) && item.duration > 0 ? item.duration : 0)
   }, 0)
+  const duration = state?.duration && state.duration > 0 ? state.duration : calculatedDuration
 
   return {
     imageUrl,

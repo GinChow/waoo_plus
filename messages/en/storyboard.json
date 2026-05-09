@@ -56,6 +56,12 @@
         "coarseGridPreview": "Coarse-shot grid preview",
         "coarseShotTitle": "Coarse Shot {number}",
         "fineShotCount": "{count} fine shots",
+        "imageHistoryCount": "{count} storyboard images",
+        "currentImage": "Current",
+        "historyImage": "History image {number}",
+        "useHistoryImage": "Use",
+        "deleteHistoryImage": "Delete history image",
+        "deleteHistoryImageConfirm": "Delete this coarse-shot history image? If it is the current image, the latest remaining history image will be used.",
         "backToCoarseList": "Back to coarse shots"
     },
     "header": {

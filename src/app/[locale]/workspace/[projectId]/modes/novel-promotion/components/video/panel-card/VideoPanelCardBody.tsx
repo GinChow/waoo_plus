@@ -7,7 +7,7 @@ import type { VideoPanelRuntime } from './hooks/useVideoPanelActions'
 
 interface VideoPanelCardBodyProps {
   runtime: VideoPanelRuntime
-  onUpdateDuration?: (storyboardId: string, panelIndex: number, duration: number | null) => void
+  onUpdateDuration?: (storyboardId: string, panelIndex: number, duration: number | null, groupNumber?: number) => void
 }
 
 export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoPanelCardBodyProps) {
@@ -59,7 +59,7 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
         <DurationEditor
           duration={panel.textPanel?.duration ?? null}
           unit={t('promptModal.duration')}
-          onChange={onUpdateDuration ? (val) => onUpdateDuration(panel.storyboardId, panel.panelIndex, val) : undefined}
+          onChange={onUpdateDuration ? (val) => onUpdateDuration(panel.storyboardId, panel.panelIndex, val, panel.videoTargetGroupNumber) : undefined}
         />
       </div>
 

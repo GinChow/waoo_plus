@@ -45,6 +45,8 @@ export interface StoryboardGroupProps {
   onRetryPanelSave: (panelId: string) => void
   onRegeneratePanelImage: (panelId: string, count?: number, force?: boolean) => void
   onRegenerateStoryboardGroupImage: (groupNumber: number, count?: number) => void
+  onSelectStoryboardGroupImage: (groupNumber: number, imageUrl: string) => Promise<void>
+  onDeleteStoryboardGroupHistoryImage: (groupNumber: number, imageUrl: string) => Promise<void>
   onOpenEditModal: (panelIndex: number) => void
   onOpenAIDataModal: (panelIndex: number) => void
   getPanelCandidates: (panel: NovelPromotionPanel) => { candidates: string[]; selectedIndex: number } | null

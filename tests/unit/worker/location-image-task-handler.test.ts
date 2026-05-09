@@ -1,6 +1,6 @@
 import type { Job } from 'bullmq'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { LOCATION_IMAGE_RATIO, PROP_IMAGE_RATIO, getArtStylePrompt } from '@/lib/constants'
+import { LOCATION_IMAGE_RATIO, LOCATION_PROMPT_SUFFIX, PROP_IMAGE_RATIO, getArtStylePrompt } from '@/lib/constants'
 import { TASK_TYPE, type TaskJobData } from '@/lib/task/types'
 
 const utilsMock = vi.hoisted(() => ({
@@ -127,6 +127,8 @@ describe('worker location-image-task-handler behavior', () => {
     expect(generationCall).toBeTruthy()
     if (!generationCall) throw new Error('expected generateProjectLabeledImageToStorage call')
     const generationInput = generationCall[0]
+    expect(generationInput.prompt).toContain(LOCATION_PROMPT_SUFFIX)
+    expect(generationInput.prompt.split(LOCATION_PROMPT_SUFFIX).length - 1).toBe(1)
     expect(generationInput.prompt.split(animeStylePrompt).length - 1).toBe(1)
 
     expect(prismaMock.locationImage.update).toHaveBeenCalledWith({

@@ -16,42 +16,7 @@ import StoryboardGroupDialogs from './StoryboardGroupDialogs'
 import type { StoryboardGroupProps } from './StoryboardGroup.types'
 import { AppIcon } from '@/components/ui/icons'
 import { MediaImageWithLoading } from '@/components/media/MediaImageWithLoading'
-
-type CoarseGroupImageState = {
-  groupNumber: number
-  imageUrl: string | null
-  imagePrompt: string
-  videoPrompt: string
-}
-
-function parseCoarseGroupStates(raw: string | null | undefined): Map<number, CoarseGroupImageState> {
-  if (!raw) return new Map()
-  try {
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return new Map()
-    const map = new Map<number, CoarseGroupImageState>()
-    for (const item of parsed) {
-      if (!item || typeof item !== 'object') continue
-      const groupNumber = (item as { groupNumber?: unknown }).groupNumber
-      if (typeof groupNumber !== 'number') continue
-      map.set(groupNumber, {
-        groupNumber,
-        imageUrl: typeof (item as { imageUrl?: unknown }).imageUrl === 'string'
-          ? (item as { imageUrl: string }).imageUrl
-          : null,
-        imagePrompt: typeof (item as { imagePrompt?: unknown }).imagePrompt === 'string'
-          ? (item as { imagePrompt: string }).imagePrompt
-          : '',
-        videoPrompt: typeof (item as { videoPrompt?: unknown }).videoPrompt === 'string'
-          ? (item as { videoPrompt: string }).videoPrompt
-          : '',
-      })
-    }
-    return map
-  } catch {
-    return new Map()
-  }
-}
+import { parseCoarseGroupsJson } from '@/lib/novel-promotion/coarse-group-image-state'
 
 function buildPreviewImagePrompt(panels: StoryboardPanel[]) {
   const sortedPanels = [...panels].sort((left, right) => left.panelIndex - right.panelIndex)
@@ -125,6 +90,8 @@ export default function StoryboardGroup({
   onRetryPanelSave,
   onRegeneratePanelImage,
   onRegenerateStoryboardGroupImage,
+  onSelectStoryboardGroupImage,
+  onDeleteStoryboardGroupHistoryImage,
   onOpenEditModal,
   onOpenAIDataModal,
   getPanelCandidates,
@@ -146,6 +113,9 @@ export default function StoryboardGroup({
   const t = useTranslations('storyboard')
   const tProgress = useTranslations('progress')
   const [activeCoarseGroupNumber, setActiveCoarseGroupNumber] = useState<number | null>(null)
+  const [openHistoryGroupNumber, setOpenHistoryGroupNumber] = useState<number | null>(null)
+  const [selectingHistoryImageKey, setSelectingHistoryImageKey] = useState<string | null>(null)
+  const [deletingHistoryImageKey, setDeletingHistoryImageKey] = useState<string | null>(null)
 
   const {
     insertModalOpen,
@@ -206,9 +176,38 @@ export default function StoryboardGroup({
       .map(([groupNumber, panels]) => ({ groupNumber, panels }))
   }, [textPanels])
   const coarseGroupStates = useMemo(
-    () => parseCoarseGroupStates(storyboard.coarseGroupsJson),
+    () => new Map(parseCoarseGroupsJson(storyboard.coarseGroupsJson).map((state) => [state.groupNumber, state])),
     [storyboard.coarseGroupsJson],
   )
+
+  const formatHistoryTime = useCallback((value: string) => {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return date.toLocaleString()
+  }, [])
+
+  const handleSelectCoarseGroupImage = useCallback(async (groupNumber: number, imageUrl: string) => {
+    const key = `${groupNumber}:${imageUrl}`
+    setSelectingHistoryImageKey(key)
+    try {
+      await onSelectStoryboardGroupImage(groupNumber, imageUrl)
+      setOpenHistoryGroupNumber(null)
+    } finally {
+      setSelectingHistoryImageKey((current) => current === key ? null : current)
+    }
+  }, [onSelectStoryboardGroupImage])
+
+  const handleDeleteCoarseGroupHistoryImage = useCallback(async (groupNumber: number, imageUrl: string) => {
+    if (!confirm(t('group.deleteHistoryImageConfirm'))) return
+    const key = `${groupNumber}:${imageUrl}`
+    setDeletingHistoryImageKey(key)
+    try {
+      await onDeleteStoryboardGroupHistoryImage(groupNumber, imageUrl)
+    } finally {
+      setDeletingHistoryImageKey((current) => current === key ? null : current)
+    }
+  }, [onDeleteStoryboardGroupHistoryImage, t])
 
   const activeFinePanels = useMemo(() => {
     if (activeCoarseGroupNumber === null) return []
@@ -385,6 +384,7 @@ export default function StoryboardGroup({
                 : null
               const imagePrompt = coarseGroupState?.imagePrompt || buildPreviewImagePrompt(coarseGroup.panels)
               const videoPrompt = coarseGroupState?.videoPrompt || buildPreviewVideoPrompt(coarseGroup.panels)
+              const imageHistory = coarseGroupState?.imageHistory || []
               const previewImages = coarseGroup.panels
                 .map((panel) => panel.imageUrl)
                 .filter((url): url is string => typeof url === 'string' && url.length > 0)
@@ -438,28 +438,120 @@ export default function StoryboardGroup({
                     </div>
                   </div>
                   {generatedImageUrl ? (
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      className="h-44 w-full overflow-hidden rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)]"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onPreviewImage(generatedImageUrl)
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key !== 'Enter' && event.key !== ' ') return
-                        event.preventDefault()
-                        event.stopPropagation()
-                        onPreviewImage(generatedImageUrl)
-                      }}
-                    >
-                      <MediaImageWithLoading
-                        src={generatedImageUrl}
-                        alt={`coarse-shot-${coarseGroup.groupNumber}`}
-                        containerClassName="h-full w-full"
-                        className="h-full w-full cursor-zoom-in object-cover"
-                        title={t('image.clickToPreview')}
-                      />
+                    <div className="space-y-2">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className="h-44 w-full overflow-hidden rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)]"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onPreviewImage(generatedImageUrl)
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') return
+                          event.preventDefault()
+                          event.stopPropagation()
+                          onPreviewImage(generatedImageUrl)
+                        }}
+                      >
+                        <MediaImageWithLoading
+                          src={generatedImageUrl}
+                          alt={`coarse-shot-${coarseGroup.groupNumber}`}
+                          containerClassName="h-full w-full"
+                          className="h-full w-full cursor-zoom-in object-cover"
+                          title={t('image.clickToPreview')}
+                        />
+                      </div>
+                      {imageHistory.length > 0 && (
+                        <div
+                          className="relative"
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            className="flex h-8 w-full items-center justify-between rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)] px-2 text-xs text-[var(--glass-text-secondary)] hover:bg-[var(--glass-bg-surface-hover)]"
+                            onClick={() => setOpenHistoryGroupNumber((current) =>
+                              current === coarseGroup.groupNumber ? null : coarseGroup.groupNumber,
+                            )}
+                          >
+                            <span>{t('group.imageHistoryCount', { count: imageHistory.length })}</span>
+                            <AppIcon
+                              name="chevronDown"
+                              className={`h-3.5 w-3.5 transition-transform ${openHistoryGroupNumber === coarseGroup.groupNumber ? 'rotate-180' : ''}`}
+                            />
+                          </button>
+                          {openHistoryGroupNumber === coarseGroup.groupNumber && (
+                            <div className="absolute left-0 right-0 top-9 z-20 max-h-72 overflow-y-auto rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-surface)] p-2 shadow-xl">
+                              <div className="grid gap-2">
+                                {[...imageHistory].reverse().map((entry, historyIndex) => {
+                                  const isCurrent = entry.imageUrl === generatedImageUrl
+                                  const selectingKey = `${coarseGroup.groupNumber}:${entry.imageUrl}`
+                                  const isSelecting = selectingHistoryImageKey === selectingKey
+                                  const isDeleting = deletingHistoryImageKey === selectingKey
+                                  return (
+                                    <div
+                                      key={`${entry.imageUrl}-${historyIndex}`}
+                                      className={`grid grid-cols-[64px_1fr_auto_auto] items-center gap-2 rounded-md border p-1.5 ${
+                                        isCurrent
+                                          ? 'border-[var(--glass-accent-from)] bg-[var(--glass-bg-muted)]'
+                                          : 'border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)]/60'
+                                      }`}
+                                    >
+                                      <button
+                                        type="button"
+                                        className="h-12 overflow-hidden rounded border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)]"
+                                        onClick={() => onPreviewImage(entry.imageUrl)}
+                                        title={t('image.clickToPreview')}
+                                      >
+                                        <MediaImageWithLoading
+                                          src={entry.imageUrl}
+                                          alt={`coarse-shot-history-${coarseGroup.groupNumber}-${historyIndex + 1}`}
+                                          containerClassName="h-full w-full"
+                                          className="h-full w-full object-cover"
+                                        />
+                                      </button>
+                                      <div className="min-w-0">
+                                        <div className="truncate text-xs text-[var(--glass-text-primary)]">
+                                          {isCurrent ? t('group.currentImage') : t('group.historyImage', { number: imageHistory.length - historyIndex })}
+                                        </div>
+                                        <div className="truncate text-[11px] text-[var(--glass-text-tertiary)]">
+                                          {formatHistoryTime(entry.generatedAt)}
+                                        </div>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        className="glass-btn-base glass-btn-soft rounded-md px-2 py-1 text-xs disabled:opacity-60"
+                                        disabled={isCurrent || isSelecting || isDeleting}
+                                        onClick={() => handleSelectCoarseGroupImage(coarseGroup.groupNumber, entry.imageUrl)}
+                                      >
+                                        {isCurrent ? (
+                                          <AppIcon name="check" className="h-3.5 w-3.5" />
+                                        ) : (
+                                          <span>{isSelecting ? t('common.saving') : t('group.useHistoryImage')}</span>
+                                        )}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="glass-btn-base glass-btn-danger rounded-md px-2 py-1 text-xs disabled:opacity-60"
+                                        disabled={isSelecting || isDeleting}
+                                        onClick={() => handleDeleteCoarseGroupHistoryImage(coarseGroup.groupNumber, entry.imageUrl)}
+                                        title={t('group.deleteHistoryImage')}
+                                      >
+                                        {isDeleting ? (
+                                          <span>{t('common.deleting')}</span>
+                                        ) : (
+                                          <AppIcon name="trashAlt" className="h-3.5 w-3.5" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-2">

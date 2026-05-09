@@ -26,6 +26,15 @@ const OFFICIAL_ONLY_PROVIDER_KEYS = new Set(['bailian', 'siliconflow'])
 // 视频场景：Vidu/Yunwu 只能走官方实现（有专门的 VideoGenerator），不能走 openai-compat 模板
 const OFFICIAL_ONLY_VIDEO_PROVIDER_KEYS = new Set(['bailian', 'siliconflow', 'vidu', 'yunwu'])
 
+function isYunwuBaseUrl(baseUrl: string | undefined): boolean {
+    if (!baseUrl) return false
+    try {
+        return new URL(baseUrl).hostname.toLowerCase() === 'yunwu.ai'
+    } catch {
+        return baseUrl.toLowerCase().includes('yunwu.ai')
+    }
+}
+
 function isYunwuImageOfficialRoute(providerKey: string, modelId: string, baseUrl: string | undefined): boolean {
     const normalizedModelId = modelId.trim()
     const isYunwuNativeImageModel =
@@ -34,12 +43,24 @@ function isYunwuImageOfficialRoute(providerKey: string, modelId: string, baseUrl
     if (!isYunwuNativeImageModel) return false
     if (providerKey === 'yunwu') return true
     if (providerKey !== 'openai-compatible') return false
-    if (!baseUrl) return false
-    try {
-        return new URL(baseUrl).hostname.toLowerCase() === 'yunwu.ai'
-    } catch {
-        return baseUrl.toLowerCase().includes('yunwu.ai')
-    }
+    return isYunwuBaseUrl(baseUrl)
+}
+
+function normalizeYunwuOmniVideoModelId(modelId: string): string {
+    const normalized = modelId.trim()
+    if (normalized === 'kling-omni-video') return 'kling-v3-omni'
+    return normalized
+}
+
+function isYunwuVideoOfficialRoute(providerKey: string, modelId: string, baseUrl: string | undefined): boolean {
+    const normalizedModelId = normalizeYunwuOmniVideoModelId(modelId)
+    const isYunwuNativeVideoModel =
+        normalizedModelId === 'kling-video-o1' ||
+        normalizedModelId === 'kling-v3-omni'
+    if (!isYunwuNativeVideoModel) return false
+    if (providerKey === 'yunwu') return true
+    if (providerKey !== 'openai-compatible') return false
+    return isYunwuBaseUrl(baseUrl)
 }
 
 /**
@@ -250,9 +271,12 @@ export async function generateVideo(
     }
     const providerConfig = await getProviderConfig(userId, selection.provider)
     const defaultGatewayRoute = resolveModelGatewayRoute(selection.provider)
-    const gatewayRoute = OFFICIAL_ONLY_VIDEO_PROVIDER_KEYS.has(providerKey)
+    let gatewayRoute = OFFICIAL_ONLY_VIDEO_PROVIDER_KEYS.has(providerKey)
         ? 'official'
         : (providerConfig.gatewayRoute || defaultGatewayRoute)
+    if (isYunwuVideoOfficialRoute(providerKey, selection.modelId, providerConfig.baseUrl)) {
+        gatewayRoute = 'official'
+    }
 
     const { prompt, ...providerOptions } = options || {}
     if (gatewayRoute === 'openai-compat') {
@@ -296,7 +320,13 @@ export async function generateVideo(
         })
     }
 
-    const generator = createVideoGenerator(selection.provider)
+    const generatorProvider = isYunwuVideoOfficialRoute(providerKey, selection.modelId, providerConfig.baseUrl)
+        ? 'yunwu'
+        : selection.provider
+    const generatorModelId = generatorProvider === 'yunwu'
+        ? normalizeYunwuOmniVideoModelId(selection.modelId)
+        : selection.modelId
+    const generator = createVideoGenerator(generatorProvider)
     return await generator.generate({
         userId,
         imageUrl,
@@ -304,7 +334,7 @@ export async function generateVideo(
         options: {
             ...providerOptions,
             provider: selection.provider,
-            modelId: selection.modelId,
+            modelId: generatorModelId,
             modelKey: selection.modelKey,
             ...(selection.customEndpoint ? { customEndpoint: selection.customEndpoint } : {}),
         }

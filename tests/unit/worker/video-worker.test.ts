@@ -244,6 +244,7 @@ describe('worker video processor behavior', () => {
           groupNumber: 1,
           imageUrl: 'cos/coarse-group-1.png',
           videoPrompt: 'coarse group video prompt',
+          duration: 11,
         },
       ]),
       panels: [
@@ -282,7 +283,7 @@ describe('worker video processor behavior', () => {
         imageUrl: 'https://signed.example/cos/coarse-group-1.png',
         options: expect.objectContaining({
           prompt: 'coarse group video prompt',
-          duration: 4,
+          duration: 11,
         }),
       }),
     )

@@ -1,277 +1,70 @@
 # Testing
 
-Date: 2026-04-26
+Date: 2026-05-01
 Executor: Codex
 
-## Previous Commands
+## Passed
 
-- `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts tests/unit/worker/script-to-storyboard-atomic-retry.test.ts`
-  - Result: passed, 2 files, 15 tests.
+- `npx vitest run tests/unit/novel-promotion/coarse-group-image-state.test.ts tests/unit/worker/panel-image-task-handler.test.ts`
+  - 2 files passed, 18 tests passed.
 - `npm run typecheck`
-  - Result: passed.
-- `npm run test:unit:all`
-  - Result: failed with 1 unrelated assertion in `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts`.
-  - Failure: test expected body `{"async":true}` but implementation sent `{"async":true,"mode":"all"}`.
-  - Note: user later clarified full unit suite is not needed; no further full-suite runs were made.
+  - TypeScript check passed.
+- `npm run lint -- <changed related files>`
+  - ESLint passed for the touched implementation files.
+- `npx vitest run tests/unit/guards/api-route-contract-guard.test.ts`
+  - API route contract guard passed.
 
-## Previous Focused Coverage
+## Noted
 
-- Final phase3 panels now preserve acting guidance in both `actingNotes` and `acting_notes`.
-- Atomic retry normalizes old nested acting guidance artifacts before final merge.
+- `npm run test:unit:all -- tests/unit/novel-promotion/coarse-group-image-state.test.ts tests/unit/worker/panel-image-task-handler.test.ts` invokes the package script with the fixed `tests/unit` argument first, so it ran the whole unit suite. It reported unrelated failures:
+  - `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts` expected `{"async":true}` but received existing behavior `{"async":true,"mode":"all"}`.
+  - Redis connection attempts to `127.0.0.1:16379` were blocked by the sandbox in helper route tests.
+  - The new coarse group state test initially failed due history ordering and was fixed; the focused rerun passed.
 
-## Current Commands
+## Yunwu Kling Omni Video
 
+Date: 2026-05-01 16:37:50 +0800
+Executor: Codex
+
+### Passed
+
+- `npx vitest run tests/unit/generators/yunwu-base-url.test.ts tests/unit/generators/yunwu-omni-video.test.ts tests/unit/task/async-poll-external-id.test.ts tests/unit/task/async-poll-yunwu-omni.test.ts`
+  - 4 files passed, 19 tests passed.
 - `npm run typecheck`
-  - Result: passed.
+  - TypeScript check passed.
+- `npm run check:capability-catalog`
+  - Capability catalog check passed.
+- `npm run lint -- src/lib/generators/yunwu.ts src/lib/async-poll.ts 'src/app/[locale]/profile/components/api-config/types.ts' tests/unit/generators/yunwu-base-url.test.ts tests/unit/generators/yunwu-omni-video.test.ts tests/unit/task/async-poll-external-id.test.ts tests/unit/task/async-poll-yunwu-omni.test.ts`
+  - ESLint passed for touched implementation and test files.
+- `npx vitest run tests/unit/task/async-poll-external-id.test.ts tests/unit/task/async-poll-yunwu-omni.test.ts`
+  - Rerun after externalId help text update passed, 10 tests passed.
+- `npm run lint -- src/lib/async-poll.ts`
+  - ESLint passed after externalId help text update.
 
-- `npm run lint:all`
-  - Result: passed with existing warnings.
-  - Notes: 0 errors, 44 warnings. Warnings are unrelated existing unused variable / hook dependency warnings.
+### Noted
 
-- `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts tests/unit/worker/script-to-storyboard.test.ts`
-  - Result: passed.
-  - Coverage: 2 files, 17 tests.
+- `npm run check:pricing-catalog` failed on pre-existing Ark Seedance 2.0 `containsVideoInput` pricing fields not declared in capabilities, unrelated to Yunwu Omni changes.
+- `npm run test:unit:all` ran 223 files: 222 passed, 1 failed. The failure is an existing assertion mismatch in `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts`, expecting `{"async":true}` while current code sends `{"async":true,"mode":"all"}`.
 
-- `npm run test:unit:all -- tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts tests/unit/worker/script-to-storyboard.test.ts`
-  - Result: failed because the npm script always includes `tests/unit` and ran the whole unit suite.
-  - Unrelated failure: `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts` expected request body `{"async":true}`, actual body included `{"async":true,"mode":"all"}`.
+## Panel Video Outbound Request Logging
 
-## Current Risk
+Date: 2026-05-07 17:34:00 +0800
+Executor: Codex
 
-The changed path now shares the same orchestrator and persistence helper as the full script-to-storyboard generation path, so regenerated panels should retain `parent_group_number` and render multiple coarse groups when the model outputs multiple coarse groups.
+### Passed
 
-## 2026-04-27 Commands
-
-- `npm run typecheck`
-  - Result: passed.
-
-- `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts tests/unit/worker/script-to-storyboard-atomic-retry.test.ts tests/unit/worker/script-to-storyboard.test.ts`
-  - Result: passed.
-  - Coverage: 3 files, 20 tests.
-
-## 2026-04-27 Risk
-
-Existing generated records with only old `acting` text can now be merged without empty `posture/facing`; best output quality still depends on regenerating acting direction with the updated prompt so the model supplies explicit `screen_position/posture/facing`.
-
-## 2026-04-27 Phase Start Commands
-
-- `npm run typecheck`
-  - Result: passed.
-- `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts`
-  - Result: passed, 13 tests.
-- `npm run lint:all`
-  - Result: passed with existing warnings.
-  - Notes: 0 errors, 44 warnings.
-
-## 2026-04-27 Phase Start Risk
-
-phase4 续跑沿用现有 reconcile 规则，保留当前分镜的 `description/source_text`，主要刷新视频提示词、首帧提示、时长、镜头/运镜等 detail 字段。
-
-## 2026-04-27 Phase4 Acting Seed Fix
-
-- `npm run typecheck`
-  - Result: passed.
-- `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts`
-  - Result: passed, 16 tests.
-
-## 2026-04-27 Regenerate Text Concurrency
-
-- `npm run typecheck`
-  - Result: passed.
-- `npx vitest run tests/unit/worker/script-to-storyboard.test.ts tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts`
-  - Result: passed, 21 tests.
-
-## 2026-04-27 Phase4 Duration Final
-
-- `npm run typecheck`
-  - Result: passed.
-- `npx vitest run tests/unit/worker/script-to-storyboard-orchestrator.retry.test.ts`
-  - Result: passed, 17 tests.
-
-## 2026-04-27 Progress Text Guard
-
-- `npm run typecheck`
-  - Result: passed.
-
-## 2026-04-28 Coarse Grid Storyboard Images
-
-- `npx prisma generate`
-  - Result: passed.
-
-## 2026-04-30 Coarse Group Video Generation
-
-- `npm run typecheck`
-  - Result: passed.
-
+- `npx vitest run tests/unit/worker/video-generation-resume.test.ts`
+  - 1 file passed, 3 tests passed.
 - `npx vitest run tests/unit/worker/video-worker.test.ts`
-  - Result: passed.
-  - Coverage: 1 file, 7 tests.
-  - Focus: group-level video task reads `coarseGroupsJson.imageUrl/videoPrompt` and aggregates fine-shot duration.
-
-- `npm run lint:all`
-  - Result: passed with existing warnings.
-  - Notes: 0 errors, 43 existing warnings after removing the new unused prop.
-
-- `npx vitest run tests/unit/worker/video-worker.test.ts tests/system/generate-video.system.test.ts`
-  - Result: unit file passed; system file blocked before execution because local MySQL test database at `localhost:13306` was unavailable.
-  - Failure class: `PrismaClientInitializationError` from `tests/helpers/db-reset.ts`.
-
-- Coarse group prompt display follow-up:
-  - `npm run typecheck` passed.
-  - `npm run lint:all` passed with existing warnings.
-  - `npx vitest run tests/unit/worker/video-worker.test.ts` passed.
-
-## 2026-04-29 Yunwu GPT Image 2
-
-- `npm run test:unit:all -- --run tests/unit/generators/yunwu-image.test.ts tests/unit/generator-api.test.ts tests/unit/generators/openai-compatible-image.test.ts`
-  - Result: failed as a command choice because the npm script still ran the whole `tests/unit` suite.
-  - Relevant changed tests passed inside the run.
-  - Unrelated failure: `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts` expected request body `{"async":true}`, actual body included `{"async":true,"mode":"all"}`.
-  - Sandbox noise: Redis connection attempts to `127.0.0.1:16379` emitted `EPERM`.
-
-- `npx vitest run tests/unit/generators/yunwu-image.test.ts tests/unit/generator-api.test.ts tests/unit/generators/openai-compatible-image.test.ts`
-  - Result: passed.
-  - Coverage: 3 files, 17 tests.
-  - Focus: yunwu image endpoint normalization, multipart payload, choices/data response extraction, generator-api routing.
-
+  - 1 file passed, 7 tests passed.
+- `npx vitest run tests/unit/generators/openai-compatible-video.test.ts tests/unit/generators/yunwu-omni-video.test.ts tests/unit/generators/fal-video-kling-presets.test.ts`
+  - 3 files passed, 10 tests passed.
+- `npx vitest run tests/unit/worker/video-generation-resume.test.ts tests/unit/worker/video-worker.test.ts tests/unit/generators/openai-compatible-video.test.ts tests/unit/generators/yunwu-omni-video.test.ts tests/unit/generators/fal-video-kling-presets.test.ts`
+  - 5 files passed, 20 tests passed.
 - `npm run typecheck`
-  - Result: passed.
+  - TypeScript check passed.
 
-- `npm run lint:all`
-  - Result: passed with existing warnings.
-  - Notes: 0 errors, 43 warnings. Warnings are unrelated existing unused variable / hook dependency warnings.
+### Noted
 
-## 2026-04-29 Yunwu Custom Endpoint
-
-- `npm run typecheck`
-  - Result: passed.
-
-- `npx vitest run tests/unit/generators/yunwu-image.test.ts tests/unit/generator-api.test.ts`
-  - Result: passed.
-  - Coverage: 2 files, 15 tests.
-  - Focus: yunwu image generator accepts model-level `customEndpoint` and normalizes duplicate `/v1` image edit paths.
-
-## 2026-04-29 Storyboard Group Image Size
-
-- `npm run typecheck`
-  - Result: passed.
-
-- `npx vitest run tests/unit/worker/panel-image-task-handler.test.ts tests/unit/generators/yunwu-image.test.ts`
-  - Result: passed.
-  - Coverage: 2 files, 15 tests.
-  - Focus: final storyboard sheet size respects gpt-image-2 size constraints and accounts for panel layout, aspect ratio, and black separator width.
-
-- `npm run lint:all`
-  - Result: passed with existing warnings.
-  - Notes: 0 errors, 43 warnings. Warnings are unrelated existing unused variable / hook dependency warnings.
-
-## 2026-04-29 Storyboard Coarse Group Concurrent Persist
-
-- `npx vitest run tests/unit/worker/panel-image-task-handler.test.ts`
-  - Result: passed.
-  - Coverage: 1 file, 13 tests.
-  - Focus: coarse group image persistence merges against latest `coarseGroupsJson` so concurrent storyboard group tasks do not overwrite each other's generated images with stale snapshots.
-
-- `npm run typecheck`
-  - Result: passed.
-
-- `npm run test:unit:all -- tests/unit/worker/panel-image-task-handler.test.ts`
-  - Result: failed because the npm script also ran the whole `tests/unit` suite.
-  - Relevant changed test file passed in that run.
-  - Unrelated failure: `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts` expected request body `{"async":true}`, actual body included `{"async":true,"mode":"all"}`.
-
-## 2026-04-30 Yunwu Gemini Image GenerateContent
-
-- `npx vitest run tests/unit/generators/yunwu-image.test.ts tests/unit/generator-api.test.ts`
-  - Result: passed.
-  - Coverage: 2 files, 21 tests.
-  - Focus: Yunwu Gemini image models use JSON `v1beta/models/{model}:generateContent?key=...`, preserve prompt-first parts order, convert references to `inline_data`, parse inline image responses, openai-compatible Yunwu Gemini models route to the Yunwu official generator instead of openai-compat template, storyboard pixel sizes such as `3104x1760` map to supported Gemini `imageSize` values, baseUrl/customEndpoint combinations do not produce `/v1/v1beta/models`, explicit `imageSize` wins over compatibility fields, and `quality` is not sent in Gemini requests.
-
-- `npm run typecheck`
-  - Result: passed.
-
-- `npm run lint:all`
-  - Result: passed with existing warnings.
-  - Notes: 0 errors, 43 warnings. Warnings are unrelated existing unused variable / hook dependency warnings.
-
-## 2026-04-30 Shared Redis Subscriber Recovery
-
-- `npx vitest run tests/unit/helpers/shared-subscriber.test.ts`
-  - Result: passed.
-  - Coverage: 1 file, 1 test.
-  - Focus: shared SSE subscriber replaces the current Redis subscriber connection and resubscribes active channels when subscriber-mode Redis errors are emitted asynchronously.
-
-- `npm run typecheck`
-  - Result: passed.
-
-## 2026-04-30 Storyboard Coarse Groups LongText
-
-- `npx prisma db execute --file prisma/migrations/20260430193000_widen_storyboard_coarse_groups/migration.sql --schema prisma/schema.prisma`
-  - Result: passed.
-  - Purpose: widen local `novel_promotion_storyboards.coarseGroupsJson` from `TEXT` to `LONGTEXT`.
-
-- `SHOW COLUMNS FROM novel_promotion_storyboards LIKE 'coarseGroupsJson'`
-  - Result: returned `Type: longtext`.
-
-- `npx prisma generate`
-  - Result: passed.
-
-- `npm run typecheck`
-  - Result: passed.
-
-- `npx vitest run tests/unit/worker/panel-image-task-handler.test.ts`
-  - Result: passed.
-  - Coverage: 1 file, 13 tests.
-
-## 2026-04-29 Yunwu GPT Image 2 Compat Route
-
-- `npm run typecheck`
-  - Result: passed.
-
-- `npx vitest run tests/unit/generator-api.test.ts tests/unit/generators/yunwu-image.test.ts tests/unit/generators/openai-compatible-image.test.ts`
-  - Result: passed.
-  - Coverage: 3 files, 18 tests.
-  - Focus: openai-compatible provider with `https://yunwu.ai/v1` baseUrl and `gpt-image-2` bypasses compat template and routes to yunwu official generator.
-
-- `npm run lint:all`
-  - Result: passed with existing warnings.
-  - Notes: 0 errors, 43 warnings. Warnings are unrelated existing unused variable / hook dependency warnings.
-
-## 2026-04-28 Coarse Card Generate Button
-
-- `npm run typecheck`
-  - Result: passed.
-
-- `npm run lint:all`
-  - Result: passed with existing warnings.
-  - Notes: 0 errors, 44 warnings. Warnings are unrelated existing unused variable / hook dependency warnings.
-  - Purpose: refresh Prisma Client after adding `NovelPromotionStoryboard.coarseGroupsJson`.
-
-- `npm run typecheck`
-  - Result: passed.
-
-- `npx vitest run tests/unit/worker/panel-image-task-handler.test.ts tests/unit/worker/image-worker.test.ts`
-  - Result: passed.
-  - Coverage: 2 files, 7 tests.
-  - Focus: storyboard group image worker routing, multi-grid prompt aggregation, coarse group prompt persistence.
-
-- `npm run lint:all`
-  - Result: passed with existing warnings.
-  - Notes: 0 errors, 44 warnings. Warnings are unrelated existing unused variable / hook dependency warnings.
-
-- `npm run test:unit:all -- panel-image-task-handler image-worker`
-  - Result: failed because the npm script still ran the whole `tests/unit` suite.
-  - Relevant changed tests passed inside the run.
-  - Unrelated failure: `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts` expected request body `{"async":true}`, actual body included `{"async":true,"mode":"all"}`.
-
-## 2026-04-28 Local Database Repair
-
-- `npx prisma db execute --file prisma/migrations/20260428120000_add_storyboard_coarse_groups/migration.sql --schema prisma/schema.prisma`
-  - Result: passed.
-  - Purpose: directly apply the new column to the existing non-empty local MySQL database.
-
-- `SHOW COLUMNS FROM novel_promotion_storyboards LIKE 'coarseGroupsJson'`
-  - Result: returned `coarseGroupsJson` as nullable `text`.
-
-- `npx prisma generate`
-  - Result: passed.
+- `npm run test:unit -- ...` failed because the package has no `test:unit` script. Retried with `npx vitest run ...`.
+- The new focused test verifies `/tmp/wao-panel-video-outbound-requests.ndjson` receives sanitized data URL placeholders and does not contain long base64 runs.

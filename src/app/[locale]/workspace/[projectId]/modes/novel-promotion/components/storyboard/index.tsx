@@ -89,6 +89,8 @@ export default function StoryboardStage({
     regeneratePanelImage,
     regenerateAllPanelsIndividually,
     regenerateStoryboardGroupImage,
+    selectStoryboardGroupImage,
+    deleteStoryboardGroupHistoryImage,
     selectPanelCandidate,
     selectPanelCandidateIndex,
     cancelPanelCandidate,
@@ -244,6 +246,8 @@ export default function StoryboardStage({
           onRetryPanelSave={retrySave}
           onRegeneratePanelImage={regeneratePanelImage}
           onRegenerateStoryboardGroupImage={regenerateStoryboardGroupImage}
+          onSelectStoryboardGroupImage={selectStoryboardGroupImage}
+          onDeleteStoryboardGroupHistoryImage={deleteStoryboardGroupHistoryImage}
           onOpenEditModal={(storyboardId, panelIndex) => setEditingPanel({ storyboardId, panelIndex })}
           onOpenAIDataModal={(storyboardId, panelIndex) => setAIDataPanel({ storyboardId, panelIndex })}
           getPanelCandidates={getPanelCandidates}

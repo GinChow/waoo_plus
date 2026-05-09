@@ -56,6 +56,12 @@
         "coarseGridPreview": "粗镜头宫格预览",
         "coarseShotTitle": "粗镜头 {number}",
         "fineShotCount": "细镜头 {count} 个",
+        "imageHistoryCount": "历史分镜图 {count} 张",
+        "currentImage": "当前使用",
+        "historyImage": "历史分镜图 {number}",
+        "useHistoryImage": "使用",
+        "deleteHistoryImage": "删除历史分镜图",
+        "deleteHistoryImageConfirm": "确定要删除这张历史粗镜头分镜图吗？如果它是当前使用图，将自动切换到剩余历史图。",
         "backToCoarseList": "返回粗镜头列表"
     },
     "header": {

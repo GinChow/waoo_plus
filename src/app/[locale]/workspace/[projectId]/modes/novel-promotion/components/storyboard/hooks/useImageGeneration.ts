@@ -10,9 +10,12 @@ import {
   useRefreshEpisodeData,
   useRefreshStoryboards,
   useRegenerateProjectPanelImage,
+  useSelectProjectStoryboardGroupImage,
+  useDeleteProjectStoryboardGroupHistoryImage,
   useModifyProjectStoryboardImage,
   useDownloadProjectImages,
 } from '@/lib/query/hooks'
+import { deleteCoarseGroupHistoryImage } from '@/lib/novel-promotion/coarse-group-image-state'
 import {
   getStoryboardPanels,
   reconcileModifyingPanelIds,
@@ -48,6 +51,8 @@ export function useStoryboardImageGeneration({
   const refreshEpisode = useRefreshEpisodeData(projectId, episodeId ?? null)
   const refreshStoryboards = useRefreshStoryboards(episodeId ?? null)
   const regeneratePanelMutation = useRegenerateProjectPanelImage(projectId)
+  const selectStoryboardGroupImageMutation = useSelectProjectStoryboardGroupImage(projectId)
+  const deleteStoryboardGroupHistoryImageMutation = useDeleteProjectStoryboardGroupHistoryImage(projectId)
   const modifyPanelMutation = useModifyProjectStoryboardImage(projectId)
   const downloadImagesMutation = useDownloadProjectImages(projectId)
   const clearStoryboardErrorMutation = useClearProjectStoryboardError(projectId)
@@ -129,6 +134,92 @@ export function useStoryboardImageGeneration({
     selectPanelCandidateIndex,
   })
 
+  const selectStoryboardGroupImage = useCallback(async (
+    storyboardId: string,
+    groupNumber: number,
+    imageUrl: string,
+  ) => {
+    let snapshot: NovelPromotionStoryboard[] | null = null
+    setLocalStoryboards((previousStoryboards) => {
+      snapshot = previousStoryboards
+      return previousStoryboards.map((storyboard) => {
+        if (storyboard.id !== storyboardId || !storyboard.coarseGroupsJson) return storyboard
+        try {
+          const groups = JSON.parse(storyboard.coarseGroupsJson)
+          if (!Array.isArray(groups)) return storyboard
+          const nextGroups = groups.map((group) => (
+            group && typeof group === 'object' && (group as { groupNumber?: unknown }).groupNumber === groupNumber
+              ? { ...group, imageUrl }
+              : group
+          ))
+          return { ...storyboard, coarseGroupsJson: JSON.stringify(nextGroups) }
+        } catch {
+          return storyboard
+        }
+      })
+    })
+
+    try {
+      await selectStoryboardGroupImageMutation.mutateAsync({ storyboardId, groupNumber, imageUrl })
+      if (onSilentRefresh) {
+        await onSilentRefresh()
+      }
+      refreshEpisode()
+      refreshStoryboards()
+    } catch (error: unknown) {
+      if (snapshot) {
+        setLocalStoryboards(snapshot)
+      }
+      _ulogError('[selectStoryboardGroupImage] persist failed:', error)
+    }
+  }, [
+    onSilentRefresh,
+    refreshEpisode,
+    refreshStoryboards,
+    selectStoryboardGroupImageMutation,
+    setLocalStoryboards,
+  ])
+
+  const deleteStoryboardGroupHistoryImage = useCallback(async (
+    storyboardId: string,
+    groupNumber: number,
+    imageUrl: string,
+  ) => {
+    let snapshot: NovelPromotionStoryboard[] | null = null
+    setLocalStoryboards((previousStoryboards) => {
+      snapshot = previousStoryboards
+      return previousStoryboards.map((storyboard) => {
+        if (storyboard.id !== storyboardId) return storyboard
+        const coarseGroupsJson = deleteCoarseGroupHistoryImage({
+          raw: storyboard.coarseGroupsJson,
+          groupNumber,
+          imageUrl,
+        })
+        return coarseGroupsJson ? { ...storyboard, coarseGroupsJson } : storyboard
+      })
+    })
+
+    try {
+      await deleteStoryboardGroupHistoryImageMutation.mutateAsync({ storyboardId, groupNumber, imageUrl })
+      if (onSilentRefresh) {
+        await onSilentRefresh()
+      }
+      refreshEpisode()
+      refreshStoryboards()
+    } catch (error: unknown) {
+      if (snapshot) {
+        setLocalStoryboards(snapshot)
+      }
+      _ulogError('[deleteStoryboardGroupHistoryImage] persist failed:', error)
+    }
+  }, [
+    deleteStoryboardGroupHistoryImageMutation,
+    onSilentRefresh,
+    refreshEpisode,
+    refreshStoryboards,
+    setLocalStoryboards,
+  ])
+
   const { modifyPanelImage } = usePanelImageModification({
     localStoryboards,
     setLocalStoryboards,
@@ -192,6 +283,8 @@ export function useStoryboardImageGeneration({
     regeneratePanelImage,
     regenerateAllPanelsIndividually,
     regenerateStoryboardGroupImage,
+    selectStoryboardGroupImage,
+    deleteStoryboardGroupHistoryImage,
     selectPanelCandidate: confirmPanelCandidate,
     selectPanelCandidateIndex,
     cancelPanelCandidate,

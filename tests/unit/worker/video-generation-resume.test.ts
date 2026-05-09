@@ -22,6 +22,17 @@ const generatorApiMock = vi.hoisted(() => ({
   generateVideo: vi.fn(),
 }))
 
+const fsPromisesMock = vi.hoisted(() => ({
+  appendFile: vi.fn(async (_file: string, _data: string, _encoding: string) => undefined),
+}))
+
+const configServiceMock = vi.hoisted(() => ({
+  getProjectModelConfig: vi.fn(),
+  getUserModelConfig: vi.fn(),
+  resolveProjectModelCapabilityGenerationOptions: vi.fn(async () => ({})),
+}))
+
+vi.mock('node:fs/promises', () => fsPromisesMock)
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }))
 vi.mock('@/lib/task/service', () => taskServiceMock)
 vi.mock('@/lib/async-poll', () => asyncPollMock)
@@ -33,11 +44,7 @@ vi.mock('@/lib/storage', () => ({
 }))
 vi.mock('@/lib/fonts', () => ({ initializeFonts: vi.fn(), createLabelSVG: vi.fn() }))
 vi.mock('@/lib/media-process', () => ({ processMediaResult: vi.fn() }))
-vi.mock('@/lib/config-service', () => ({
-  getProjectModelConfig: vi.fn(),
-  getUserModelConfig: vi.fn(),
-  resolveProjectModelCapabilityGenerationOptions: vi.fn(),
-}))
+vi.mock('@/lib/config-service', () => configServiceMock)
 
 import { resolveImageSourceFromGeneration, resolveVideoSourceFromGeneration } from '@/lib/workers/utils'
 
@@ -60,6 +67,15 @@ function buildJob(): Job<TaskJobData> {
 describe('worker utils video generation resume', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    prismaMock.task.findUnique.mockReset()
+    asyncPollMock.pollAsyncTask.mockReset()
+    generatorApiMock.generateImage.mockReset()
+    generatorApiMock.generateVideo.mockReset()
+    fsPromisesMock.appendFile.mockReset()
+    taskServiceMock.isTaskActive.mockResolvedValue(true)
+    taskServiceMock.trySetTaskExternalId.mockResolvedValue(true)
+    fsPromisesMock.appendFile.mockResolvedValue(undefined)
+    configServiceMock.resolveProjectModelCapabilityGenerationOptions.mockResolvedValue({})
   })
 
   it('continues polling from existing externalId without re-submitting generation', async () => {
@@ -113,5 +129,89 @@ describe('worker utils video generation resume', () => {
     expect(prismaMock.task.findUnique).not.toHaveBeenCalled()
     expect(asyncPollMock.pollAsyncTask).not.toHaveBeenCalled()
     expect(generatorApiMock.generateImage).toHaveBeenCalledTimes(1)
+  })
+
+  it('logs video generation params to a temp file without full base64 image payloads', async () => {
+    prismaMock.task.findUnique.mockResolvedValue({ externalId: null })
+    configServiceMock.resolveProjectModelCapabilityGenerationOptions.mockResolvedValueOnce({
+      resolution: '720p',
+    })
+    generatorApiMock.generateVideo.mockResolvedValueOnce({
+      success: true,
+      async: false,
+      videoUrl: 'https://provider.test/video.mp4',
+    })
+
+    const imageUrl = `data:image/png;base64,${'A'.repeat(640)}`
+    const lastFrameImageUrl = `data:image/png;base64,${'B'.repeat(768)}`
+    const result = await resolveVideoSourceFromGeneration(buildJob(), {
+      userId: 'user-1',
+      modelId: 'vidu::viduq3-pro',
+      imageUrl,
+      options: {
+        prompt: 'animate this frame',
+        duration: 5.8,
+        generationMode: 'firstlastframe',
+        lastFrameImageUrl,
+      },
+    })
+
+    expect(result).toEqual({ url: 'https://provider.test/video.mp4' })
+    expect(generatorApiMock.generateVideo).toHaveBeenCalledWith(
+      'user-1',
+      'vidu::viduq3-pro',
+      imageUrl,
+      expect.objectContaining({
+        prompt: 'animate this frame',
+        duration: 5,
+        lastFrameImageUrl,
+        resolution: '720p',
+      }),
+    )
+
+    expect(fsPromisesMock.appendFile).toHaveBeenCalledWith(
+      '/tmp/wao-panel-video-outbound-requests.ndjson',
+      expect.any(String),
+      'utf8',
+    )
+    const videoDebugWrite = fsPromisesMock.appendFile.mock.calls.find(([file]) => file === '/tmp/wao-panel-video-outbound-requests.ndjson')
+    expect(videoDebugWrite).toBeTruthy()
+    const line = String(videoDebugWrite?.[1] || '')
+    expect(line).toContain('data:image/png;base64,[base64 omitted length=640]')
+    expect(line).toContain('data:image/png;base64,[base64 omitted length=768]')
+    expect(line).not.toContain('A'.repeat(120))
+    expect(line).not.toContain('B'.repeat(120))
+  })
+
+  it('clamps yunwu omni duration before logging and submitting generation', async () => {
+    prismaMock.task.findUnique.mockResolvedValue({ externalId: null })
+    generatorApiMock.generateVideo.mockResolvedValueOnce({
+      success: true,
+      async: false,
+      videoUrl: 'https://provider.test/omni.mp4',
+    })
+
+    await resolveVideoSourceFromGeneration(buildJob(), {
+      userId: 'user-1',
+      modelId: 'openai-compatible:yunwu-1::kling-omni-video',
+      imageUrl: 'data:image/png;base64,ZmFrZQ==',
+      options: {
+        prompt: 'animate this frame',
+        duration: 19,
+      },
+    })
+
+    expect(generatorApiMock.generateVideo).toHaveBeenCalledWith(
+      'user-1',
+      'openai-compatible:yunwu-1::kling-omni-video',
+      'data:image/png;base64,ZmFrZQ==',
+      expect.objectContaining({
+        duration: 15,
+      }),
+    )
+    const videoDebugWrite = fsPromisesMock.appendFile.mock.calls.find(([file]) => file === '/tmp/wao-panel-video-outbound-requests.ndjson')
+    const line = String(videoDebugWrite?.[1] || '')
+    expect(line).toContain('"duration":15')
+    expect(line).not.toContain('"duration":19')
   })
 })

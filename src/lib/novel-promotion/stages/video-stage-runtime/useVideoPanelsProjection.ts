@@ -26,6 +26,7 @@ interface UseVideoPanelsProjectionParams {
 interface CoarseGroupState {
   imageUrl: string | null
   videoPrompt: string | null
+  duration: number | null
 }
 
 function parseCoarseGroupStates(raw: string | null | undefined): Map<number, CoarseGroupState> {
@@ -44,6 +45,11 @@ function parseCoarseGroupStates(raw: string | null | undefined): Map<number, Coa
           : null,
         videoPrompt: typeof (item as { videoPrompt?: unknown }).videoPrompt === 'string'
           ? (item as { videoPrompt: string }).videoPrompt
+          : null,
+        duration: typeof (item as { duration?: unknown }).duration === 'number'
+          && Number.isFinite((item as { duration: number }).duration)
+          && (item as { duration: number }).duration > 0
+          ? (item as { duration: number }).duration
           : null,
       })
     }
@@ -141,6 +147,7 @@ export function useVideoPanelsProjection({
           videoTargetGroupNumber: parentGroupNumber,
           coarseGroupImageUrl: coarseGroupState?.imageUrl || null,
           coarseGroupVideoPrompt: coarseGroupState?.videoPrompt || null,
+          coarseGroupDuration: coarseGroupState?.duration || null,
           textPanel: {
             panel_number: panelNumber,
             parent_group_number: parentGroupNumber,

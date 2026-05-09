@@ -58,6 +58,48 @@ export function useRegenerateProjectPanelImage(projectId: string) {
     })
 }
 
+export function useSelectProjectStoryboardGroupImage(projectId: string) {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: async (payload: { storyboardId: string; groupNumber: number; imageUrl: string }) => {
+            const res = await apiFetch(`/api/novel-promotion/${projectId}/storyboard-group/select-image`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({}))
+                throw new Error(resolveTaskErrorMessage(error, '选择粗镜头分镜图失败'))
+            }
+            return res.json()
+        },
+        onSettled: () => {
+            invalidateQueryTemplates(queryClient, [queryKeys.projectAssets.all(projectId)])
+        },
+    })
+}
+
+export function useDeleteProjectStoryboardGroupHistoryImage(projectId: string) {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: async (payload: { storyboardId: string; groupNumber: number; imageUrl: string }) => {
+            const res = await apiFetch(`/api/novel-promotion/${projectId}/storyboard-group/select-image`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({}))
+                throw new Error(resolveTaskErrorMessage(error, '删除粗镜头历史分镜图失败'))
+            }
+            return res.json()
+        },
+        onSettled: () => {
+            invalidateQueryTemplates(queryClient, [queryKeys.projectAssets.all(projectId)])
+        },
+    })
+}
+
 /**
  * 修改镜头图片（storyboard）
  */

@@ -13,8 +13,8 @@ function VideoPanelCardLayout(props: VideoPanelCardShellProps) {
   const runtime = useVideoPanelActions(props)
   const updateDurationMutation = useUpdateProjectPanelDuration(props.projectId)
 
-  const handleUpdateDuration = useCallback((storyboardId: string, panelIndex: number, duration: number | null) => {
-    updateDurationMutation.mutate({ storyboardId, panelIndex, duration })
+  const handleUpdateDuration = useCallback((storyboardId: string, panelIndex: number, duration: number | null, groupNumber?: number) => {
+    updateDurationMutation.mutate({ storyboardId, panelIndex, duration, groupNumber })
   }, [updateDurationMutation])
 
   return (

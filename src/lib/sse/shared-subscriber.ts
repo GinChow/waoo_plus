@@ -1,4 +1,4 @@
-import { logError as _ulogError } from '@/lib/logging/core'
+import { logDebug as _ulogDebug, logError as _ulogError } from '@/lib/logging/core'
 import type Redis from 'ioredis'
 import { createSubscriber } from '@/lib/redis'
 
@@ -31,8 +31,13 @@ class SharedSubscriber {
     })
 
     client.on('error', (error) => {
-      _ulogError(`[SSE:shared] redis error: ${error?.message || 'unknown'}`)
-      if (client !== this.subscriber || !this.shouldRecover(error)) return
+      const recoverable = this.shouldRecover(error)
+      if (!recoverable) {
+        _ulogError(`[SSE:shared] redis error: ${error?.message || 'unknown'}`)
+        return
+      }
+      _ulogDebug(`[SSE:shared] redis subscriber recovered after subscriber-mode error`)
+      if (client !== this.subscriber) return
       void this.recoverSubscriberConnection().catch((recoverError) => {
         const message = recoverError instanceof Error ? recoverError.message : String(recoverError)
         _ulogError(`[SSE:shared] redis recover failed: ${message}`)

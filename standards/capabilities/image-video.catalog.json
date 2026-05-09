@@ -1136,5 +1136,81 @@
         "supportGenerateAudio": false
       }
     }
+  },
+  {
+    "modelType": "video",
+    "provider": "yunwu",
+    "modelId": "kling-video-o1",
+    "capabilities": {
+      "video": {
+        "generationModeOptions": [
+          "normal",
+          "firstlastframe"
+        ],
+        "generateAudioOptions": [
+          false,
+          true
+        ],
+        "durationOptions": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "resolutionOptions": [
+          "std",
+          "pro"
+        ],
+        "firstlastframe": true,
+        "supportGenerateAudio": true
+      }
+    }
+  },
+  {
+    "modelType": "video",
+    "provider": "yunwu",
+    "modelId": "kling-v3-omni",
+    "capabilities": {
+      "video": {
+        "generationModeOptions": [
+          "normal",
+          "firstlastframe"
+        ],
+        "generateAudioOptions": [
+          false,
+          true
+        ],
+        "durationOptions": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "resolutionOptions": [
+          "std",
+          "pro"
+        ],
+        "firstlastframe": true,
+        "supportGenerateAudio": true
+      }
+    }
   }
 ]

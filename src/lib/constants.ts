@@ -194,8 +194,8 @@ export const CHARACTER_PROMPT_SUFFIX = '角色设定图，画面分为左右两�
 // 道具图片生成的系统后缀（固定白底三视图资产图）
 export const PROP_PROMPT_SUFFIX = '道具设定图，画面分为左右两个区域：【左侧区域】占约1/3宽度，是道具主体的主视图特写；【右侧区域】占约2/3宽度，是同一道具的三视图横向排列（从左到右依次为：正面、侧面、背面），三视图高度一致。纯白色背景，主体居中完整展示，无人物、无手部、无桌面陈设、无环境背景、无其他元素。'
 
-// 场景图片生成的系统后缀（已禁用四视图，直接生成单张场景图）
-export const LOCATION_PROMPT_SUFFIX = ''
+// 场景图片生成的系统后缀（固定场景设定图：左侧主视图+右侧三视图）
+export const LOCATION_PROMPT_SUFFIX = '场景设定图，画面分为左右两个区域：【左侧区域】占约1/3宽度，是场景的主视角完整环境图，展示最具辨识度的空间结构、入口、主要陈设和氛围；【右侧区域】占约2/3宽度，是同一场景的三视图纵向排列（从上到下依次为：俯视图、侧面视图、背面视图），三视图空间结构、门窗、家具、道路、地标和光照方向必须与主视图一致，三视图高度一致。纯白色背景，场景结构完整展示，无人物、无动物、无文字、无水印、无额外装饰元素。'
 
 // 角色资产图生成比例（当前角色设定图实际使用 3:2）
 export const CHARACTER_ASSET_IMAGE_RATIO = '3:2'
@@ -209,12 +209,12 @@ export const CHARACTER_IMAGE_BANANA_RATIO = CHARACTER_ASSET_IMAGE_RATIO
 // 道具图片生成比例（与角色资产图保持一致）
 export const PROP_IMAGE_RATIO = CHARACTER_ASSET_IMAGE_RATIO
 
-// 场景图片生成比例（1:1 正方形单张场景）
-export const LOCATION_IMAGE_RATIO = '1:1'
-// 场景图片尺寸（用于Seedream API）- 4K
-export const LOCATION_IMAGE_SIZE = '4096x4096'  // 1:1 正方形 4K
+// 场景图片生成比例（宽画幅，适配左侧主视图+右侧三视图，并兼容 Yunwu Gemini Image）
+export const LOCATION_IMAGE_RATIO = '16:9'
+// 场景图片尺寸（用于Seedream API）
+export const LOCATION_IMAGE_SIZE = '3840x2160'
 // 场景图片尺寸（用于Banana API）
-export const LOCATION_IMAGE_BANANA_RATIO = '1:1'
+export const LOCATION_IMAGE_BANANA_RATIO = '16:9'
 
 // 从提示词中移除角色系统后缀（用于显示给用户）
 export function removeCharacterPromptSuffix(prompt: string): string {

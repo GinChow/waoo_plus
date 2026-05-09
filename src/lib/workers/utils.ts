@@ -23,6 +23,7 @@ import { prisma } from '@/lib/prisma'
 const DEFAULT_POLL_TIMEOUT_MS = Number.parseInt(process.env.WORKER_EXTERNAL_TIMEOUT_MS || String(20 * 60 * 1000), 10)
 const DEFAULT_POLL_INTERVAL_MS = Number.parseInt(process.env.WORKER_EXTERNAL_POLL_MS || '3000', 10)
 const PANEL_IMAGE_OUTBOUND_DEBUG_FILE = '/tmp/wao-panel-image-outbound-requests.ndjson'
+const PANEL_VIDEO_OUTBOUND_DEBUG_FILE = '/tmp/wao-panel-video-outbound-requests.ndjson'
 
 /**
  * 查询 DB 中任务是否已有 externalId（服务重启后续接轮询用，避免重复提交外部 API）
@@ -88,6 +89,38 @@ function normalizeExternalId(result: {
 async function appendPanelImageOutboundDebugRecord(record: Record<string, unknown>) {
   const line = `${JSON.stringify(record)}\n`
   await appendFile(PANEL_IMAGE_OUTBOUND_DEBUG_FILE, line, 'utf8')
+}
+
+function sanitizeOutboundMediaValue(value: unknown): unknown {
+  if (typeof value === 'string') {
+    const dataUrlMatch = value.match(/^(data:[^,]+,)([\s\S]*)$/)
+    if (dataUrlMatch) {
+      return `${dataUrlMatch[1]}[base64 omitted length=${dataUrlMatch[2].length}]`
+    }
+    if (value.length > 512 && /^[A-Za-z0-9+/=_-]+$/.test(value)) {
+      return `[base64-like string omitted length=${value.length}]`
+    }
+    return value
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeOutboundMediaValue(item))
+  }
+
+  if (value && typeof value === 'object') {
+    const next: Record<string, unknown> = {}
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      next[key] = sanitizeOutboundMediaValue(item)
+    }
+    return next
+  }
+
+  return value
+}
+
+async function appendPanelVideoOutboundDebugRecord(record: Record<string, unknown>) {
+  const line = `${JSON.stringify(record)}\n`
+  await appendFile(PANEL_VIDEO_OUTBOUND_DEBUG_FILE, line, 'utf8')
 }
 
 export async function waitExternalResult(
@@ -520,21 +553,22 @@ export async function resolveVideoSourceFromGeneration(
     },
   })
 
+  const normalizedOptions = normalizeVideoGenerationOptions(params.options, params.modelId)
   const runtimeSelections: Record<string, string | number | boolean> = {}
-  if (typeof params.options?.duration === 'number') {
-    runtimeSelections.duration = params.options.duration
+  if (typeof normalizedOptions.duration === 'number') {
+    runtimeSelections.duration = normalizedOptions.duration
   }
-  if (typeof params.options?.resolution === 'string') {
-    runtimeSelections.resolution = params.options.resolution
+  if (typeof normalizedOptions.resolution === 'string') {
+    runtimeSelections.resolution = normalizedOptions.resolution
   }
   if (
-    params.options?.generationMode === 'normal'
-    || params.options?.generationMode === 'firstlastframe'
+    normalizedOptions.generationMode === 'normal'
+    || normalizedOptions.generationMode === 'firstlastframe'
   ) {
-    runtimeSelections.generationMode = params.options.generationMode
+    runtimeSelections.generationMode = normalizedOptions.generationMode
   }
-  if (typeof params.options?.generateAudio === 'boolean') {
-    runtimeSelections.generateAudio = params.options.generateAudio
+  if (typeof normalizedOptions.generateAudio === 'boolean') {
+    runtimeSelections.generateAudio = normalizedOptions.generateAudio
   }
 
   const capabilityOptions = await resolveProjectModelCapabilityGenerationOptions({
@@ -548,17 +582,44 @@ export async function resolveVideoSourceFromGeneration(
   const providerCapabilityOptions: Record<string, string | number | boolean> = { ...capabilityOptions }
   delete providerCapabilityOptions.generationMode
   const providerRequestOptions: Record<string, string | number | boolean> = {}
-  for (const [key, value] of Object.entries(params.options || {})) {
+  for (const [key, value] of Object.entries(normalizedOptions)) {
     if (key === 'generationMode' || value === undefined) continue
     providerRequestOptions[key] = value
   }
+  const mergedVideoOptions = {
+    ...providerRequestOptions,
+    ...providerCapabilityOptions,
+  }
+  const sanitizedVideoParams = {
+    model: params.modelId,
+    imageUrl: sanitizeOutboundMediaValue(params.imageUrl),
+    options: sanitizeOutboundMediaValue(mergedVideoOptions),
+  }
+
+  logger.info({
+    audit: true,
+    message: 'panel video outbound request params',
+    details: sanitizedVideoParams,
+  })
+  void appendPanelVideoOutboundDebugRecord({
+    ts: new Date().toISOString(),
+    taskId: job.data.taskId,
+    projectId: job.data.projectId,
+    userId: params.userId,
+    ...sanitizedVideoParams,
+  }).catch((error) => {
+    logger.warn({
+      message: 'write panel video outbound debug file failed',
+      details: {
+        file: PANEL_VIDEO_OUTBOUND_DEBUG_FILE,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    })
+  })
 
   const result = await withLogContext(
     { projectId: job.data.projectId, taskId: job.data.taskId, userId: params.userId },
-    () => generateVideo(params.userId, params.modelId, params.imageUrl, {
-      ...providerRequestOptions,
-      ...providerCapabilityOptions,
-    }),
+    () => generateVideo(params.userId, params.modelId, params.imageUrl, mergedVideoOptions),
   )
   if (!result.success) {
     throw new Error(result.error || 'Video generation failed')
@@ -593,6 +654,54 @@ export async function resolveVideoSourceFromGeneration(
     ...(typeof polled.actualVideoTokens === 'number' ? { actualVideoTokens: polled.actualVideoTokens } : {}),
     ...(polled.downloadHeaders ? { downloadHeaders: polled.downloadHeaders } : {}),
   }
+}
+
+function normalizeVideoGenerationOptions(
+  options: {
+    prompt?: string
+    duration?: number
+    fps?: number
+    resolution?: string
+    aspectRatio?: string
+    generateAudio?: boolean
+    lastFrameImageUrl?: string
+    generationMode?: 'normal' | 'firstlastframe'
+    [key: string]: string | number | boolean | undefined
+  } | undefined,
+  modelId?: string,
+): {
+  prompt?: string
+  duration?: number
+  fps?: number
+  resolution?: string
+  aspectRatio?: string
+  generateAudio?: boolean
+  lastFrameImageUrl?: string
+  generationMode?: 'normal' | 'firstlastframe'
+  [key: string]: string | number | boolean | undefined
+} {
+  const normalized = { ...(options || {}) }
+  if (normalized.duration !== undefined) {
+    const duration = Math.floor(Number(normalized.duration))
+    if (Number.isFinite(duration)) {
+      normalized.duration = isYunwuOmniVideoModel(modelId)
+        ? clampNumber(duration, 3, 15)
+        : duration
+    }
+  }
+  return normalized
+}
+
+function isYunwuOmniVideoModel(modelId?: string): boolean {
+  if (!modelId) return false
+  const normalized = modelId.split('::').at(-1)?.trim()
+  return normalized === 'kling-omni-video'
+    || normalized === 'kling-video-o1'
+    || normalized === 'kling-v3-omni'
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
 }
 
 export async function resolveLipSyncVideoSource(

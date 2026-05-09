@@ -21,7 +21,7 @@ import { queryGeminiBatchStatus, querySeedanceVideoStatus, queryGoogleVideoStatu
 import { getProviderConfig, getUserModels } from './api-config'
 import { buildRenderedTemplateRequest, buildTemplateVariables, normalizeResponseJson, readJsonPath } from './openai-compat-template-runtime'
 import { composeModelKey } from './model-config-contract'
-import { normalizeYunwuBaseUrl } from './generators/yunwu'
+import { YUNWU_OMNI_DEFAULT_BASE_URL, normalizeYunwuBaseUrl, normalizeYunwuOmniBaseUrl } from './generators/yunwu'
 
 const OPENAI_COMPAT_PROVIDER_PREFIX = 'openai-compatible:'
 const PROVIDER_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -49,7 +49,7 @@ function getErrorMessage(error: unknown): string {
  * 解析 externalId 获取 provider、type 和请求信息
  */
 export function parseExternalId(externalId: string): {
-    provider: 'FAL' | 'ARK' | 'GEMINI' | 'GOOGLE' | 'MINIMAX' | 'VIDU' | 'YUNWU' | 'OPENAI' | 'OCOMPAT' | 'BAILIAN' | 'SILICONFLOW' | 'UNKNOWN'
+    provider: 'FAL' | 'ARK' | 'GEMINI' | 'GOOGLE' | 'MINIMAX' | 'VIDU' | 'YUNWU' | 'YUNWUOMNI' | 'OPENAI' | 'OCOMPAT' | 'BAILIAN' | 'SILICONFLOW' | 'UNKNOWN'
     type: 'VIDEO' | 'IMAGE' | 'BATCH' | 'UNKNOWN'
     endpoint?: string
     requestId: string
@@ -186,6 +186,37 @@ export function parseExternalId(externalId: string): {
         }
     }
 
+    if (externalId.startsWith('YUNWUOMNI:')) {
+        const parts = externalId.split(':')
+        const type = parts[1]
+        if (type !== 'VIDEO') {
+            throw new Error(`无效 YUNWUOMNI externalId: "${externalId}"，应为 YUNWUOMNI:VIDEO:taskId`)
+        }
+        const maybeEpToken = parts[2]
+        if (maybeEpToken && maybeEpToken.startsWith('ep_')) {
+            const requestId = parts.slice(3).join(':')
+            if (!requestId) {
+                throw new Error(`无效 YUNWUOMNI externalId: "${externalId}"，缺少 taskId`)
+            }
+            const customBaseUrl = Buffer.from(maybeEpToken.slice(3), 'base64url').toString('utf8')
+            return {
+                provider: 'YUNWUOMNI',
+                type: 'VIDEO',
+                requestId,
+                customBaseUrl,
+            }
+        }
+        const requestId = parts.slice(2).join(':')
+        if (!requestId) {
+            throw new Error(`无效 YUNWUOMNI externalId: "${externalId}"，应为 YUNWUOMNI:VIDEO:taskId`)
+        }
+        return {
+            provider: 'YUNWUOMNI',
+            type: 'VIDEO',
+            requestId,
+        }
+    }
+
     if (externalId.startsWith('OPENAI:')) {
         const parts = externalId.split(':')
         const type = parts[1]
@@ -250,7 +281,7 @@ export function parseExternalId(externalId: string): {
 
     throw new Error(
         `无法识别的 externalId 格式: "${externalId}". ` +
-        `支持的格式: FAL:TYPE:endpoint:requestId, ARK:TYPE:requestId, GEMINI:BATCH:batchName, GOOGLE:VIDEO:operationName, MINIMAX:TYPE:taskId, VIDU:TYPE:taskId, OPENAI:VIDEO:providerToken:videoId, OCOMPAT:TYPE:providerToken:modelKeyToken:taskId, BAILIAN:TYPE:requestId, SILICONFLOW:TYPE:requestId`
+        `支持的格式: FAL:TYPE:endpoint:requestId, ARK:TYPE:requestId, GEMINI:BATCH:batchName, GOOGLE:VIDEO:operationName, MINIMAX:TYPE:taskId, VIDU:TYPE:taskId, YUNWUOMNI:VIDEO:taskId, OPENAI:VIDEO:providerToken:videoId, OCOMPAT:TYPE:providerToken:modelKeyToken:taskId, BAILIAN:TYPE:requestId, SILICONFLOW:TYPE:requestId`
     )
 }
 
@@ -284,6 +315,8 @@ export async function pollAsyncTask(
             return await pollViduTask(parsed.requestId, userId, parsed.customBaseUrl, 'vidu')
         case 'YUNWU':
             return await pollViduTask(parsed.requestId, userId, parsed.customBaseUrl, 'yunwu')
+        case 'YUNWUOMNI':
+            return await pollYunwuOmniTask(parsed.requestId, userId, parsed.customBaseUrl)
         case 'OPENAI':
             return await pollOpenAIVideoTask(parsed.requestId, userId, parsed.providerToken)
         case 'OCOMPAT':
@@ -760,6 +793,27 @@ async function pollViduTask(
     }
 }
 
+async function pollYunwuOmniTask(
+    taskId: string,
+    userId: string,
+    customBaseUrl: string | undefined,
+): Promise<PollResult> {
+    _ulogInfo(`[Poll Yunwu Omni] 开始轮询 task_id=${taskId}, userId=${userId}`)
+
+    const { apiKey, baseUrl: providerBaseUrl } = await getProviderConfig(userId, 'yunwu')
+    const rawBaseUrl = customBaseUrl || providerBaseUrl || YUNWU_OMNI_DEFAULT_BASE_URL
+    const baseUrl = normalizeYunwuOmniBaseUrl(rawBaseUrl)
+    const result = await queryYunwuOmniTaskStatus(taskId, apiKey, baseUrl)
+    _ulogInfo('[Poll Yunwu Omni] 查询结果:', result)
+
+    return {
+        status: result.status,
+        videoUrl: result.videoUrl,
+        resultUrl: result.videoUrl,
+        error: result.error,
+    }
+}
+
 interface BailianTaskQueryResultItem {
     url?: string
     video_url?: string
@@ -995,13 +1049,121 @@ async function queryViduTaskStatus(
     }
 }
 
+function readStringField(record: Record<string, unknown>, key: string): string | undefined {
+    const value = record[key]
+    return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+function readOmniStatus(payload: unknown): string | undefined {
+    if (!payload || typeof payload !== 'object') return undefined
+    const record = payload as Record<string, unknown>
+    const topLevel = readStringField(record, 'status')
+    if (topLevel) return topLevel
+    const data = record.data
+    if (data && typeof data === 'object') {
+        return readStringField(data as Record<string, unknown>, 'task_status')
+            || readStringField(data as Record<string, unknown>, 'status')
+    }
+    return undefined
+}
+
+function readOmniError(payload: unknown): string | undefined {
+    if (!payload || typeof payload !== 'object') return undefined
+    const record = payload as Record<string, unknown>
+    return readStringField(record, 'error') || readStringField(record, 'message')
+}
+
+function readOmniVideoUrl(payload: unknown): string | undefined {
+    if (!payload || typeof payload !== 'object') return undefined
+    const record = payload as Record<string, unknown>
+    const direct = readStringField(record, 'video_url') || readStringField(record, 'videoUrl')
+    if (direct) return direct
+
+    for (const key of ['data', 'output', 'result', 'task_result']) {
+        const nested = record[key]
+        const nestedUrl = readOmniVideoUrl(nested)
+        if (nestedUrl) return nestedUrl
+    }
+
+    for (const key of ['videos', 'video_list', 'results']) {
+        const list = record[key]
+        if (!Array.isArray(list)) continue
+        for (const item of list) {
+            const itemUrl = readOmniVideoUrl(item)
+            if (itemUrl) return itemUrl
+            if (item && typeof item === 'object') {
+                const itemRecord = item as Record<string, unknown>
+                const url = readStringField(itemRecord, 'url')
+                if (url) return url
+            }
+        }
+    }
+
+    return undefined
+}
+
+async function queryYunwuOmniTaskStatus(
+    taskId: string,
+    apiKey: string,
+    baseUrl: string = YUNWU_OMNI_DEFAULT_BASE_URL,
+): Promise<{ status: 'pending' | 'completed' | 'failed'; videoUrl?: string; error?: string }> {
+    const logPrefix = '[Yunwu Omni Query]'
+    try {
+        const response = await fetch(`${baseUrl}/videos/omni-video/${encodeURIComponent(taskId)}`, {
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+            },
+        })
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            _ulogError(`${logPrefix} 查询失败:`, response.status, errorText)
+            return {
+                status: 'failed',
+                error: `Yunwu Omni: 查询失败 ${response.status}`,
+            }
+        }
+
+        const data = await response.json()
+        _ulogInfo(`${logPrefix} 响应数据:`, JSON.stringify(data, null, 2))
+        const status = readOmniStatus(data)
+        if (status === 'succeed' || status === 'success' || status === 'completed') {
+            const videoUrl = readOmniVideoUrl(data)
+            if (!videoUrl) {
+                return {
+                    status: 'failed',
+                    error: 'Yunwu Omni: 任务完成但未返回视频URL',
+                }
+            }
+            return {
+                status: 'completed',
+                videoUrl,
+            }
+        }
+        if (status === 'failed' || status === 'fail') {
+            return {
+                status: 'failed',
+                error: `Yunwu Omni: ${readOmniError(data) || 'Unknown'}`,
+            }
+        }
+        return { status: 'pending' }
+    } catch (error: unknown) {
+        const errorMessage = getErrorMessage(error)
+        _ulogError(`${logPrefix} task_id=${taskId} 异常:`, error)
+        return {
+            status: 'failed',
+            error: `Yunwu Omni: ${errorMessage}`,
+        }
+    }
+}
+
 // ==================== 格式化辅助函数 ====================
 
 /**
  * 创建标准格式的 externalId
  */
 export function formatExternalId(
-    provider: 'FAL' | 'ARK' | 'GEMINI' | 'GOOGLE' | 'MINIMAX' | 'VIDU' | 'OPENAI' | 'OCOMPAT' | 'BAILIAN' | 'SILICONFLOW',
+    provider: 'FAL' | 'ARK' | 'GEMINI' | 'GOOGLE' | 'MINIMAX' | 'VIDU' | 'YUNWUOMNI' | 'OPENAI' | 'OCOMPAT' | 'BAILIAN' | 'SILICONFLOW',
     type: 'VIDEO' | 'IMAGE' | 'BATCH',
     requestId: string,
     endpoint?: string,

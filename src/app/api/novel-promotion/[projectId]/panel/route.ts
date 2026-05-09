@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireProjectAuthLight, isErrorResponse } from '@/lib/api-auth'
 import { apiHandler, ApiError } from '@/lib/api-errors'
 import { serializeStructuredJsonField } from '@/lib/novel-promotion/panel-ai-data-sync'
+import { updateCoarseGroupVideoSettings } from '@/lib/novel-promotion/coarse-group-image-state'
 
 function parseNullableNumberField(value: unknown): number | null {
   if (value === null || value === '') return null
@@ -229,7 +230,7 @@ export const PATCH = apiHandler(async (
   const panelModel = prisma.novelPromotionPanel as unknown as {
     create: (args: { data: Record<string, unknown> }) => Promise<unknown>
   }
-  const { panelId, storyboardId, panelIndex, videoPrompt, firstLastFramePrompt, duration } = body
+  const { panelId, storyboardId, panelIndex, groupNumber, videoPrompt, firstLastFramePrompt, duration } = body
 
   // 🔥 方式1：通过 panelId 直接更新（优先）
   if (panelId) {
@@ -259,7 +260,44 @@ export const PATCH = apiHandler(async (
     return NextResponse.json({ success: true })
   }
 
-  // 🔥 方式2：通过 storyboardId + panelIndex 更新（兼容旧接口）
+  // 🔥 方式2：通过 storyboardId + groupNumber 更新粗镜头级视频设置
+  if (storyboardId && groupNumber !== undefined) {
+    const normalizedGroupNumber = Number(groupNumber)
+    if (!Number.isInteger(normalizedGroupNumber) || normalizedGroupNumber <= 0) {
+      throw new ApiError('INVALID_PARAMS')
+    }
+    if (firstLastFramePrompt !== undefined) {
+      throw new ApiError('INVALID_PARAMS')
+    }
+
+    const storyboard = await prisma.novelPromotionStoryboard.findUnique({
+      where: { id: storyboardId }
+    })
+
+    if (!storyboard) {
+      throw new ApiError('NOT_FOUND')
+    }
+
+    const nextCoarseGroupsJson = updateCoarseGroupVideoSettings({
+      raw: storyboard.coarseGroupsJson,
+      groupNumber: normalizedGroupNumber,
+      ...(videoPrompt !== undefined ? { videoPrompt } : {}),
+      ...(duration !== undefined ? { duration: parseNullableNumberField(duration) } : {}),
+    })
+
+    if (!nextCoarseGroupsJson) {
+      throw new ApiError('INVALID_PARAMS')
+    }
+
+    await prisma.novelPromotionStoryboard.update({
+      where: { id: storyboardId },
+      data: { coarseGroupsJson: nextCoarseGroupsJson },
+    })
+
+    return NextResponse.json({ success: true })
+  }
+
+  // 🔥 方式3：通过 storyboardId + panelIndex 更新（兼容旧接口）
   if (!storyboardId || panelIndex === undefined) {
     throw new ApiError('INVALID_PARAMS')
   }

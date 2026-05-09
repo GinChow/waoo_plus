@@ -55,6 +55,8 @@ interface StoryboardCanvasProps {
   onRetryPanelSave: (panelId: string) => void
   onRegeneratePanelImage: (panelId: string, count?: number, force?: boolean) => void
   onRegenerateStoryboardGroupImage: (storyboardId: string, groupNumber: number, count?: number) => void
+  onSelectStoryboardGroupImage: (storyboardId: string, groupNumber: number, imageUrl: string) => Promise<void>
+  onDeleteStoryboardGroupHistoryImage: (storyboardId: string, groupNumber: number, imageUrl: string) => Promise<void>
   onOpenEditModal: (storyboardId: string, panelIndex: number) => void
   onOpenAIDataModal: (storyboardId: string, panelIndex: number) => void
   getPanelCandidates: (panel: NovelPromotionPanel) => { candidates: string[]; selectedIndex: number } | null
@@ -117,6 +119,8 @@ export default function StoryboardCanvas({
   onRetryPanelSave,
   onRegeneratePanelImage,
   onRegenerateStoryboardGroupImage,
+  onSelectStoryboardGroupImage,
+  onDeleteStoryboardGroupHistoryImage,
   onOpenEditModal,
   onOpenAIDataModal,
   getPanelCandidates,
@@ -197,6 +201,12 @@ export default function StoryboardCanvas({
               onRegeneratePanelImage={onRegeneratePanelImage}
               onRegenerateStoryboardGroupImage={(groupNumber, count) =>
                 onRegenerateStoryboardGroupImage(storyboard.id, groupNumber, count)
+              }
+              onSelectStoryboardGroupImage={(groupNumber, imageUrl) =>
+                onSelectStoryboardGroupImage(storyboard.id, groupNumber, imageUrl)
+              }
+              onDeleteStoryboardGroupHistoryImage={(groupNumber, imageUrl) =>
+                onDeleteStoryboardGroupHistoryImage(storyboard.id, groupNumber, imageUrl)
               }
               onOpenEditModal={(panelIndex) => onOpenEditModal(storyboard.id, panelIndex)}
               onOpenAIDataModal={(panelIndex) => onOpenAIDataModal(storyboard.id, panelIndex)}

@@ -466,4 +466,51 @@ describe('api contract - crud routes (behavior)', () => {
       },
     })
   })
+
+  it('PATCH /novel-promotion/[projectId]/panel persists coarse group video settings on storyboard', async () => {
+    authState.authenticated = true
+    prismaMock.novelPromotionStoryboard.findUnique.mockResolvedValueOnce({
+      id: 'storyboard-1',
+      projectId: 'project-1',
+      coarseGroupsJson: JSON.stringify([
+        {
+          groupNumber: 9,
+          imagePrompt: 'image prompt',
+          videoPrompt: 'old video',
+          imageUrl: 'cos/group-9.png',
+          candidateImages: ['cos/group-9.png'],
+          imageHistory: [],
+          updatedAt: '2026-05-01T00:00:00.000Z',
+        },
+      ]),
+    })
+    const mod = await import('@/app/api/novel-promotion/[projectId]/panel/route')
+    const req = buildMockRequest({
+      path: '/api/novel-promotion/project-1/panel',
+      method: 'PATCH',
+      body: {
+        storyboardId: 'storyboard-1',
+        panelIndex: 0,
+        groupNumber: 9,
+        videoPrompt: 'new video',
+        duration: 19,
+      },
+    })
+
+    const res = await mod.PATCH(req, {
+      params: Promise.resolve({ projectId: 'project-1' }),
+    })
+
+    expect(res.status).toBe(200)
+    const updateCall = prismaMock.novelPromotionStoryboard.update.mock.calls.at(-1)?.[0]
+    expect(updateCall.where).toEqual({ id: 'storyboard-1' })
+    const stored = JSON.parse(updateCall.data.coarseGroupsJson)
+    expect(stored[0]).toMatchObject({
+      groupNumber: 9,
+      imagePrompt: 'image prompt',
+      videoPrompt: 'new video',
+      duration: 19,
+      imageUrl: 'cos/group-9.png',
+    })
+  })
 })
