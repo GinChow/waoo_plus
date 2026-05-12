@@ -3,6 +3,10 @@ import TaskStatusInline from '@/components/task/TaskStatusInline'
 import { resolveTaskPresentationState } from '@/lib/task/presentation'
 import { ModelCapabilityDropdown } from '@/components/ui/config-modals/ModelCapabilityDropdown'
 import { AppIcon } from '@/components/ui/icons'
+import {
+  useDeleteProjectStoryboardGroupHistoryVideo,
+  useSelectProjectStoryboardGroupVideo,
+} from '@/lib/query/hooks'
 import type { VideoPanelRuntime } from './hooks/useVideoPanelActions'
 
 interface VideoPanelCardBodyProps {
@@ -14,6 +18,7 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
   const {
     t,
     tCommon,
+    projectId,
     panel,
     panelIndex,
     panelKey,
@@ -51,6 +56,7 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
   const showsOutgoingLinkBadge = layout.isLinked && !!layout.nextPanel
   const showsPromptEditor = !layout.isLastFrame || layout.isLinked
   const showsFirstLastFrameActions = layout.isLinked && !!layout.nextPanel
+  const videoHistory = panel.coarseGroupVideoHistory || []
 
   return (
     <div className="p-4 space-y-2">
@@ -210,6 +216,17 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
                   </div>
                 </div>
 
+                {videoHistory.length > 0 && (
+                  <CoarseGroupVideoHistoryDropdown
+                    projectId={projectId}
+                    storyboardId={panel.storyboardId}
+                    groupNumber={panel.videoTargetGroupNumber}
+                    currentVideoUrl={panel.videoUrl || ''}
+                    videoHistory={videoHistory}
+                    t={t}
+                  />
+                )}
+
                 {computed.showLipSyncSection && (
                   <div className="mt-2">
                     <div className="flex gap-2">
@@ -292,6 +309,142 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+function CoarseGroupVideoHistoryDropdown({
+  projectId,
+  storyboardId,
+  groupNumber,
+  currentVideoUrl,
+  videoHistory,
+  t,
+}: {
+  projectId: string
+  storyboardId: string
+  groupNumber?: number
+  currentVideoUrl: string
+  videoHistory: NonNullable<VideoPanelRuntime['panel']['coarseGroupVideoHistory']>
+  t: (key: string, values?: Record<string, number>) => string
+}) {
+  const [openVideoHistory, setOpenVideoHistory] = useState(false)
+  const selectHistoryVideoMutation = useSelectProjectStoryboardGroupVideo(projectId)
+  const deleteHistoryVideoMutation = useDeleteProjectStoryboardGroupHistoryVideo(projectId)
+  const [selectingHistoryVideoUrl, setSelectingHistoryVideoUrl] = useState<string | null>(null)
+  const [deletingHistoryVideoUrl, setDeletingHistoryVideoUrl] = useState<string | null>(null)
+
+  const formatHistoryTime = useCallback((value: string) => {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return date.toLocaleString()
+  }, [])
+
+  const handleSelectHistoryVideo = useCallback(async (videoUrl: string) => {
+    if (!groupNumber) return
+    setSelectingHistoryVideoUrl(videoUrl)
+    try {
+      await selectHistoryVideoMutation.mutateAsync({
+        storyboardId,
+        groupNumber,
+        videoUrl,
+      })
+    } finally {
+      setSelectingHistoryVideoUrl(null)
+    }
+  }, [groupNumber, selectHistoryVideoMutation, storyboardId])
+
+  const handleDeleteHistoryVideo = useCallback(async (videoUrl: string) => {
+    if (!groupNumber) return
+    setDeletingHistoryVideoUrl(videoUrl)
+    try {
+      await deleteHistoryVideoMutation.mutateAsync({
+        storyboardId,
+        groupNumber,
+        videoUrl,
+      })
+    } finally {
+      setDeletingHistoryVideoUrl(null)
+    }
+  }, [deleteHistoryVideoMutation, groupNumber, storyboardId])
+
+  return (
+    <div className="relative mt-2">
+      <button
+        type="button"
+        className="flex h-8 w-full items-center justify-between rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)] px-2 text-xs text-[var(--glass-text-secondary)] hover:bg-[var(--glass-bg-surface-hover)]"
+        onClick={() => setOpenVideoHistory((current) => !current)}
+      >
+        <span>{t('panelCard.videoHistoryCount', { count: videoHistory.length })}</span>
+        <AppIcon
+          name="chevronDown"
+          className={`h-3.5 w-3.5 transition-transform ${openVideoHistory ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {openVideoHistory && (
+        <div className="absolute left-0 right-0 top-9 z-20 max-h-80 overflow-y-auto rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-surface)] p-2 shadow-xl">
+          <div className="grid gap-2">
+            {[...videoHistory].reverse().map((entry, historyIndex) => {
+              const isCurrent = entry.videoUrl === currentVideoUrl
+              const isSelecting = selectingHistoryVideoUrl === entry.videoUrl
+              const isDeleting = deletingHistoryVideoUrl === entry.videoUrl
+              return (
+                <div
+                  key={`${entry.videoUrl}-${historyIndex}`}
+                  className={`grid grid-cols-[76px_1fr_auto_auto] items-center gap-2 rounded-md border p-1.5 ${
+                    isCurrent
+                      ? 'border-[var(--glass-accent-from)] bg-[var(--glass-bg-muted)]'
+                      : 'border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)]/60'
+                  }`}
+                >
+                  <video
+                    src={entry.videoUrl}
+                    className="h-12 w-[76px] rounded border border-[var(--glass-stroke-base)] bg-black object-cover"
+                    muted
+                    playsInline
+                    preload="metadata"
+                    controls
+                  />
+                  <div className="min-w-0">
+                    <div className="truncate text-xs text-[var(--glass-text-primary)]">
+                      {isCurrent ? t('panelCard.currentVideo') : t('panelCard.historyVideo', { number: videoHistory.length - historyIndex })}
+                    </div>
+                    <div className="truncate text-[11px] text-[var(--glass-text-tertiary)]">
+                      {formatHistoryTime(entry.generatedAt)}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="glass-btn-base glass-btn-soft rounded-md px-2 py-1 text-xs disabled:opacity-60"
+                    disabled={isCurrent || isSelecting || isDeleting}
+                    onClick={() => handleSelectHistoryVideo(entry.videoUrl)}
+                  >
+                    {isCurrent ? (
+                      <AppIcon name="check" className="h-3.5 w-3.5" />
+                    ) : (
+                      <span>{isSelecting ? t('panelCard.saving') : t('panelCard.useHistoryVideo')}</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="glass-btn-base glass-btn-danger rounded-md px-2 py-1 text-xs disabled:opacity-60"
+                    disabled={isSelecting || isDeleting}
+                    onClick={() => handleDeleteHistoryVideo(entry.videoUrl)}
+                    title={t('panelCard.deleteHistoryVideo')}
+                  >
+                    {isDeleting ? (
+                      <span>{t('panelCard.deleting')}</span>
+                    ) : (
+                      <AppIcon name="trashAlt" className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

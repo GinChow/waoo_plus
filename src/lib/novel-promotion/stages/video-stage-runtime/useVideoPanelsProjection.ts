@@ -25,8 +25,16 @@ interface UseVideoPanelsProjectionParams {
 
 interface CoarseGroupState {
   imageUrl: string | null
+  videoUrl: string | null
   videoPrompt: string | null
   duration: number | null
+  videoHistory: Array<{
+    videoUrl: string
+    generatedAt: string
+    videoPrompt: string
+    videoModel: string
+    generationMode: string
+  }>
 }
 
 function parseCoarseGroupStates(raw: string | null | undefined): Map<number, CoarseGroupState> {
@@ -43,6 +51,9 @@ function parseCoarseGroupStates(raw: string | null | undefined): Map<number, Coa
         imageUrl: typeof (item as { imageUrl?: unknown }).imageUrl === 'string'
           ? (item as { imageUrl: string }).imageUrl
           : null,
+        videoUrl: typeof (item as { videoUrl?: unknown }).videoUrl === 'string'
+          ? (item as { videoUrl: string }).videoUrl
+          : null,
         videoPrompt: typeof (item as { videoPrompt?: unknown }).videoPrompt === 'string'
           ? (item as { videoPrompt: string }).videoPrompt
           : null,
@@ -51,6 +62,20 @@ function parseCoarseGroupStates(raw: string | null | undefined): Map<number, Coa
           && (item as { duration: number }).duration > 0
           ? (item as { duration: number }).duration
           : null,
+        videoHistory: Array.isArray((item as { videoHistory?: unknown }).videoHistory)
+          ? ((item as { videoHistory: unknown[] }).videoHistory).flatMap((entry) => {
+            if (!entry || typeof entry !== 'object') return []
+            const record = entry as Record<string, unknown>
+            if (typeof record.videoUrl !== 'string' || !record.videoUrl) return []
+            return [{
+              videoUrl: record.videoUrl,
+              generatedAt: typeof record.generatedAt === 'string' ? record.generatedAt : '',
+              videoPrompt: typeof record.videoPrompt === 'string' ? record.videoPrompt : '',
+              videoModel: typeof record.videoModel === 'string' ? record.videoModel : '',
+              generationMode: typeof record.generationMode === 'string' ? record.generationMode : '',
+            }]
+          })
+          : [],
       })
     }
     return states
@@ -148,6 +173,7 @@ export function useVideoPanelsProjection({
           coarseGroupImageUrl: coarseGroupState?.imageUrl || null,
           coarseGroupVideoPrompt: coarseGroupState?.videoPrompt || null,
           coarseGroupDuration: coarseGroupState?.duration || null,
+          coarseGroupVideoHistory: coarseGroupState?.videoHistory || [],
           textPanel: {
             panel_number: panelNumber,
             parent_group_number: parentGroupNumber,
@@ -164,7 +190,7 @@ export function useVideoPanelsProjection({
           },
           imageUrl: panel.imageUrl || undefined,
           firstLastFramePrompt: panel.firstLastFramePrompt || undefined,
-          videoUrl: panel.videoUrl || undefined,
+          videoUrl: coarseGroupState?.videoUrl || panel.videoUrl || undefined,
           videoGenerationMode: panel.videoGenerationMode || undefined,
           videoTaskRunning: panelVideoState?.phase === 'queued' || panelVideoState?.phase === 'processing',
           videoErrorCode:

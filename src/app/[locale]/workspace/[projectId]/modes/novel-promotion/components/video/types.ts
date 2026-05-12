@@ -90,6 +90,13 @@ export interface VideoPanel {
   coarseGroupImageUrl?: string | null
   coarseGroupVideoPrompt?: string | null
   coarseGroupDuration?: number | null
+  coarseGroupVideoHistory?: Array<{
+    videoUrl: string
+    generatedAt: string
+    videoPrompt: string
+    videoModel: string
+    generationMode: string
+  }>
   textPanel?: TextPanel
   firstLastFramePrompt?: string
   imageUrl?: string

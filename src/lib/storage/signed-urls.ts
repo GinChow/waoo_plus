@@ -221,10 +221,26 @@ function signStoryboardCoarseGroups(raw: string | null | undefined) {
             : candidate
         ))
         : record.candidateImages
+      const videoHistory = Array.isArray(record.videoHistory)
+        ? record.videoHistory.map((entry) => {
+          if (!entry || typeof entry !== 'object') return entry
+          const historyRecord = entry as UnknownRecord
+          return {
+            ...historyRecord,
+            videoUrl: typeof historyRecord.videoUrl === 'string' && !historyRecord.videoUrl.startsWith('http')
+              ? getSignedUrl(historyRecord.videoUrl, 7200) || historyRecord.videoUrl
+              : historyRecord.videoUrl,
+          }
+        })
+        : record.videoHistory
       return {
         ...record,
         imageUrl: typeof record.imageUrl === 'string' ? keyToSignedUrl(record.imageUrl) : record.imageUrl,
+        videoUrl: typeof record.videoUrl === 'string' && !record.videoUrl.startsWith('http')
+          ? getSignedUrl(record.videoUrl, 7200) || record.videoUrl
+          : record.videoUrl,
         candidateImages,
+        videoHistory,
       }
     }))
   } catch {

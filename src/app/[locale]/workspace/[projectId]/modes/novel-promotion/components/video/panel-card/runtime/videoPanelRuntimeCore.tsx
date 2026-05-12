@@ -108,6 +108,7 @@ export function useVideoPanelActions({
   return {
     t,
     tCommon,
+    projectId,
     panel,
     panelIndex,
     panelKey,

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   deleteCoarseGroupHistoryImage,
+  deleteCoarseGroupHistoryVideo,
   parseCoarseGroupsJson,
   selectCoarseGroupImage,
+  selectCoarseGroupVideo,
   updateCoarseGroupVideoSettings,
+  upsertCoarseGroupVideoState,
   upsertCoarseGroupState,
 } from '@/lib/novel-promotion/coarse-group-image-state'
 
@@ -157,5 +160,78 @@ describe('coarse group image state', () => {
     expect(group.imagePrompt).toBe('image prompt')
     expect(group.imageUrl).toBe('cos/group-6-a.png')
     expect(group.imageHistory.map((entry) => entry.imageUrl)).toEqual(['cos/group-6-a.png'])
+  })
+
+  it('keeps generated coarse group videos in history and allows selecting old videos', () => {
+    const first = upsertCoarseGroupVideoState({
+      raw: null,
+      groupNumber: 7,
+      videoUrl: 'video/group-7-a.mp4',
+      videoPrompt: 'video prompt 1',
+      videoModel: 'model-a',
+      generationMode: 'normal',
+      generatedAt: '2026-05-01T00:00:00.000Z',
+    })
+    const second = upsertCoarseGroupVideoState({
+      raw: first,
+      groupNumber: 7,
+      videoUrl: 'video/group-7-b.mp4',
+      videoPrompt: 'video prompt 2',
+      videoModel: 'model-b',
+      generationMode: 'normal',
+      generatedAt: '2026-05-01T01:00:00.000Z',
+    })
+
+    const [generated] = parseCoarseGroupsJson(second)
+    expect(generated.videoUrl).toBe('video/group-7-b.mp4')
+    expect(generated.videoHistory.map((entry) => entry.videoUrl)).toEqual([
+      'video/group-7-a.mp4',
+      'video/group-7-b.mp4',
+    ])
+
+    const selected = selectCoarseGroupVideo({
+      raw: second,
+      groupNumber: 7,
+      selectedVideoUrl: 'video/group-7-a.mp4',
+    })
+    const [group] = parseCoarseGroupsJson(selected)
+    expect(group.videoUrl).toBe('video/group-7-a.mp4')
+    expect(group.videoPrompt).toBe('video prompt 1')
+
+    expect(selectCoarseGroupVideo({
+      raw: second,
+      groupNumber: 7,
+      selectedVideoUrl: 'video/not-in-history.mp4',
+    })).toBeNull()
+  })
+
+  it('deletes current coarse group video and falls back to latest remaining video', () => {
+    const first = upsertCoarseGroupVideoState({
+      raw: null,
+      groupNumber: 8,
+      videoUrl: 'video/group-8-a.mp4',
+      videoPrompt: 'video prompt 1',
+      videoModel: 'model-a',
+      generationMode: 'normal',
+      generatedAt: '2026-05-01T00:00:00.000Z',
+    })
+    const second = upsertCoarseGroupVideoState({
+      raw: first,
+      groupNumber: 8,
+      videoUrl: 'video/group-8-b.mp4',
+      videoPrompt: 'video prompt 2',
+      videoModel: 'model-b',
+      generationMode: 'normal',
+      generatedAt: '2026-05-01T01:00:00.000Z',
+    })
+
+    const deleted = deleteCoarseGroupHistoryVideo({
+      raw: second,
+      groupNumber: 8,
+      videoUrl: 'video/group-8-b.mp4',
+    })
+    const [group] = parseCoarseGroupsJson(deleted)
+    expect(group.videoUrl).toBe('video/group-8-a.mp4')
+    expect(group.videoHistory.map((entry) => entry.videoUrl)).toEqual(['video/group-8-a.mp4'])
   })
 })

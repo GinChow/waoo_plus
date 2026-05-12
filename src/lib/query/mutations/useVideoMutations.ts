@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../keys'
+import { apiFetch } from '@/lib/api-fetch'
+import { resolveTaskErrorMessage } from '@/lib/task/error-message'
 import { invalidateQueryTemplates, requestJsonWithError } from './mutation-shared'
 
 /**
@@ -121,6 +123,56 @@ export function useUpdateProjectPanelDuration(projectId: string) {
       ),
     onSettled: () => {
       invalidateQueryTemplates(queryClient, [queryKeys.projectData(projectId)])
+    },
+  })
+}
+
+/**
+ * 选择粗镜头历史视频
+ */
+export function useSelectProjectStoryboardGroupVideo(projectId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (payload: { storyboardId: string; groupNumber: number; videoUrl: string }) => {
+      const res = await apiFetch(`/api/novel-promotion/${projectId}/storyboard-group/select-video`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}))
+        throw new Error(resolveTaskErrorMessage(error, '选择粗镜头历史视频失败'))
+      }
+      return res.json()
+    },
+    onSettled: () => {
+      invalidateQueryTemplates(queryClient, [queryKeys.projectAssets.all(projectId)])
+    },
+  })
+}
+
+/**
+ * 删除粗镜头历史视频
+ */
+export function useDeleteProjectStoryboardGroupHistoryVideo(projectId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (payload: { storyboardId: string; groupNumber: number; videoUrl: string }) => {
+      const res = await apiFetch(`/api/novel-promotion/${projectId}/storyboard-group/select-video`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}))
+        throw new Error(resolveTaskErrorMessage(error, '删除粗镜头历史视频失败'))
+      }
+      return res.json()
+    },
+    onSettled: () => {
+      invalidateQueryTemplates(queryClient, [queryKeys.projectAssets.all(projectId)])
     },
   })
 }

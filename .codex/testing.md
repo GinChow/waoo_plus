@@ -68,3 +68,19 @@ Executor: Codex
 
 - `npm run test:unit -- ...` failed because the package has no `test:unit` script. Retried with `npx vitest run ...`.
 - The new focused test verifies `/tmp/wao-panel-video-outbound-requests.ndjson` receives sanitized data URL placeholders and does not contain long base64 runs.
+
+## Coarse Group Video History
+
+Date: 2026-05-09
+Executor: Codex
+
+### Passed
+
+- `npm run typecheck`
+  - TypeScript check passed.
+- `npx vitest run tests/unit/worker/video-worker.test.ts tests/unit/novel-promotion/video-panel-card-body.test.ts tests/unit/novel-promotion/coarse-group-image-state.test.ts`
+  - 3 files passed, 16 tests passed.
+
+### Noted
+
+- `npm run test:unit:all -- tests/unit/novel-promotion/coarse-group-image-state.test.ts` runs the whole `tests/unit` suite because the script includes a fixed `tests/unit` argument. The run had unrelated existing failures in prompt suffix, project global analyze mutation, and Yunwu Omni async poll tests; the initially exposed related worker/card issues were fixed and passed in the focused rerun.

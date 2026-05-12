@@ -66,3 +66,25 @@ Added common panel video outbound request logging and `/tmp/wao-panel-video-outb
 
 - Unit coverage confirms video generation receives original base64 values while logs/temp records contain only `[base64 omitted length=...]` placeholders.
 - Existing worker and generator tests confirm the changed common path does not regress panel video processing or supported video generator routing.
+
+## Coarse Group Video History
+
+Date: 2026-05-09
+Executor: Codex
+
+Implemented and verified coarse shot video history in the video render panel, mirroring the storyboard panel coarse image history pattern.
+
+### Commands
+
+- `npm run typecheck` passed.
+- `npx vitest run tests/unit/worker/video-worker.test.ts tests/unit/novel-promotion/video-panel-card-body.test.ts tests/unit/novel-promotion/coarse-group-image-state.test.ts` passed.
+
+### Coverage
+
+- Unit coverage confirms generated coarse group videos append into `videoHistory`, old videos can be selected, and deleting the current video falls back to the latest remaining history video.
+- Worker coverage confirms panel video generation still completes while group video state is persisted.
+- Component coverage confirms the existing video card body render path remains usable without a QueryClient when no history dropdown is mounted.
+
+### Residual Notes
+
+- `npm run test:unit:all -- tests/unit/novel-promotion/coarse-group-image-state.test.ts` ran the whole unit suite and failed on unrelated existing assertions in prompt suffix, project global analyze mutation, and Yunwu Omni async poll tests. Related failures found during that run were fixed and verified with focused tests.

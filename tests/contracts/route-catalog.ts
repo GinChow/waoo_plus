@@ -125,6 +125,7 @@ const ROUTE_FILES = [
   'src/app/api/novel-promotion/[projectId]/speaker-voice/route.ts',
   'src/app/api/novel-promotion/[projectId]/story-to-script-stream/route.ts',
   'src/app/api/novel-promotion/[projectId]/storyboard-group/select-image/route.ts',
+  'src/app/api/novel-promotion/[projectId]/storyboard-group/select-video/route.ts',
   'src/app/api/novel-promotion/[projectId]/storyboard-group/route.ts',
   'src/app/api/novel-promotion/[projectId]/storyboards/route.ts',
   'src/app/api/novel-promotion/[projectId]/undo-regenerate/route.ts',

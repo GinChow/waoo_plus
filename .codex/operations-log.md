@@ -36,3 +36,12 @@ Executor: Codex
 - 在 `src/lib/workers/utils.ts` 为通用视频生成调用增加 audit 日志，并追加写入 `/tmp/wao-panel-video-outbound-requests.ndjson`。
 - 日志与临时文件中的图片 data URL / base64-like 字符串仅保留长度占位，实际传给 `generateVideo` 的参数保持原值。
 - 调整 `src/lib/generators/vidu.ts` 的完整请求体日志，避免 `images` 中的 base64 原文刷满日志。
+
+## Task: Coarse Group Video History
+
+Date: 2026-05-09
+Executor: Codex
+
+- 工具降级：当前会话没有可调用的 `sequential-thinking`、`shrimp-task-manager`、`code-index` MCP 工具入口，因此使用 `rg`、`sed` 和本地测试替代上下文收集与任务拆分。
+- 复用 `NovelPromotionStoryboard.coarseGroupsJson` 作为粗镜头级状态源，在同一 group 内增加 `videoUrl`、`videoHistory`、`videoModel`、`videoGenerationMode`，避免新增表或并行状态。
+- 生成完成时记录粗镜头视频历史；项目数据签名/媒体附加处理视频历史；成片面板展示历史视频并支持选择/删除；新增 `storyboard-group/select-video` API；补充中英文文案和单元测试。

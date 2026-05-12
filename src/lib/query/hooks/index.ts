@@ -117,6 +117,8 @@ export {
     useGetProjectStoryboardStats,
     useUpdateProjectPanelVideoPrompt,
     useUpdateProjectPanelDuration,
+    useSelectProjectStoryboardGroupVideo,
+    useDeleteProjectStoryboardGroupHistoryVideo,
     useRegenerateProjectPanelImage,
     useSelectProjectStoryboardGroupImage,
     useDeleteProjectStoryboardGroupHistoryImage,

@@ -18,6 +18,7 @@ import { normalizeToBase64ForGeneration } from '@/lib/media/outbound-image'
 import { resolveBuiltinCapabilitiesByModelKey } from '@/lib/model-capabilities/lookup'
 import { parseModelKeyStrict } from '@/lib/model-config-contract'
 import { getProviderConfig } from '@/lib/api-config'
+import { upsertCoarseGroupVideoState } from '@/lib/novel-promotion/coarse-group-image-state'
 
 type AnyObj = Record<string, unknown>
 type VideoOptionValue = string | number | boolean
@@ -208,7 +209,14 @@ async function generateVideoForPanel(
   modelId: string,
   projectVideoRatio: string | null | undefined,
   generationOptions: VideoOptionMap,
-): Promise<{ cosKey: string; generationMode: VideoGenerationMode; actualVideoTokens?: number }> {
+): Promise<{
+  cosKey: string
+  generationMode: VideoGenerationMode
+  prompt: string
+  model: string
+  groupNumber: number | null
+  actualVideoTokens?: number
+}> {
   const groupNumber = readPositiveGroupNumber(payload.groupNumber)
   const coarseGroupSource = groupNumber ? await resolveCoarseGroupVideoSource(panel, groupNumber) : null
   const sourceImageValue = coarseGroupSource?.imageUrl || panel.imageUrl
@@ -308,6 +316,9 @@ async function generateVideoForPanel(
   return {
     cosKey,
     generationMode,
+    prompt,
+    model,
+    groupNumber,
     ...(typeof generatedVideo.actualVideoTokens === 'number'
       ? { actualVideoTokens: generatedVideo.actualVideoTokens }
       : {}),
@@ -330,7 +341,7 @@ async function handleVideoPanelTask(job: Job<TaskJobData>) {
     panelId: panel.id,
   })
 
-  const { cosKey, generationMode, actualVideoTokens } = await generateVideoForPanel(
+  const { cosKey, generationMode, prompt, model, groupNumber, actualVideoTokens } = await generateVideoForPanel(
     job,
     panel,
     payload,
@@ -340,6 +351,7 @@ async function handleVideoPanelTask(job: Job<TaskJobData>) {
   )
 
   await assertTaskActive(job, 'persist_panel_video')
+  const now = new Date()
   await prisma.novelPromotionPanel.update({
     where: { id: panel.id },
     data: {
@@ -347,6 +359,30 @@ async function handleVideoPanelTask(job: Job<TaskJobData>) {
       videoGenerationMode: generationMode,
     },
   })
+
+  if (groupNumber) {
+    const storyboard = await prisma.novelPromotionStoryboard.findUnique({
+      where: { id: panel.storyboardId },
+      select: { coarseGroupsJson: true },
+    })
+    if (storyboard) {
+      const coarseGroupsJson = upsertCoarseGroupVideoState({
+        raw: storyboard.coarseGroupsJson,
+        groupNumber,
+        videoUrl: cosKey,
+        videoPrompt: prompt,
+        videoModel: model,
+        generationMode,
+        generatedAt: now.toISOString(),
+      })
+      if (coarseGroupsJson) {
+        await prisma.novelPromotionStoryboard.update({
+          where: { id: panel.storyboardId },
+          data: { coarseGroupsJson },
+        })
+      }
+    }
+  }
 
   return {
     panelId: panel.id,
