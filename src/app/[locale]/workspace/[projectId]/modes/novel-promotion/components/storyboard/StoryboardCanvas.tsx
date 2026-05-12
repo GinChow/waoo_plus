@@ -54,6 +54,7 @@ interface StoryboardCanvasProps {
   onRemoveLocation: (panel: StoryboardPanel, storyboardId: string) => void
   onRetryPanelSave: (panelId: string) => void
   onRegeneratePanelImage: (panelId: string, count?: number, force?: boolean) => void
+  onBatchGenerateNextPanels?: (startPanelId: string, count?: number) => Promise<void> | void
   onRegenerateStoryboardGroupImage: (storyboardId: string, groupNumber: number, count?: number) => void
   onSelectStoryboardGroupImage: (storyboardId: string, groupNumber: number, imageUrl: string) => Promise<void>
   onDeleteStoryboardGroupHistoryImage: (storyboardId: string, groupNumber: number, imageUrl: string) => Promise<void>
@@ -120,6 +121,7 @@ export default function StoryboardCanvas({
   onRemoveLocation,
   onRetryPanelSave,
   onRegeneratePanelImage,
+  onBatchGenerateNextPanels,
   onRegenerateStoryboardGroupImage,
   onSelectStoryboardGroupImage,
   onDeleteStoryboardGroupHistoryImage,
@@ -203,6 +205,7 @@ export default function StoryboardCanvas({
               onRemoveLocation={(panel) => onRemoveLocation(panel, storyboard.id)}
               onRetryPanelSave={onRetryPanelSave}
               onRegeneratePanelImage={onRegeneratePanelImage}
+              onBatchGenerateNextPanels={onBatchGenerateNextPanels}
               onRegenerateStoryboardGroupImage={(groupNumber, count) =>
                 onRegenerateStoryboardGroupImage(storyboard.id, groupNumber, count)
               }

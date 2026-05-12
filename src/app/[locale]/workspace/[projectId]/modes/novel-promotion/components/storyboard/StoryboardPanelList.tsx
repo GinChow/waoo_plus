@@ -31,6 +31,7 @@ interface StoryboardPanelListProps {
   onRemoveLocation: (panel: StoryboardPanel) => void
   onRetryPanelSave: (panelId: string) => void
   onRegeneratePanelImage: (panelId: string, count?: number, force?: boolean) => void
+  onBatchGenerateNextPanels?: (startPanelId: string, count?: number) => Promise<void> | void
   onOpenEditModal: (panelIndex: number) => void
   onOpenAIDataModal: (panelIndex: number) => void
   onSelectPanelCandidateIndex: (panelId: string, index: number) => void
@@ -71,6 +72,7 @@ export default function StoryboardPanelList({
   onRemoveLocation,
   onRetryPanelSave,
   onRegeneratePanelImage,
+  onBatchGenerateNextPanels,
   onOpenEditModal,
   onOpenAIDataModal,
   onSelectPanelCandidateIndex,
@@ -141,6 +143,7 @@ export default function StoryboardPanelList({
               onRemoveCharacter={(characterIndex) => onRemoveCharacter(panel, characterIndex)}
               onRemoveLocation={() => onRemoveLocation(panel)}
               onRegeneratePanelImage={onRegeneratePanelImage}
+              onBatchGenerateNextPanels={onBatchGenerateNextPanels}
               onOpenEditModal={() => onOpenEditModal(panel.panelIndex)}
               onOpenAIDataModal={() => onOpenAIDataModal(panel.panelIndex)}
               onSelectCandidateIndex={onSelectPanelCandidateIndex}

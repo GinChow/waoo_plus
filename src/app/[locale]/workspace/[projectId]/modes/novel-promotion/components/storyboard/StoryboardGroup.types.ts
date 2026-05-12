@@ -44,6 +44,7 @@ export interface StoryboardGroupProps {
   onRemoveLocation: (panel: StoryboardPanel) => void
   onRetryPanelSave: (panelId: string) => void
   onRegeneratePanelImage: (panelId: string, count?: number, force?: boolean) => void
+  onBatchGenerateNextPanels?: (startPanelId: string, count?: number) => Promise<void> | void
   onRegenerateStoryboardGroupImage: (groupNumber: number, count?: number) => void
   onSelectStoryboardGroupImage: (groupNumber: number, imageUrl: string) => Promise<void>
   onDeleteStoryboardGroupHistoryImage: (groupNumber: number, imageUrl: string) => Promise<void>

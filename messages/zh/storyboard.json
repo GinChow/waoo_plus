@@ -108,6 +108,7 @@
         "shotMode": "景别/模式",
         "regenerateImage": "重新生成图片",
         "generateImage": "生成图片",
+        "batchGenerateNext": "向下批量生成 {count} 个",
         "imageHistory": "图片历史",
         "imageHistoryCount": "历史 {count}",
         "currentImage": "当前使用",

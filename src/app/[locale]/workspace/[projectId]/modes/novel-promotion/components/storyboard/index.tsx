@@ -133,6 +133,7 @@ export default function StoryboardStage({
     runningCount,
     pendingPanelCount,
     handleGenerateAllPanels,
+    regenerateNextNPanels,
   } = controller
 
   const modalRuntime = useStoryboardModalRuntime({
@@ -311,6 +312,7 @@ export default function StoryboardStage({
           onRemoveLocation={handleRemoveLocation}
           onRetryPanelSave={retrySave}
           onRegeneratePanelImage={regeneratePanelImage}
+          onBatchGenerateNextPanels={regenerateNextNPanels}
           onRegenerateStoryboardGroupImage={regenerateStoryboardGroupImage}
           onSelectStoryboardGroupImage={selectStoryboardGroupImage}
           onDeleteStoryboardGroupHistoryImage={deleteStoryboardGroupHistoryImage}

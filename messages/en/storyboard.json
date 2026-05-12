@@ -108,6 +108,7 @@
         "shotMode": "Shot/Mode",
         "regenerateImage": "Regenerate Image",
         "generateImage": "Generate Image",
+        "batchGenerateNext": "Generate next {count}",
         "imageHistory": "Image history",
         "imageHistoryCount": "History {count}",
         "currentImage": "Current",

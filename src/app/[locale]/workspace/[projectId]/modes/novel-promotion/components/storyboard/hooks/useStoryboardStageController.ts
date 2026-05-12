@@ -193,6 +193,27 @@ export function useStoryboardStageController({
     isTransitioning,
   })
 
+  const regenerateNextNPanels = useCallback(
+    async (startPanelId: string, count: number = 10) => {
+      const orderedPanels = sortedStoryboards.flatMap((storyboard) => getTextPanels(storyboard))
+      const startIndex = orderedPanels.findIndex((panel) => panel.id === startPanelId)
+      if (startIndex < 0) return
+
+      const eligible: string[] = []
+      for (let index = startIndex; index < orderedPanels.length && eligible.length < count; index += 1) {
+        const panel = orderedPanels[index]
+        if (panel.imageUrl) continue
+        if (panel.imageTaskRunning) continue
+        if (submittingPanelImageIds.has(panel.id)) continue
+        eligible.push(panel.id)
+      }
+
+      if (eligible.length === 0) return
+      await Promise.all(eligible.map((panelId) => regeneratePanelImage(panelId, 1, false)))
+    },
+    [sortedStoryboards, getTextPanels, submittingPanelImageIds, regeneratePanelImage],
+  )
+
   return {
     localStoryboards, setLocalStoryboards, sortedStoryboards, expandedClips, toggleExpandedClip,
     getClipInfo, getTextPanels, getPanelEditData, updatePanelEdit, formatClipTitle, totalPanels, storyboardStartIndex,
@@ -208,5 +229,6 @@ export function useStoryboardStageController({
     retrySave,
     updatePhotographyPlanMutation, updatePanelActingNotesMutation,
     addingStoryboardGroupState, transitioningState, runningCount, pendingPanelCount, handleGenerateAllPanels,
+    regenerateNextNPanels,
   }
 }

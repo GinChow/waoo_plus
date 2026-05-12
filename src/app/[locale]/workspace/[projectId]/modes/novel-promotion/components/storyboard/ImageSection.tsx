@@ -30,6 +30,7 @@ interface ImageSectionProps {
   previousImageUrl?: string | null
   imageHistoryRaw?: string | null
   onRegeneratePanelImage: (panelId: string, count?: number, force?: boolean) => void
+  onBatchGenerateNextPanels?: (startPanelId: string, count?: number) => Promise<void> | void
   onOpenEditModal: () => void
   onOpenAIDataModal: () => void
   onSelectCandidateIndex: (panelId: string, index: number) => void
@@ -60,6 +61,7 @@ export default function ImageSection({
   previousImageUrl,
   imageHistoryRaw,
   onRegeneratePanelImage,
+  onBatchGenerateNextPanels,
   onOpenEditModal,
   onOpenAIDataModal,
   onSelectCandidateIndex,
@@ -143,6 +145,18 @@ export default function ImageSection({
       >
         {t('panel.generateImage')}
       </GlassButton>
+      {onBatchGenerateNextPanels && (
+        <GlassButton
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            triggerPulse()
+            void onBatchGenerateNextPanels(panelId, 10)
+          }}
+        >
+          {t('panel.batchGenerateNext', { count: 10 })}
+        </GlassButton>
+      )}
     </div>
   )
 
