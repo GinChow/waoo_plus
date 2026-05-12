@@ -112,7 +112,7 @@ export default function StoryboardGroup({
 }: StoryboardGroupProps) {
   const t = useTranslations('storyboard')
   const tProgress = useTranslations('progress')
-  const [activeCoarseGroupNumber, setActiveCoarseGroupNumber] = useState<number | null>(null)
+  const [isCoarseSectionOpen, setIsCoarseSectionOpen] = useState(false)
   const [openHistoryGroupNumber, setOpenHistoryGroupNumber] = useState<number | null>(null)
   const [selectingHistoryImageKey, setSelectingHistoryImageKey] = useState<string | null>(null)
   const [deletingHistoryImageKey, setDeletingHistoryImageKey] = useState<string | null>(null)
@@ -209,11 +209,6 @@ export default function StoryboardGroup({
     }
   }, [onDeleteStoryboardGroupHistoryImage, t])
 
-  const activeFinePanels = useMemo(() => {
-    if (activeCoarseGroupNumber === null) return []
-    return coarseGroups.find((group) => group.groupNumber === activeCoarseGroupNumber)?.panels || []
-  }, [activeCoarseGroupNumber, coarseGroups])
-
   const groupOverlayState = useMemo(() => {
     if (isSubmittingStoryboardTextTask) {
       return resolveTaskPresentationState({
@@ -280,15 +275,9 @@ export default function StoryboardGroup({
   const handleRegeneratePanelImage = useCallback(
     (panelId: string, count?: number, force?: boolean) => {
       clearPanelTaskError(panelId)
-      const panel = textPanels.find((item) => item.id === panelId)
-      const groupNumber = panel?.parent_group_number ?? 1
-      if (groupNumber > 0) {
-        onRegenerateStoryboardGroupImage(groupNumber, count)
-        return
-      }
       onRegeneratePanelImage(panelId, count, force)
     },
-    [clearPanelTaskError, onRegeneratePanelImage, onRegenerateStoryboardGroupImage, textPanels],
+    [clearPanelTaskError, onRegeneratePanelImage],
   )
 
   return (
@@ -359,11 +348,22 @@ export default function StoryboardGroup({
         </div>
       )}
 
-      {activeCoarseGroupNumber === null ? (
-        <div className="space-y-3">
-          <div className="text-xs text-[var(--glass-text-tertiary)]">{t('group.coarseGridPreview')}</div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {coarseGroups.map((coarseGroup) => {
+      {coarseGroups.length > 0 && (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => setIsCoarseSectionOpen((current) => !current)}
+            className="glass-btn-base glass-btn-soft rounded-xl px-3 py-2 text-sm"
+          >
+            <AppIcon name="chevronRightMd" className={`h-4 w-4 transition-transform ${isCoarseSectionOpen ? 'rotate-90' : ''}`} />
+            <span>{t('group.coarseGridPreview')}</span>
+            <span className="ml-2 text-xs text-[var(--glass-text-tertiary)]">
+              {t('group.fineShotCount', { count: textPanels.length })}
+            </span>
+          </button>
+          {isCoarseSectionOpen && (
+            <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {coarseGroups.map((coarseGroup) => {
               const coarseGroupState = coarseGroupStates.get(coarseGroup.groupNumber) || null
               const generatedImageUrl = coarseGroupState?.imageUrl || null
               const coarseGroupTask = (storyboard.storyboardImageTaskGroups || [])
@@ -392,16 +392,7 @@ export default function StoryboardGroup({
               return (
                 <div
                   key={`${storyboard.id}-coarse-${coarseGroup.groupNumber}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setActiveCoarseGroupNumber(coarseGroup.groupNumber)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      setActiveCoarseGroupNumber(coarseGroup.groupNumber)
-                    }
-                  }}
-                  className="glass-surface-soft relative overflow-hidden p-3 text-left hover:bg-[var(--glass-bg-muted)] transition-colors"
+                  className="glass-surface-soft relative overflow-hidden p-3 text-left"
                 >
                   {isGeneratingCoarseGroup && (
                       <TaskStatusOverlay
@@ -601,69 +592,52 @@ export default function StoryboardGroup({
                 </div>
               )
             })}
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-[var(--glass-text-primary)]">
-              {t('group.coarseShotTitle', { number: activeCoarseGroupNumber })}
             </div>
-            <div className="text-xs text-[var(--glass-text-tertiary)]">
-              {t('group.fineShotCount', { count: activeFinePanels.length })}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setActiveCoarseGroupNumber(null)}
-            className="glass-btn-base glass-btn-soft rounded-xl px-3 py-2 text-sm"
-          >
-            <AppIcon name="chevronLeft" className="h-4 w-4" />
-            <span>{t('group.backToCoarseList')}</span>
-          </button>
-          <StoryboardPanelList
-            storyboardId={storyboard.id}
-            textPanels={activeFinePanels}
-            storyboardStartIndex={storyboardStartIndex}
-            videoRatio={videoRatio}
-            isSubmittingStoryboardTextTask={isSubmittingStoryboardTextTask}
-            savingPanels={savingPanels}
-            deletingPanelIds={deletingPanelIds}
-            saveStateByPanel={saveStateByPanel}
-            hasUnsavedByPanel={hasUnsavedByPanel}
-            modifyingPanels={modifyingPanels}
-            panelTaskErrorMap={panelTaskErrorMap}
-            isPanelTaskRunning={isPanelTaskRunning}
-            getPanelEditData={getPanelEditData}
-            getPanelCandidates={getPanelCandidates}
-            onPanelUpdate={onPanelUpdate}
-            onPanelDelete={onPanelDelete}
-            onOpenCharacterPicker={onOpenCharacterPicker}
-            onOpenLocationPicker={onOpenLocationPicker}
-            onRemoveCharacter={onRemoveCharacter}
-            onRemoveLocation={onRemoveLocation}
-            onRetryPanelSave={onRetryPanelSave}
-            onRegeneratePanelImage={handleRegeneratePanelImage}
-            onOpenEditModal={onOpenEditModal}
-            onOpenAIDataModal={onOpenAIDataModal}
-            onSelectPanelCandidateIndex={onSelectPanelCandidateIndex}
-            onConfirmPanelCandidate={onConfirmPanelCandidate}
-            onCancelPanelCandidate={onCancelPanelCandidate}
-            onClearPanelTaskError={clearPanelTaskError}
-            onDeletePanelImage={onDeletePanelImage}
-            onUploadPanelImage={onUploadPanelImage}
-            uploadingPanelIds={uploadingPanelIds}
-            onPreviewImage={onPreviewImage}
-            onInsertAfter={handleOpenInsertModal}
-            onVariant={handleOpenVariantModal}
-            isInsertDisabled={(panelId) =>
-              isSubmittingStoryboardTextTask ||
-              insertingAfterPanelId === panelId ||
-              submittingVariantPanelId === panelId
-            }
-          />
+          )}
         </div>
       )}
+
+      <StoryboardPanelList
+        storyboardId={storyboard.id}
+        textPanels={textPanels}
+        storyboardStartIndex={storyboardStartIndex}
+        videoRatio={videoRatio}
+        isSubmittingStoryboardTextTask={isSubmittingStoryboardTextTask}
+        savingPanels={savingPanels}
+        deletingPanelIds={deletingPanelIds}
+        saveStateByPanel={saveStateByPanel}
+        hasUnsavedByPanel={hasUnsavedByPanel}
+        modifyingPanels={modifyingPanels}
+        panelTaskErrorMap={panelTaskErrorMap}
+        isPanelTaskRunning={isPanelTaskRunning}
+        getPanelEditData={getPanelEditData}
+        getPanelCandidates={getPanelCandidates}
+        onPanelUpdate={onPanelUpdate}
+        onPanelDelete={onPanelDelete}
+        onOpenCharacterPicker={onOpenCharacterPicker}
+        onOpenLocationPicker={onOpenLocationPicker}
+        onRemoveCharacter={onRemoveCharacter}
+        onRemoveLocation={onRemoveLocation}
+        onRetryPanelSave={onRetryPanelSave}
+        onRegeneratePanelImage={handleRegeneratePanelImage}
+        onOpenEditModal={onOpenEditModal}
+        onOpenAIDataModal={onOpenAIDataModal}
+        onSelectPanelCandidateIndex={onSelectPanelCandidateIndex}
+        onConfirmPanelCandidate={onConfirmPanelCandidate}
+        onCancelPanelCandidate={onCancelPanelCandidate}
+        onClearPanelTaskError={clearPanelTaskError}
+        onDeletePanelImage={onDeletePanelImage}
+        onUploadPanelImage={onUploadPanelImage}
+        uploadingPanelIds={uploadingPanelIds}
+        onPreviewImage={onPreviewImage}
+        onInsertAfter={handleOpenInsertModal}
+        onVariant={handleOpenVariantModal}
+        isInsertDisabled={(panelId) =>
+          isSubmittingStoryboardTextTask ||
+          insertingAfterPanelId === panelId ||
+          submittingVariantPanelId === panelId
+        }
+      />
 
       <StoryboardGroupDialogs
         insertAfterPanel={insertAfterPanel}
