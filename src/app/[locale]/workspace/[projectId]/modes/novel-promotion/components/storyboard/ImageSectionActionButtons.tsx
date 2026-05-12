@@ -8,11 +8,13 @@ import { getImageGenerationCountOptions } from '@/lib/image-generation/count'
 import { useImageGenerationCount } from '@/lib/image-generation/use-image-generation-count'
 import { AI_EDIT_BUTTON_CLASS, AI_EDIT_ICON_CLASS } from '@/components/ui/ai-edit-style'
 import AISparklesIcon from '@/components/ui/icons/AISparklesIcon'
+import PanelImageHistoryPopover from './PanelImageHistoryPopover'
 
 interface ImageSectionActionButtonsProps {
   panelId: string
   imageUrl: string | null
   previousImageUrl?: string | null
+  imageHistoryRaw?: string | null
   isSubmittingPanelImageTask: boolean
   isModifying: boolean
   onRegeneratePanelImage: (panelId: string, count?: number, force?: boolean) => void
@@ -21,6 +23,9 @@ interface ImageSectionActionButtonsProps {
   onUndo?: (panelId: string) => void
   onDeleteImage?: (panelId: string) => void
   onUploadImage?: (panelId: string, file: File) => void
+  onSelectHistoryImage?: (panelId: string, imageUrl: string) => Promise<void>
+  onDeleteHistoryImage?: (panelId: string, imageUrl: string) => Promise<void>
+  onPreviewImage?: (url: string) => void
   isUploading?: boolean
   triggerPulse: () => void
 }
@@ -29,6 +34,7 @@ export default function ImageSectionActionButtons({
   panelId,
   imageUrl,
   previousImageUrl,
+  imageHistoryRaw,
   isSubmittingPanelImageTask,
   isModifying,
   onRegeneratePanelImage,
@@ -37,6 +43,9 @@ export default function ImageSectionActionButtons({
   onUndo,
   onDeleteImage,
   onUploadImage,
+  onSelectHistoryImage,
+  onDeleteHistoryImage,
+  onPreviewImage,
   isUploading,
   triggerPulse,
 }: ImageSectionActionButtonsProps) {
@@ -84,6 +93,20 @@ export default function ImageSectionActionButtons({
               <AppIcon name="chart" className="w-2.5 h-2.5" />
               <span>{t('aiData.viewData')}</span>
             </button>
+
+            {imageHistoryRaw && onSelectHistoryImage && onDeleteHistoryImage && (
+              <>
+                <div className="w-px h-3 bg-[var(--glass-stroke-base)]" />
+                <PanelImageHistoryPopover
+                  panelId={panelId}
+                  imageHistoryRaw={imageHistoryRaw}
+                  currentImageUrl={imageUrl}
+                  onSelectHistoryImage={onSelectHistoryImage}
+                  onDeleteHistoryImage={onDeleteHistoryImage}
+                  onPreviewImage={onPreviewImage}
+                />
+              </>
+            )}
             {imageUrl && (
               <button
                 onClick={onOpenEditModal}

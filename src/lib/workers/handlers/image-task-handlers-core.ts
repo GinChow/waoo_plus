@@ -29,6 +29,11 @@ import {
 } from './image-task-handler-shared'
 import { createScopedLogger } from '@/lib/logging/core'
 import {
+  appendPanelImageHistoryEntry,
+  parsePanelImageHistory,
+  serializePanelImageHistory,
+} from '@/lib/novel-promotion/panel-image-state'
+import {
   buildCharacterDescriptionFields,
   generateModifiedAssetDescription,
   readIndexedDescription,
@@ -280,6 +285,7 @@ export async function handleModifyAssetImageTask(job: Job<TaskJobData>) {
           panelIndex: true,
           imageUrl: true,
           previousImageUrl: true,
+          imageHistory: true,
         },
       })
       : null
@@ -297,6 +303,7 @@ export async function handleModifyAssetImageTask(job: Job<TaskJobData>) {
           panelIndex: true,
           imageUrl: true,
           previousImageUrl: true,
+          imageHistory: true,
         },
       })
     }
@@ -349,6 +356,16 @@ export async function handleModifyAssetImageTask(job: Job<TaskJobData>) {
 
     const cosKey = await uploadImageSourceToCos(source, 'panel-modify', panel.id)
 
+    const nextImageHistory = appendPanelImageHistoryEntry(
+      parsePanelImageHistory(panel.imageHistory),
+      {
+        url: cosKey,
+        timestamp: new Date().toISOString(),
+        source: 'modify',
+        taskId: job.data.taskId,
+      },
+    )
+
     await assertTaskActive(job, 'persist_storyboard_modify')
     await prisma.novelPromotionPanel.update({
       where: { id: panel.id },
@@ -356,6 +373,7 @@ export async function handleModifyAssetImageTask(job: Job<TaskJobData>) {
         previousImageUrl: panel.imageUrl || panel.previousImageUrl || null,
         imageUrl: cosKey,
         candidateImages: null,
+        imageHistory: serializePanelImageHistory(nextImageHistory),
       },
     })
 

@@ -39,6 +39,8 @@ interface StoryboardPanelListProps {
   onClearPanelTaskError: (panelId: string) => void
   onDeletePanelImage: (panelId: string) => void
   onUploadPanelImage: (panelId: string, file: File) => void
+  onSelectPanelHistoryImage: (panelId: string, imageUrl: string) => Promise<void>
+  onDeletePanelHistoryImage: (panelId: string, imageUrl: string) => Promise<void>
   uploadingPanelIds: Set<string>
   onPreviewImage: (url: string) => void
   onInsertAfter: (panelIndex: number) => void
@@ -77,6 +79,8 @@ export default function StoryboardPanelList({
   onClearPanelTaskError,
   onDeletePanelImage,
   onUploadPanelImage,
+  onSelectPanelHistoryImage,
+  onDeletePanelHistoryImage,
   uploadingPanelIds,
   onPreviewImage,
   onInsertAfter,
@@ -87,7 +91,7 @@ export default function StoryboardPanelList({
   const isVertical = ASPECT_RATIO_CONFIGS[videoRatio]?.isVertical ?? false
 
   return (
-    <div className={`grid gap-4 ${isVertical ? 'grid-cols-5' : 'grid-cols-3'} ${isSubmittingStoryboardTextTask ? 'opacity-50 pointer-events-none' : ''}`}>
+    <div className={`grid gap-4 isolate ${isVertical ? 'grid-cols-5' : 'grid-cols-3'} ${isSubmittingStoryboardTextTask ? 'opacity-50 pointer-events-none' : ''}`}>
       {textPanels.map((panel, index) => {
         const imageUrl = displayImages[index]
         const globalPanelNumber = storyboardStartIndex + panel.panelIndex + 1
@@ -145,6 +149,8 @@ export default function StoryboardPanelList({
               onClearError={() => onClearPanelTaskError(panel.id)}
               onDeleteImage={onDeletePanelImage}
               onUploadImage={onUploadPanelImage}
+              onSelectHistoryImage={onSelectPanelHistoryImage}
+              onDeleteHistoryImage={onDeletePanelHistoryImage}
               isUploading={uploadingPanelIds.has(panel.id)}
               onPreviewImage={onPreviewImage}
               onInsertAfter={() => onInsertAfter(panel.panelIndex)}

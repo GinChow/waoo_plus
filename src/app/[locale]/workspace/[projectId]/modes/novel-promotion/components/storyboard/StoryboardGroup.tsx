@@ -106,6 +106,8 @@ export default function StoryboardGroup({
   episodeId,
   onDeletePanelImage,
   onUploadPanelImage,
+  onSelectPanelHistoryImage,
+  onDeletePanelHistoryImage,
   uploadingPanelIds,
   onPanelVariant,
   submittingVariantPanelId,
@@ -628,6 +630,8 @@ export default function StoryboardGroup({
         onClearPanelTaskError={clearPanelTaskError}
         onDeletePanelImage={onDeletePanelImage}
         onUploadPanelImage={onUploadPanelImage}
+        onSelectPanelHistoryImage={onSelectPanelHistoryImage}
+        onDeletePanelHistoryImage={onDeletePanelHistoryImage}
         uploadingPanelIds={uploadingPanelIds}
         onPreviewImage={onPreviewImage}
         onInsertAfter={handleOpenInsertModal}

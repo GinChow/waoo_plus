@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { uploadObject, generateUniqueKey } from '@/lib/storage'
 import { requireProjectAuthLight, isErrorResponse } from '@/lib/api-auth'
 import { apiHandler, ApiError } from '@/lib/api-errors'
+import {
+  appendPanelImageHistoryEntry,
+  parsePanelImageHistory,
+  serializePanelImageHistory,
+} from '@/lib/novel-promotion/panel-image-state'
 
 /**
  * POST /api/novel-promotion/[projectId]/panel/update-image
@@ -27,7 +32,7 @@ export const POST = apiHandler(async (
 
   const panel = await prisma.novelPromotionPanel.findUnique({
     where: { id: panelId },
-    select: { id: true, imageUrl: true, previousImageUrl: true },
+    select: { id: true, imageUrl: true, previousImageUrl: true, imageHistory: true },
   })
 
   if (!panel) {
@@ -40,12 +45,22 @@ export const POST = apiHandler(async (
   const key = generateUniqueKey(`panel-upload-${panelId}`, 'jpg')
   await uploadObject(buffer, key)
 
+  const nextImageHistory = appendPanelImageHistoryEntry(
+    parsePanelImageHistory(panel.imageHistory),
+    {
+      url: key,
+      timestamp: new Date().toISOString(),
+      source: 'upload',
+    },
+  )
+
   await prisma.novelPromotionPanel.update({
     where: { id: panelId },
     data: {
       previousImageUrl: panel.imageUrl || panel.previousImageUrl || null,
       imageUrl: key,
       candidateImages: null,
+      imageHistory: serializePanelImageHistory(nextImageHistory),
     },
   })
 

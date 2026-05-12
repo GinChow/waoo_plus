@@ -28,6 +28,7 @@ interface ImageSectionProps {
   failedError: string | null
   candidateData: PanelCandidateData | null
   previousImageUrl?: string | null
+  imageHistoryRaw?: string | null
   onRegeneratePanelImage: (panelId: string, count?: number, force?: boolean) => void
   onOpenEditModal: () => void
   onOpenAIDataModal: () => void
@@ -38,6 +39,8 @@ interface ImageSectionProps {
   onUndo?: (panelId: string) => void
   onDeleteImage?: (panelId: string) => void
   onUploadImage?: (panelId: string, file: File) => void
+  onSelectHistoryImage?: (panelId: string, imageUrl: string) => Promise<void>
+  onDeleteHistoryImage?: (panelId: string, imageUrl: string) => Promise<void>
   isUploading?: boolean
   onPreviewImage?: (url: string) => void
 }
@@ -55,6 +58,7 @@ export default function ImageSection({
   failedError,
   candidateData,
   previousImageUrl,
+  imageHistoryRaw,
   onRegeneratePanelImage,
   onOpenEditModal,
   onOpenAIDataModal,
@@ -65,6 +69,8 @@ export default function ImageSection({
   onUndo,
   onDeleteImage,
   onUploadImage,
+  onSelectHistoryImage,
+  onDeleteHistoryImage,
   isUploading,
   onPreviewImage,
 }: ImageSectionProps) {
@@ -195,6 +201,7 @@ export default function ImageSection({
           panelId={panelId}
           imageUrl={imageUrl}
           previousImageUrl={previousImageUrl}
+          imageHistoryRaw={imageHistoryRaw}
           isSubmittingPanelImageTask={isSubmittingPanelImageTask}
           isModifying={isModifying}
           onRegeneratePanelImage={onRegeneratePanelImage}
@@ -203,6 +210,9 @@ export default function ImageSection({
           onUndo={onUndo}
           onDeleteImage={onDeleteImage}
           onUploadImage={onUploadImage}
+          onSelectHistoryImage={onSelectHistoryImage}
+          onDeleteHistoryImage={onDeleteHistoryImage}
+          onPreviewImage={onPreviewImage}
           isUploading={isUploading}
           triggerPulse={triggerPulse}
         />

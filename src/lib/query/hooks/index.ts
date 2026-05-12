@@ -122,6 +122,8 @@ export {
     useRegenerateProjectPanelImage,
     useSelectProjectStoryboardGroupImage,
     useDeleteProjectStoryboardGroupHistoryImage,
+    useSelectProjectPanelHistoryImage,
+    useDeleteProjectPanelHistoryImage,
     useModifyProjectStoryboardImage,
     useDownloadProjectImages,
     useUpdateProjectPanel,

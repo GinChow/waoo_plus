@@ -55,6 +55,8 @@ export interface StoryboardGroupProps {
   onCancelPanelCandidate: (panelId: string) => void
   onDeletePanelImage: (panelId: string) => void
   onUploadPanelImage: (panelId: string, file: File) => void
+  onSelectPanelHistoryImage: (panelId: string, imageUrl: string) => Promise<void>
+  onDeletePanelHistoryImage: (panelId: string, imageUrl: string) => Promise<void>
   uploadingPanelIds: Set<string>
 
   formatClipTitle: (clip: NovelPromotionClip | undefined) => string

@@ -111,6 +111,29 @@ async function attachMediaFieldsToPanel<T extends Record<string, unknown>>(panel
     candidateMediaUrls.push(media?.url || candidate)
   }
 
+  let resolvedImageHistoryJson: unknown = panel.imageHistory
+  if (typeof panel.imageHistory === 'string' && panel.imageHistory.trim()) {
+    try {
+      const parsed = JSON.parse(panel.imageHistory)
+      if (Array.isArray(parsed)) {
+        const resolved = await Promise.all(parsed.map(async (entry) => {
+          if (!entry || typeof entry !== 'object') return entry
+          const record = entry as Record<string, unknown>
+          const url = typeof record.url === 'string' ? record.url : ''
+          if (!url || url.startsWith('PENDING:')) return record
+          const media = await resolveMediaRefFromLegacyValue(url)
+          return {
+            ...record,
+            url: media?.url || url,
+          }
+        }))
+        resolvedImageHistoryJson = JSON.stringify(resolved)
+      }
+    } catch {
+      // keep original on parse failure
+    }
+  }
+
   return {
     ...panel,
     media: imageMedia,
@@ -125,6 +148,7 @@ async function attachMediaFieldsToPanel<T extends Record<string, unknown>>(panel
     sketchImageUrl: sketchImageMedia?.url || panel.sketchImageUrl || null,
     previousImageUrl: previousImageMedia?.url || panel.previousImageUrl || null,
     candidateImages: candidateRaw.length > 0 ? JSON.stringify(candidateMediaUrls) : panel.candidateImages,
+    imageHistory: resolvedImageHistoryJson,
   }
 }
 

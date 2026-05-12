@@ -25,6 +25,11 @@ import {
   parseLocationAvailableSlots,
 } from '@/lib/location-available-slots'
 import { upsertCoarseGroupState } from '@/lib/novel-promotion/coarse-group-image-state'
+import {
+  appendPanelImageHistoryEntries,
+  parsePanelImageHistory,
+  serializePanelImageHistory,
+} from '@/lib/novel-promotion/panel-image-state'
 
 function parseJsonUnknown(raw: string | null | undefined): unknown | null {
   if (!raw) return null
@@ -575,6 +580,18 @@ export async function handlePanelImageTask(job: Job<TaskJobData>) {
   }
 
   const isFirstGeneration = !panel.imageUrl
+  const generatedAt = new Date().toISOString()
+  const historyEntries = candidates.map((url) => ({
+    url,
+    timestamp: generatedAt,
+    source: 'generate' as const,
+    taskId: job.data.taskId,
+  }))
+  const nextImageHistory = appendPanelImageHistoryEntries(
+    parsePanelImageHistory(panel.imageHistory),
+    historyEntries,
+  )
+  const serializedHistory = serializePanelImageHistory(nextImageHistory)
 
   await assertTaskActive(job, 'persist_panel_image')
   if (isFirstGeneration) {
@@ -583,6 +600,7 @@ export async function handlePanelImageTask(job: Job<TaskJobData>) {
       data: {
         imageUrl: candidates[0] || null,
         candidateImages: candidateCount > 1 ? JSON.stringify(candidates) : null,
+        imageHistory: serializedHistory,
       },
     })
   } else {
@@ -591,6 +609,7 @@ export async function handlePanelImageTask(job: Job<TaskJobData>) {
       data: {
         previousImageUrl: panel.imageUrl,
         candidateImages: JSON.stringify(candidates),
+        imageHistory: serializedHistory,
       },
     })
   }

@@ -274,13 +274,24 @@ describe('worker panel-image-task-handler behavior', () => {
       }),
     }))
 
-    expect(prismaMock.novelPromotionPanel.update).toHaveBeenCalledWith({
-      where: { id: 'panel-1' },
-      data: {
-        imageUrl: 'cos/panel-candidate-1.png',
-        candidateImages: JSON.stringify(['cos/panel-candidate-1.png', 'cos/panel-candidate-2.png']),
-      },
-    })
+    const updateCall = prismaMock.novelPromotionPanel.update.mock.calls.find(
+      (call: unknown[]) => (call[0] as { where?: { id?: string } })?.where?.id === 'panel-1',
+    ) as unknown[] | undefined
+    expect(updateCall).toBeTruthy()
+    const updateData = (updateCall![0] as { data: Record<string, unknown> }).data
+    expect(updateData.imageUrl).toBe('cos/panel-candidate-1.png')
+    expect(updateData.candidateImages).toBe(
+      JSON.stringify(['cos/panel-candidate-1.png', 'cos/panel-candidate-2.png']),
+    )
+    const historyJson = updateData.imageHistory as string | null
+    expect(historyJson).toBeTruthy()
+    const historyEntries = JSON.parse(historyJson as string)
+    expect(historyEntries).toHaveLength(2)
+    expect(historyEntries.map((entry: { url: string }) => entry.url)).toEqual([
+      'cos/panel-candidate-1.png',
+      'cos/panel-candidate-2.png',
+    ])
+    expect(historyEntries.every((entry: { source?: string }) => entry.source === 'generate')).toBe(true)
   })
 
   it('passes normalized reference images through to resolveImageSourceFromGeneration', async () => {
@@ -347,13 +358,17 @@ describe('worker panel-image-task-handler behavior', () => {
       imageUrl: null,
     })
 
-    expect(prismaMock.novelPromotionPanel.update).toHaveBeenCalledWith({
-      where: { id: 'panel-1' },
-      data: {
-        previousImageUrl: 'cos/panel-old.png',
-        candidateImages: JSON.stringify(['cos/panel-regenerated.png']),
-      },
-    })
+    const regenUpdateCall = prismaMock.novelPromotionPanel.update.mock.calls.find(
+      (call: unknown[]) => (call[0] as { where?: { id?: string } })?.where?.id === 'panel-1',
+    ) as unknown[] | undefined
+    expect(regenUpdateCall).toBeTruthy()
+    const regenData = (regenUpdateCall![0] as { data: Record<string, unknown> }).data
+    expect(regenData.previousImageUrl).toBe('cos/panel-old.png')
+    expect(regenData.candidateImages).toBe(JSON.stringify(['cos/panel-regenerated.png']))
+    const regenHistory = JSON.parse(regenData.imageHistory as string)
+    expect(regenHistory).toHaveLength(1)
+    expect(regenHistory[0].url).toBe('cos/panel-regenerated.png')
+    expect(regenHistory[0].source).toBe('generate')
   })
 
   it('storyboard group generation -> builds grid prompt and stores prompt bundle on storyboard', async () => {

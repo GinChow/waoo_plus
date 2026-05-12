@@ -144,11 +144,26 @@ export function addSignedUrlsToStoryboard(storyboard: StoryboardLike) {
   if (storyboard.panels && Array.isArray(storyboard.panels)) {
     panels = storyboard.panels.map((dbPanel) => {
       let panelHistoryCount = 0
-      const historyField = dbPanel.panelImageHistory || dbPanel.imageHistory
-      if (historyField) {
+      let signedImageHistory = dbPanel.panelImageHistory || dbPanel.imageHistory || null
+      if (signedImageHistory) {
         try {
-          const history = JSON.parse(historyField)
-          panelHistoryCount = Array.isArray(history) ? history.length : 0
+          const history = JSON.parse(signedImageHistory)
+          if (Array.isArray(history)) {
+            panelHistoryCount = history.length
+            const signedHistory = history.map((entry) => {
+              if (!entry || typeof entry !== 'object') return entry
+              const record = entry as Record<string, unknown>
+              const url = typeof record.url === 'string' ? record.url : null
+              if (!url) return entry
+              return {
+                ...record,
+                url: keyToSignedUrl(url) || url,
+              }
+            })
+            signedImageHistory = JSON.stringify(signedHistory)
+          } else {
+            panelHistoryCount = 0
+          }
         } catch {
           panelHistoryCount = 0
         }
@@ -182,6 +197,7 @@ export function addSignedUrlsToStoryboard(storyboard: StoryboardLike) {
           ? getSignedUrl(dbPanel.lipSyncVideoUrl, 7200)
           : dbPanel.lipSyncVideoUrl,
         candidateImages: signedCandidateImages,
+        imageHistory: signedImageHistory,
         historyCount: panelHistoryCount,
       }
     })

@@ -11,7 +11,19 @@ import StoryboardToolbar from './StoryboardToolbar'
 import StoryboardCanvas from './StoryboardCanvas'
 import { useStoryboardStageController } from './hooks/useStoryboardStageController'
 import { useStoryboardModalRuntime } from './hooks/useStoryboardModalRuntime'
-import { useRefreshProjectAssets } from '@/lib/query/hooks'
+import {
+  useRefreshProjectAssets,
+  useRefreshEpisodeData,
+  useRefreshStoryboards,
+  useSelectProjectPanelHistoryImage,
+  useDeleteProjectPanelHistoryImage,
+} from '@/lib/query/hooks'
+import { usePanelEpisodeCachePatch } from './hooks/usePanelEpisodeCachePatch'
+import {
+  parsePanelImageHistory,
+  removePanelImageHistoryEntry,
+  serializePanelImageHistory,
+} from '@/lib/novel-promotion/panel-image-state'
 
 interface StoryboardStageProps {
   projectId: string
@@ -161,6 +173,60 @@ export default function StoryboardStage({
     }
   }, [projectId, onRefresh])
 
+  const selectPanelHistoryImageMutation = useSelectProjectPanelHistoryImage(projectId)
+  const deletePanelHistoryImageMutation = useDeleteProjectPanelHistoryImage(projectId)
+  const refreshEpisodeData = useRefreshEpisodeData(projectId, episodeId)
+  const refreshStoryboards = useRefreshStoryboards(episodeId)
+  const patchPanelInEpisodeCache = usePanelEpisodeCachePatch({ projectId, episodeId })
+
+  const handleSelectPanelHistoryImage = useCallback(async (panelId: string, imageUrl: string) => {
+    const result = await selectPanelHistoryImageMutation.mutateAsync({ panelId, imageUrl }) as { imageUrl?: string; cosKey?: string }
+    const nextImageUrl = result?.imageUrl || imageUrl
+    setLocalStoryboards((previous) => previous.map((storyboard) => {
+      const panels = storyboard.panels || []
+      let changed = false
+      const nextPanels = panels.map((panel) => {
+        if (panel.id !== panelId) return panel
+        changed = true
+        return { ...panel, imageUrl: nextImageUrl, candidateImages: null }
+      })
+      return changed ? { ...storyboard, panels: nextPanels } : storyboard
+    }))
+    patchPanelInEpisodeCache(panelId, {
+      imageUrl: nextImageUrl,
+      candidateImages: null,
+    })
+    onRefresh()
+    refreshEpisodeData()
+    refreshStoryboards()
+  }, [selectPanelHistoryImageMutation, onRefresh, refreshEpisodeData, refreshStoryboards, patchPanelInEpisodeCache, setLocalStoryboards])
+
+  const handleDeletePanelHistoryImage = useCallback(async (panelId: string, imageUrl: string) => {
+    let optimisticHistoryRaw: string | null | undefined
+    setLocalStoryboards((previous) => previous.map((storyboard) => {
+      const panels = storyboard.panels || []
+      let changed = false
+      const nextPanels = panels.map((panel) => {
+        if (panel.id !== panelId) return panel
+        if (!panel.imageHistory) return panel
+        const nextHistory = serializePanelImageHistory(
+          removePanelImageHistoryEntry(parsePanelImageHistory(panel.imageHistory), imageUrl),
+        )
+        optimisticHistoryRaw = nextHistory
+        changed = true
+        return { ...panel, imageHistory: nextHistory }
+      })
+      return changed ? { ...storyboard, panels: nextPanels } : storyboard
+    }))
+    if (optimisticHistoryRaw !== undefined) {
+      patchPanelInEpisodeCache(panelId, { imageHistory: optimisticHistoryRaw })
+    }
+    await deletePanelHistoryImageMutation.mutateAsync({ panelId, imageUrl })
+    onRefresh()
+    refreshEpisodeData()
+    refreshStoryboards()
+  }, [deletePanelHistoryImageMutation, onRefresh, refreshEpisodeData, refreshStoryboards, patchPanelInEpisodeCache, setLocalStoryboards])
+
   const handleUploadPanelImage = useCallback(async (panelId: string, file: File) => {
     setUploadingPanelIds((prev) => new Set(prev).add(panelId))
     try {
@@ -256,6 +322,8 @@ export default function StoryboardStage({
           onCancelPanelCandidate={cancelPanelCandidate}
           onDeletePanelImage={handleDeletePanelImage}
           onUploadPanelImage={handleUploadPanelImage}
+          onSelectPanelHistoryImage={handleSelectPanelHistoryImage}
+          onDeletePanelHistoryImage={handleDeletePanelHistoryImage}
           uploadingPanelIds={uploadingPanelIds}
 
           onInsertPanel={insertPanel}

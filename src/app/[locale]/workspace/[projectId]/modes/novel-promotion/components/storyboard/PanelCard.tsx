@@ -46,6 +46,8 @@ interface PanelCardProps {
   onUndo?: (panelId: string) => void  // 撤回到上一版本
   onDeleteImage?: (panelId: string) => void  // 删除分镜图片
   onUploadImage?: (panelId: string, file: File) => void  // 上传本地图片
+  onSelectHistoryImage?: (panelId: string, imageUrl: string) => Promise<void>
+  onDeleteHistoryImage?: (panelId: string, imageUrl: string) => Promise<void>
   isUploading?: boolean
   onPreviewImage?: (url: string) => void  // 放大预览图片
   onInsertAfter?: () => void  // 在此镜头后插入
@@ -86,6 +88,8 @@ export default function PanelCard({
   onUndo,
   onDeleteImage,
   onUploadImage,
+  onSelectHistoryImage,
+  onDeleteHistoryImage,
   isUploading,
   onPreviewImage,
   onInsertAfter,
@@ -126,6 +130,7 @@ export default function PanelCard({
           failedError={failedError}
           candidateData={candidateData}
           previousImageUrl={previousImageUrl}
+          imageHistoryRaw={panel.imageHistory ?? null}
           onRegeneratePanelImage={onRegeneratePanelImage}
           onOpenEditModal={onOpenEditModal}
           onOpenAIDataModal={onOpenAIDataModal}
@@ -136,6 +141,8 @@ export default function PanelCard({
           onUndo={onUndo}
           onDeleteImage={onDeleteImage}
           onUploadImage={onUploadImage}
+          onSelectHistoryImage={onSelectHistoryImage}
+          onDeleteHistoryImage={onDeleteHistoryImage}
           isUploading={isUploading}
           onPreviewImage={onPreviewImage}
         />
