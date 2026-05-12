@@ -1,7 +1,8 @@
 'use client'
 
 const PROBE_SUCCESS_COOLDOWN_MS = 60_000
-const PROBE_RETRY_INTERVAL_MS = 2_000
+const PROBE_EMPTY_RETRY_MS = 60_000
+const PROBE_ERROR_RETRY_MS = 2_000
 const successfulProbeScopes = new Map<string, number>()
 
 type RecoveryProbeContext = {
@@ -57,15 +58,22 @@ export function startRecoveryProbe(args: StartRecoveryProbeArgs): () => void {
       }
     }
 
-    const activeRunId = await args.resolveActiveRunId({
-      projectId: args.projectId,
-      storageScopeKey: args.storageScopeKey,
-    }).catch(() => null)
+    let activeRunId: string | null = null
+    try {
+      activeRunId = await args.resolveActiveRunId({
+        projectId: args.projectId,
+        storageScopeKey: args.storageScopeKey,
+      })
+    } catch {
+      if (cancelled || args.hasRunState()) return
+      scheduleRetry(PROBE_ERROR_RETRY_MS)
+      return
+    }
 
     if (cancelled || args.hasRunState()) return
 
     if (!activeRunId) {
-      scheduleRetry(PROBE_RETRY_INTERVAL_MS)
+      scheduleRetry(PROBE_EMPTY_RETRY_MS)
       return
     }
 
@@ -85,6 +93,7 @@ export const recoveryProbeTestUtils = {
   clearSuccessfulProbeScopes() {
     successfulProbeScopes.clear()
   },
-  PROBE_RETRY_INTERVAL_MS,
+  PROBE_EMPTY_RETRY_MS,
+  PROBE_ERROR_RETRY_MS,
   PROBE_SUCCESS_COOLDOWN_MS,
 }

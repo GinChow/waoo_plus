@@ -45,7 +45,9 @@ export function useStoryToScriptRunStream({ projectId, episodeId }: UseStoryToSc
         method: 'GET',
         cache: 'no-store',
       })
-      if (!response.ok) return null
+      if (!response.ok) {
+        throw new Error(`failed to fetch active runs: ${response.status}`)
+      }
       const data = await response.json().catch(() => null)
       const runs = data && typeof data === 'object' && Array.isArray((data as { runs?: unknown[] }).runs)
         ? (data as {
