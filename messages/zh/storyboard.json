@@ -413,10 +413,26 @@
         "generateVariant": "基于此镜头生成变体",
         "needImage": "需要先生成图片",
         "deleteShot": "删除镜头",
-        "pasteSrtPlaceholder": "粘贴新的SRT内容..."
+        "pasteSrtPlaceholder": "粘贴新的SRT内容...",
+        "linkToNext": "与下一个分镜组合（一次性生成同一视频）",
+        "unlinkFromNext": "取消与下一个分镜的组合",
+        "linkGroupMaxReached": "最多 {max} 个相邻分镜可组合在一起"
     },
     "firstLastFrame": {
         "placeholder": "输入首尾帧视频提示词...",
         "modelTitle": "首尾帧模型"
+    },
+    "panelGroup": {
+        "title": "组合分镜 #{start}→{end}",
+        "subtitle": "组合后将一次性生成为同一段视频",
+        "badge": "组合",
+        "imagesCount": "已生成 {count}/{total} 张图",
+        "videosCount": "已生成 {count}/{total} 段视频",
+        "expand": "展开",
+        "expandTitle": "展开查看每个分镜",
+        "collapse": "折叠",
+        "collapseTitle": "折叠为组合卡片",
+        "unlinkAll": "解除组合",
+        "unlinkAllTitle": "解除此组所有分镜的链接"
     }
 }

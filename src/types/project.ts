@@ -184,6 +184,7 @@ export interface NovelPromotionPanel {
   firstLastFramePrompt?: string | null
   videoUrl: string | null
   videoGenerationMode?: 'normal' | 'firstlastframe' | null
+  linkedToNextPanel?: boolean | null
   videoMedia?: MediaRef | null
   lipSyncVideoUrl?: string | null
   lipSyncVideoMedia?: MediaRef | null

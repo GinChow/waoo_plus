@@ -54,6 +54,10 @@ interface PanelCardProps {
   onInsertAfter?: () => void  // 在此镜头后插入
   onVariant?: () => void  // 生成镜头变体
   isInsertDisabled?: boolean  // 插入按钮是否禁用
+  linkable?: boolean  // 是否允许显示「链接到下一个分镜」按钮（最后一个分镜不显示）
+  linkedToNext?: boolean  // 当前是否已与下一个分镜链接
+  linkEnableAllowed?: boolean  // 开启链接是否会触发 6 上限（开启时为 false 表示禁用）
+  onToggleLink?: () => Promise<{ rejected: boolean; reason?: string; max?: number }> | void
 }
 
 export default function PanelCard({
@@ -96,7 +100,11 @@ export default function PanelCard({
   onPreviewImage,
   onInsertAfter,
   onVariant,
-  isInsertDisabled
+  isInsertDisabled,
+  linkable = false,
+  linkedToNext = false,
+  linkEnableAllowed = true,
+  onToggleLink,
 }: PanelCardProps) {
   const t = useTranslations('storyboard')
   return (
@@ -149,14 +157,18 @@ export default function PanelCard({
           isUploading={isUploading}
           onPreviewImage={onPreviewImage}
         />
-        {/* 插入分镜/镜头变体按钮 - 在图片区域右侧垂直居中 */}
-        {(onInsertAfter || onVariant) && (
+        {/* 插入分镜/镜头变体/链接按钮 - 在图片区域右侧垂直居中 */}
+        {(onInsertAfter || onVariant || (linkable && onToggleLink)) && (
           <div className="absolute -right-[22px] top-1/2 -translate-y-1/2 z-50">
             <PanelActionButtons
               onInsertPanel={onInsertAfter || (() => { })}
               onVariant={onVariant || (() => { })}
               disabled={isInsertDisabled}
               hasImage={!!imageUrl}
+              showLink={linkable && !!onToggleLink}
+              linked={linkedToNext}
+              linkDisabled={!linkedToNext && !linkEnableAllowed}
+              onToggleLink={onToggleLink}
             />
           </div>
         )}

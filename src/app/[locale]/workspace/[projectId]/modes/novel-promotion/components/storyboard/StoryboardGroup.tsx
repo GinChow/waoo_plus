@@ -90,6 +90,10 @@ export default function StoryboardGroup({
   onRetryPanelSave,
   onRegeneratePanelImage,
   onBatchGenerateNextPanels,
+  linkedPanels,
+  isLastLinkablePanel,
+  canEnableLink,
+  onToggleLink,
   onRegenerateStoryboardGroupImage,
   onSelectStoryboardGroupImage,
   onDeleteStoryboardGroupHistoryImage,
@@ -624,6 +628,10 @@ export default function StoryboardGroup({
         onRetryPanelSave={onRetryPanelSave}
         onRegeneratePanelImage={handleRegeneratePanelImage}
         onBatchGenerateNextPanels={onBatchGenerateNextPanels}
+        linkedPanels={linkedPanels}
+        isLastLinkablePanel={isLastLinkablePanel}
+        canEnableLink={canEnableLink}
+        onToggleLink={onToggleLink}
         onOpenEditModal={onOpenEditModal}
         onOpenAIDataModal={onOpenAIDataModal}
         onSelectPanelCandidateIndex={onSelectPanelCandidateIndex}

@@ -4,9 +4,10 @@ import { AppIcon } from '@/components/ui/icons'
 
 /**
  * PanelActionButtons - 面板间操作按钮组
- * 包含两个按钮：
- * - + 插入分镜（原有功能）
- * - 镜头变体（新功能）
+ * 包含三个按钮：
+ * - + 插入分镜
+ * - 镜头变体
+ * - 链接到下一个分镜（与下一个分镜组合，一次性生成同一个视频）
  */
 
 interface PanelActionButtonsProps {
@@ -14,13 +15,21 @@ interface PanelActionButtonsProps {
     onVariant: () => void
     disabled?: boolean
     hasImage: boolean // 原镜头是否有图片（没图片不能做变体）
+    showLink?: boolean
+    linked?: boolean
+    linkDisabled?: boolean
+    onToggleLink?: () => Promise<{ rejected: boolean; reason?: string; max?: number }> | void
 }
 
 export default function PanelActionButtons({
     onInsertPanel,
     onVariant,
     disabled,
-    hasImage
+    hasImage,
+    showLink = false,
+    linked = false,
+    linkDisabled = false,
+    onToggleLink,
 }: PanelActionButtonsProps) {
     const t = useTranslations('storyboard')
     const baseButtonClass = `
@@ -89,6 +98,42 @@ export default function PanelActionButtons({
                     {t('panelActions.panelVariant')}
                 </span>
             </button>
+
+            {/* 链接到下一个分镜按钮（与下一个分镜组合，一次性生成同一个视频） */}
+            {showLink && onToggleLink && (
+                <button
+                    onClick={() => { void onToggleLink() }}
+                    disabled={disabled || linkDisabled}
+                    className={`
+                        ${baseButtonClass}
+                        ${linked
+                            ? 'bg-[var(--glass-accent-from)] !text-white border-[var(--glass-accent-from)] shadow-[0_0_10px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 hover:shadow-[var(--glass-shadow-md)]'
+                            : (disabled || linkDisabled ? disabledButtonClass : enabledButtonClass)
+                        }
+                    `}
+                    title={
+                        linked
+                            ? t('panelActions.unlinkFromNext')
+                            : linkDisabled
+                                ? t('panelActions.linkGroupMaxReached', { max: 6 })
+                                : t('panelActions.linkToNext')
+                    }
+                >
+                    <AppIcon name="unplug" className="w-4 h-4" />
+
+                    {/* Hover 时显示提示 */}
+                    <span className={`
+                        absolute -top-8 left-1/2 -translate-x-1/2
+                        px-2 py-1 text-xs text-white bg-[var(--glass-overlay)] rounded
+                        opacity-0 group-hover:opacity-100
+                        transition-opacity duration-200
+                        whitespace-nowrap pointer-events-none
+                        ${disabled || linkDisabled ? 'hidden' : ''}
+                    `}>
+                        {linked ? t('panelActions.unlinkFromNext') : t('panelActions.linkToNext')}
+                    </span>
+                </button>
+            )}
         </div>
     )
 }

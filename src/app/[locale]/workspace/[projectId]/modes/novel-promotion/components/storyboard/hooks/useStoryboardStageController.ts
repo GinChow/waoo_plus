@@ -11,7 +11,11 @@ import { useProjectAssets } from '@/lib/query/hooks/useProjectAssets'
 import {
   useUpdateProjectPhotographyPlan,
   useUpdateProjectPanelActingNotes,
+  useUpdateProjectPanelLink,
+  useRefreshEpisodeData,
+  useRefreshStoryboards,
 } from '@/lib/query/hooks'
+import { useStoryboardPanelLinking } from './useStoryboardPanelLinking'
 import { useStoryboardState } from './useStoryboardState'
 import { usePanelOperations } from './usePanelOperations'
 import { useStoryboardImageGeneration } from './useImageGeneration'
@@ -193,6 +197,25 @@ export function useStoryboardStageController({
     isTransitioning,
   })
 
+  const updatePanelLinkMutation = useUpdateProjectPanelLink(projectId)
+  const refreshEpisodeData = useRefreshEpisodeData(projectId, episodeId)
+  const refreshStoryboards = useRefreshStoryboards(episodeId)
+
+  const {
+    linkedPanels,
+    isLastPanel: isLastLinkablePanel,
+    canEnableLink,
+    handleToggleLink,
+  } = useStoryboardPanelLinking({
+    sortedStoryboards,
+    getTextPanels,
+    updatePanelLinkMutation,
+    onPersisted: () => {
+      refreshEpisodeData()
+      refreshStoryboards()
+    },
+  })
+
   const regenerateNextNPanels = useCallback(
     async (startPanelId: string, count: number = 10) => {
       const orderedPanels = sortedStoryboards.flatMap((storyboard) => getTextPanels(storyboard))
@@ -230,5 +253,6 @@ export function useStoryboardStageController({
     updatePhotographyPlanMutation, updatePanelActingNotesMutation,
     addingStoryboardGroupState, transitioningState, runningCount, pendingPanelCount, handleGenerateAllPanels,
     regenerateNextNPanels,
+    linkedPanels, isLastLinkablePanel, canEnableLink, handleToggleLink,
   }
 }

@@ -413,7 +413,23 @@
         "generateVariant": "Generate variant based on this panel",
         "needImage": "Need to generate image first",
         "deleteShot": "Delete Shot",
-        "pasteSrtPlaceholder": "Paste new SRT content..."
+        "pasteSrtPlaceholder": "Paste new SRT content...",
+        "linkToNext": "Combine with next panel (generate as one video)",
+        "unlinkFromNext": "Unlink from next panel",
+        "linkGroupMaxReached": "At most {max} adjacent panels can be combined"
+    },
+    "panelGroup": {
+        "title": "Combined Panels #{start}→{end}",
+        "subtitle": "Will be generated as a single video",
+        "badge": "Group",
+        "imagesCount": "{count}/{total} images generated",
+        "videosCount": "{count}/{total} videos generated",
+        "expand": "Expand",
+        "expandTitle": "Expand to see each panel",
+        "collapse": "Collapse",
+        "collapseTitle": "Collapse into a group card",
+        "unlinkAll": "Unlink",
+        "unlinkAllTitle": "Unlink all panels in this group"
     },
     "firstLastFrame": {
         "placeholder": "Enter first/last frame video prompt...",

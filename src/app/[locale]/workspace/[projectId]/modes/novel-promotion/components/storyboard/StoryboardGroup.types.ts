@@ -45,6 +45,10 @@ export interface StoryboardGroupProps {
   onRetryPanelSave: (panelId: string) => void
   onRegeneratePanelImage: (panelId: string, count?: number, force?: boolean) => void
   onBatchGenerateNextPanels?: (startPanelId: string, count?: number) => Promise<void> | void
+  linkedPanels: Map<string, boolean>
+  isLastLinkablePanel: (panelKey: string) => boolean
+  canEnableLink: (panelKey: string) => boolean
+  onToggleLink: (panelKey: string, storyboardId: string, panelIndex: number) => Promise<{ rejected: boolean; reason?: string; max?: number }>
   onRegenerateStoryboardGroupImage: (groupNumber: number, count?: number) => void
   onSelectStoryboardGroupImage: (groupNumber: number, imageUrl: string) => Promise<void>
   onDeleteStoryboardGroupHistoryImage: (groupNumber: number, imageUrl: string) => Promise<void>

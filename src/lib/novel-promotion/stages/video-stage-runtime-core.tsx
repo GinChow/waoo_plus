@@ -542,6 +542,7 @@ export function useVideoStageRuntime({
 
       <VideoRenderPanel
         allPanels={projectedPanels}
+        linkedPanels={linkedPanels}
         highlightedPanelKey={highlightedPanelKey}
         panelRefs={panelRefs}
         videoRatio={videoRatio}

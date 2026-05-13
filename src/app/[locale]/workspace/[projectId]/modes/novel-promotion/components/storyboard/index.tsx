@@ -134,6 +134,10 @@ export default function StoryboardStage({
     pendingPanelCount,
     handleGenerateAllPanels,
     regenerateNextNPanels,
+    linkedPanels,
+    isLastLinkablePanel,
+    canEnableLink,
+    handleToggleLink,
   } = controller
 
   const modalRuntime = useStoryboardModalRuntime({
@@ -313,6 +317,10 @@ export default function StoryboardStage({
           onRetryPanelSave={retrySave}
           onRegeneratePanelImage={regeneratePanelImage}
           onBatchGenerateNextPanels={regenerateNextNPanels}
+          linkedPanels={linkedPanels}
+          isLastLinkablePanel={isLastLinkablePanel}
+          canEnableLink={canEnableLink}
+          onToggleLink={handleToggleLink}
           onRegenerateStoryboardGroupImage={regenerateStoryboardGroupImage}
           onSelectStoryboardGroupImage={selectStoryboardGroupImage}
           onDeleteStoryboardGroupHistoryImage={deleteStoryboardGroupHistoryImage}
