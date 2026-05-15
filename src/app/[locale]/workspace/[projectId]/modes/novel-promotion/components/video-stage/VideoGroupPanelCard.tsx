@@ -1,10 +1,25 @@
 'use client'
 
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { GlassSurface } from '@/components/ui/primitives'
 import { MediaImageWithLoading } from '@/components/media/MediaImageWithLoading'
 import { AppIcon } from '@/components/ui/icons'
-import type { VideoPanel } from '../video'
+import type {
+  FirstLastFrameParams,
+  GroupVideoGenerationOptions,
+  MultiPromptShot,
+  VideoGenerationOptions,
+  VideoModelOption,
+  VideoPanel,
+} from '../video'
+import VideoGroupOmniModal from './VideoGroupOmniModal'
+
+// kling-omni-video multi_prompt 最多支持 6 个分镜
+const MAX_OMNI_SHOTS = 6
+// 组合分镜固定使用 kling-v3-omni 多分镜合成模型。provider 不固定（用户可能配在
+// yunwu / openai-compatible 等任意 provider 下），按 modelId 在已启用模型里动态匹配。
+const OMNI_MODEL_ID = 'kling-v3-omni'
 
 interface VideoGroupPanelCardProps {
   groupPanels: VideoPanel[]
@@ -13,6 +28,17 @@ interface VideoGroupPanelCardProps {
   onExpand: () => void
   onUnlinkAll: () => void
   onPreviewImage?: (url: string) => void
+  userVideoModels?: VideoModelOption[]
+  onGenerateVideo: (
+    storyboardId: string,
+    panelIndex: number,
+    videoModel?: string,
+    firstLastFrame?: FirstLastFrameParams,
+    generationOptions?: VideoGenerationOptions,
+    panelId?: string,
+    groupNumber?: number,
+    customPrompt?: string,
+  ) => Promise<void>
 }
 
 export default function VideoGroupPanelCard({
@@ -22,6 +48,8 @@ export default function VideoGroupPanelCard({
   onExpand,
   onUnlinkAll,
   onPreviewImage,
+  userVideoModels,
+  onGenerateVideo,
 }: VideoGroupPanelCardProps) {
   const t = useTranslations('storyboard')
   const cssAspectRatio = videoRatio.replace(':', '/')
@@ -32,6 +60,54 @@ export default function VideoGroupPanelCard({
   const startNumber = groupStartGlobalNumber
   const endNumber = groupStartGlobalNumber + groupPanels.length - 1
   const generatedVideoCount = groupPanels.filter((panel) => panel.videoUrl).length
+
+  const [modalOpen, setModalOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const firstPanel = groupPanels[0]
+  const isGroupVideoRunning = !!firstPanel?.videoTaskRunning
+  const tooManyShots = groupPanels.length > MAX_OMNI_SHOTS
+  const missingImage = groupPanels.some((panel) => !panel.imageUrl)
+  // 在已启用视频模型里按 modelId 匹配 kling-v3-omni（provider 任意）
+  const omniModel = (userVideoModels ?? []).find((model) => model.value.endsWith(`::${OMNI_MODEL_ID}`))
+  const omniModelEnabled = !!omniModel
+  const generateDisabled =
+    tooManyShots || missingImage || !omniModelEnabled || isGroupVideoRunning || submitting
+
+  const handleConfirmGenerate = async (multiPrompt: MultiPromptShot[], shotTotalDuration: number) => {
+    if (!firstPanel || !omniModel) return
+    setSubmitting(true)
+    try {
+      const groupVideo: GroupVideoGenerationOptions = {
+        multiShot: true,
+        shotType: 'customize',
+        multiPrompt,
+        sound: 'off',
+        groupPanelIndices: groupPanels.map((panel) => panel.panelIndex),
+      }
+      // kling-v3-omni 的能力字段（duration / generateAudio / resolution）必须齐全，
+      // 否则 API 的 requireAllFields 校验会因缺省值而失败；generationMode 由 API 自动补。
+      // 其余 omni 专属参数收进 groupVideo 嵌套对象，避免被当作能力选择项校验。
+      const generationOptions = {
+        duration: shotTotalDuration,
+        generateAudio: false,
+        resolution: 'pro',
+        groupVideo,
+      }
+      await onGenerateVideo(
+        firstPanel.storyboardId,
+        firstPanel.panelIndex,
+        omniModel.value,
+        undefined,
+        generationOptions as unknown as VideoGenerationOptions,
+        firstPanel.panelId,
+        undefined,
+        undefined,
+      )
+      setModalOpen(false)
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <GlassSurface
@@ -117,14 +193,43 @@ export default function VideoGroupPanelCard({
           <button
             type="button"
             onClick={onExpand}
-            className="glass-btn-base glass-btn-primary flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px]"
+            className="glass-btn-base glass-btn-soft flex items-center gap-1 rounded-md px-2 py-1 text-[11px]"
             title={t('panelGroup.expandTitle')}
           >
             <AppIcon name="chevronRightMd" className="h-3 w-3" />
             <span>{t('panelGroup.expand')}</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            disabled={generateDisabled}
+            className="glass-btn-base glass-btn-primary flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] disabled:opacity-50"
+            title={
+              tooManyShots
+                ? t('panelGroup.omni.tooManyShotsTitle', { max: MAX_OMNI_SHOTS })
+                : missingImage
+                  ? t('panelGroup.omni.missingImageTitle')
+                  : !omniModelEnabled
+                    ? t('panelGroup.omni.modelNotEnabledTitle')
+                    : t('panelGroup.omni.generateTitle')
+            }
+          >
+            <AppIcon name={isGroupVideoRunning ? 'loader' : 'play'} className="h-3 w-3" />
+            <span>{isGroupVideoRunning ? t('panelGroup.omni.generating') : t('panelGroup.omni.generate')}</span>
+          </button>
         </div>
       </div>
+
+      {modalOpen && firstPanel && (
+        <VideoGroupOmniModal
+          groupPanels={groupPanels}
+          startNumber={startNumber}
+          videoRatio={videoRatio}
+          submitting={submitting}
+          onClose={() => { if (!submitting) setModalOpen(false) }}
+          onConfirm={handleConfirmGenerate}
+        />
+      )}
     </GlassSurface>
   )
 }

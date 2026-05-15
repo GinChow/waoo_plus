@@ -303,6 +303,8 @@ export default function VideoRenderPanel({
                 onExpand={() => toggleExpand(group.groupKey)}
                 onUnlinkAll={() => { void handleUnlinkGroup(group) }}
                 onPreviewImage={(url) => onPreviewImage(url)}
+                userVideoModels={userVideoModels}
+                onGenerateVideo={onGenerateVideo}
               />
             </div>
           )]

@@ -433,6 +433,28 @@
         "collapse": "折叠",
         "collapseTitle": "折叠为组合卡片",
         "unlinkAll": "解除组合",
-        "unlinkAllTitle": "解除此组所有分镜的链接"
+        "unlinkAllTitle": "解除此组所有分镜的链接",
+        "omni": {
+            "generate": "生成视频",
+            "generating": "生成中",
+            "generateTitle": "将整组分镜合成为单条视频",
+            "tooManyShotsTitle": "组合分镜最多支持 {max} 个分镜",
+            "missingImageTitle": "组内存在未生成图片的分镜，无法合成",
+            "modelNotEnabledTitle": "请先在「设置 - 模型配置」中启用 Kling V3 Omni（云雾）视频模型",
+            "title": "组合分镜合成 #{start}→{end}",
+            "subtitle": "参考 kling-omni-video 多分镜接口，整组一次性合成为单条视频",
+            "promptPlaceholder": "描述该分镜的画面与运镜",
+            "durationLabel": "时长",
+            "totalDuration": "总时长",
+            "submitting": "提交中",
+            "confirm": "开始合成",
+            "cancel": "取消",
+            "errorEmpty": "至少需要 1 个分镜",
+            "errorTooManyShots": "最多支持 {max} 个分镜",
+            "errorPromptEmpty": "每个分镜的提示词不能为空",
+            "errorPromptTooLong": "分镜提示词长度不能超过 {max} 字",
+            "errorDurationInvalid": "分镜时长必须是不小于 1 的整数",
+            "errorTotalRange": "总时长需在 {min}-{max} 秒之间"
+        }
     }
 }

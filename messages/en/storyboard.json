@@ -429,7 +429,29 @@
         "collapse": "Collapse",
         "collapseTitle": "Collapse into a group card",
         "unlinkAll": "Unlink",
-        "unlinkAllTitle": "Unlink all panels in this group"
+        "unlinkAllTitle": "Unlink all panels in this group",
+        "omni": {
+            "generate": "Generate Video",
+            "generating": "Generating",
+            "generateTitle": "Combine the whole group into a single video",
+            "tooManyShotsTitle": "A combined group supports at most {max} shots",
+            "missingImageTitle": "Some panels in this group have no image yet",
+            "modelNotEnabledTitle": "Enable the Kling V3 Omni (Yunwu) video model in Settings - Model Config first",
+            "title": "Combined Video #{start}→{end}",
+            "subtitle": "Uses the kling-omni-video multi-prompt API to combine the group into one video",
+            "promptPlaceholder": "Describe the shot's visuals and camera movement",
+            "durationLabel": "Duration",
+            "totalDuration": "Total",
+            "submitting": "Submitting",
+            "confirm": "Start Combining",
+            "cancel": "Cancel",
+            "errorEmpty": "At least 1 shot is required",
+            "errorTooManyShots": "At most {max} shots are supported",
+            "errorPromptEmpty": "Each shot prompt cannot be empty",
+            "errorPromptTooLong": "Shot prompt cannot exceed {max} characters",
+            "errorDurationInvalid": "Shot duration must be an integer no less than 1",
+            "errorTotalRange": "Total duration must be between {min}-{max} seconds"
+        }
     },
     "firstLastFrame": {
         "placeholder": "Enter first/last frame video prompt...",

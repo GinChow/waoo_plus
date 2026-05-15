@@ -7,15 +7,39 @@
  * - externalId: YUNWU:VIDEO:... 便于轮询时识别
  */
 
+import sharp from 'sharp'
 import { logInfo as _ulogInfo, logError as _ulogError } from '@/lib/logging/core'
 import { getProviderConfig } from '@/lib/api-config'
 import { normalizeToBase64ForGeneration } from '@/lib/media/outbound-image'
+import { ensureOutboundImageUrl, isOutboundCosConfigured } from '@/lib/media/outbound-cos'
 import {
     GenerateResult,
     VideoGenerateParams,
     readCustomEndpoint,
 } from './base'
 import { ViduVideoGenerator, ViduModelSpec, VIDU_MODEL_SPECS } from './vidu'
+
+const PROVIDER_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+// 提交 POST 的超时：正常情况下 body 已是几百字节的 URL，应秒回 task_id；
+// 卡住时快速失败而非吊死，交给上层重试（重试已用 external_task_id 幂等）。
+const YUNWU_OMNI_SUBMIT_TIMEOUT_MS = 180_000
+
+/**
+ * 把 provider id 编码进 externalId，便于轮询时用「创建任务的那个 provider」
+ * 解析 apiKey/baseUrl —— 与 async-poll.ts 的 decodeProviderId 对称。
+ */
+function encodeYunwuProviderToken(providerId: string): string {
+    const value = providerId.trim()
+    const prefix = 'openai-compatible:'
+    if (value.startsWith(prefix)) {
+        const uuid = value.slice(prefix.length).trim()
+        if (PROVIDER_UUID_PATTERN.test(uuid)) {
+            return `u_${uuid.toLowerCase()}`
+        }
+    }
+    return `b64_${Buffer.from(value, 'utf8').toString('base64url')}`
+}
 
 export const YUNWU_DEFAULT_BASE_URL = 'https://yunwu.ai/ent/v2'
 export const YUNWU_OMNI_DEFAULT_BASE_URL = 'https://yunwu.ai/kling/v1'
@@ -197,11 +221,97 @@ function normalizeOmniImageSource(value: string): string {
     return markerIndex === -1 ? trimmed : trimmed.slice(markerIndex + marker.length)
 }
 
+// kling-omni-video 单图上限 10MB，留足余量压到 ~6MB 以内
+const OMNI_IMAGE_MAX_BYTES = 6 * 1024 * 1024
+
+/**
+ * 把（纯）base64 图压缩到 omni 单图上限内：超限则用 sharp 限制最大边 + 降质重编码，
+ * 逐档尝试直到落在上限内。解码/压缩失败时回退原图，不阻断提交。
+ */
+async function compressOmniImageBase64(pureBase64: string): Promise<string> {
+    let buffer: Buffer
+    try {
+        buffer = Buffer.from(pureBase64, 'base64')
+    } catch {
+        return pureBase64
+    }
+    if (buffer.length <= OMNI_IMAGE_MAX_BYTES) return pureBase64
+
+    const attempts: Array<{ width: number; quality: number }> = [
+        { width: 2048, quality: 82 },
+        { width: 1600, quality: 78 },
+        { width: 1280, quality: 72 },
+        { width: 1024, quality: 65 },
+    ]
+    let best: Buffer | null = null
+    for (const { width, quality } of attempts) {
+        try {
+            const out = await sharp(buffer)
+                .rotate()
+                .resize({ width, height: width, fit: 'inside', withoutEnlargement: true })
+                .jpeg({ quality })
+                .toBuffer()
+            best = out
+            if (out.length <= OMNI_IMAGE_MAX_BYTES) break
+        } catch (error) {
+            _ulogError('[Yunwu Omni] 图片压缩失败，回退原图:', error)
+            return pureBase64
+        }
+    }
+    return (best ?? buffer).toString('base64')
+}
+
 async function toOmniImageItem(imageUrl: string, type?: YunwuOmniImageItem['type']): Promise<YunwuOmniImageItem> {
     const normalized = imageUrl.startsWith('data:')
         ? normalizeOmniImageSource(imageUrl)
         : normalizeOmniImageSource(await normalizeToBase64ForGeneration(imageUrl))
     return type ? { image_url: normalized, type } : { image_url: normalized }
+}
+
+/**
+ * 归一化 image_list 出站图片：统一去掉 data URL 前缀、压缩到 omni 单图上限内，
+ * COS 已配置时再落临时桶换成公网 URL。
+ * - 已经是 http(s) URL：原样保留
+ * - COS 未配置（如本地开发）：返回压缩后的纯 base64 内联
+ * - 单张上传失败：回退该张压缩后的 base64，不阻断整体提交
+ */
+async function normalizeOmniImageItemsForOutbound(
+    items: YunwuOmniImageItem[],
+): Promise<YunwuOmniImageItem[]> {
+    if (items.length === 0) {
+        return items
+    }
+    const cosConfigured = isOutboundCosConfigured()
+    // 临时诊断：用 _ulogError 确保在 LOG_LEVEL=ERROR 下也可见
+    _ulogError(`[Yunwu Omni DIAG] 归一化 image_list: ${items.length} 张, cosConfigured=${cosConfigured}`)
+    return await Promise.all(
+        items.map(async (item, index) => {
+            const src = item.image_url?.trim()
+            if (!src || /^https?:\/\//i.test(src)) {
+                _ulogError(`[Yunwu Omni DIAG] image[${index}] 跳过归一化（空或已是 URL）: ${String(src).slice(0, 80)}`)
+                return item
+            }
+            // omni 要求纯 base64（不带 data: 前缀），并需控制在单图上限内
+            const pureBase64 = normalizeOmniImageSource(src)
+            const compressed = await compressOmniImageBase64(pureBase64)
+            _ulogError(
+                `[Yunwu Omni DIAG] image[${index}] 原始≈${Math.round(Buffer.from(pureBase64, 'base64').length / 1024)}KB`
+                + ` 压缩后≈${Math.round(Buffer.from(compressed, 'base64').length / 1024)}KB`,
+            )
+            if (!cosConfigured) {
+                _ulogError(`[Yunwu Omni DIAG] image[${index}] COS 未配置，回退内联 base64`)
+                return { ...item, image_url: compressed }
+            }
+            try {
+                const url = await ensureOutboundImageUrl(compressed)
+                _ulogError(`[Yunwu Omni DIAG] image[${index}] 已上传 COS: ${url}`)
+                return { ...item, image_url: url }
+            } catch (error) {
+                _ulogError('[Yunwu Omni DIAG] 出站图片上传 COS 失败，回退 base64:', error)
+                return { ...item, image_url: compressed }
+            }
+        }),
+    )
 }
 
 function assertOmniAllowedOptions(options: Record<string, unknown>) {
@@ -443,6 +553,7 @@ export class YunwuVideoGenerator extends ViduVideoGenerator {
         if (lastFrameImageUrl) {
             imageList.push(await toOmniImageItem(lastFrameImageUrl, 'end_frame'))
         }
+        const outboundImageList = await normalizeOmniImageItemsForOutbound(imageList)
 
         const body: YunwuOmniRequestBody = {
             model_name: modelName,
@@ -454,7 +565,7 @@ export class YunwuVideoGenerator extends ViduVideoGenerator {
                 ? { negative_prompt: readString(rawOptions.negativePrompt) || readString(rawOptions.negative_prompt) }
                 : {}),
             sound,
-            ...(imageList.length > 0 ? { image_list: imageList } : {}),
+            ...(outboundImageList.length > 0 ? { image_list: outboundImageList } : {}),
             ...((rawOptions.videoList || rawOptions.video_list)
                 ? { video_list: (rawOptions.videoList || rawOptions.video_list) as YunwuOmniVideoItem[] }
                 : {}),
@@ -482,6 +593,14 @@ export class YunwuVideoGenerator extends ViduVideoGenerator {
         const logPrefix = `[Yunwu Omni Video ${modelName}]`
         _ulogInfo(`${logPrefix} 提交任务`)
         _ulogInfo(`${logPrefix} - Endpoint: ${requestUrl}`)
+        // 临时诊断：确认实际出站的 image_list 是 URL 还是内联 base64、各自多大
+        _ulogError(`[Yunwu Omni DIAG] 出站 image_list (${body.image_list?.length ?? 0} 张):`,
+            (body.image_list ?? []).map((img, i) => {
+                const u = img.image_url || ''
+                const isUrl = /^https?:\/\//i.test(u)
+                return `image[${i}] type=${img.type ?? 'none'} ${isUrl ? `URL=${u}` : `base64≈${Math.round(u.length / 1024)}KB`}`
+            }),
+        )
         _ulogInfo(`${logPrefix} - 参数摘要:`, {
             mode,
             sound,
@@ -500,6 +619,7 @@ export class YunwuVideoGenerator extends ViduVideoGenerator {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(body),
+            signal: AbortSignal.timeout(YUNWU_OMNI_SUBMIT_TIMEOUT_MS),
         })
         const rawBody = await response.text()
         let data: { data?: { task_id?: string }; task_id?: string; status?: string; error?: string; message?: string }
@@ -522,10 +642,12 @@ export class YunwuVideoGenerator extends ViduVideoGenerator {
             throw new Error('YUNWU_OMNI_VIDEO_TASK_ID_MISSING')
         }
 
-        const useCustomBase = baseUrl !== YUNWU_OMNI_DEFAULT_BASE_URL
-        const externalId = useCustomBase
-            ? `YUNWUOMNI:VIDEO:ep_${Buffer.from(baseUrl, 'utf8').toString('base64url')}:${taskId}`
-            : `YUNWUOMNI:VIDEO:${taskId}`
+        // externalId 带上 provider token —— 轮询时用「创建任务的同一个 provider」
+        // 解析 apiKey/baseUrl，避免硬编码 'yunwu' 导致鉴权用错 key。
+        // baseUrl 始终编码进 ep_ token：轮询若回退到 providerBaseUrl，对 openai-compatible
+        // provider（baseUrl 形如 .../v1）会拼出错误的查询 URL，必须用提交时解析的同一个 baseUrl。
+        const providerToken = encodeYunwuProviderToken(providerId)
+        const externalId = `YUNWUOMNI:VIDEO:pr_${providerToken}:ep_${Buffer.from(baseUrl, 'utf8').toString('base64url')}:${taskId}`
 
         _ulogInfo(`${logPrefix} 任务已提交，task_id=${taskId}`)
         return {

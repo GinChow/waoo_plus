@@ -515,7 +515,8 @@ export async function resolveVideoSourceFromGeneration(
       generateAudio?: boolean
       lastFrameImageUrl?: string
       generationMode?: 'normal' | 'firstlastframe'
-      [key: string]: string | number | boolean | undefined
+      // 组合分镜 omni 合成会传入数组型选项（multiPrompt / imageList）
+      [key: string]: string | number | boolean | undefined | unknown[]
     }
     pollProgress?: { start?: number; end?: number }
   },
@@ -581,7 +582,7 @@ export async function resolveVideoSourceFromGeneration(
 
   const providerCapabilityOptions: Record<string, string | number | boolean> = { ...capabilityOptions }
   delete providerCapabilityOptions.generationMode
-  const providerRequestOptions: Record<string, string | number | boolean> = {}
+  const providerRequestOptions: Record<string, string | number | boolean | unknown[]> = {}
   for (const [key, value] of Object.entries(normalizedOptions)) {
     if (key === 'generationMode' || value === undefined) continue
     providerRequestOptions[key] = value
@@ -589,6 +590,9 @@ export async function resolveVideoSourceFromGeneration(
   const mergedVideoOptions = {
     ...providerRequestOptions,
     ...providerCapabilityOptions,
+    // 提交幂等：把任务 ID 作为 external_task_id 传给支持去重的 provider（如云雾 omni）。
+    // BullMQ 重试 / 生成器内部重试都用同一个 ID，避免重复建任务、重复计费。
+    externalTaskId: job.data.taskId,
   }
   const sanitizedVideoParams = {
     model: params.modelId,
@@ -666,7 +670,7 @@ function normalizeVideoGenerationOptions(
     generateAudio?: boolean
     lastFrameImageUrl?: string
     generationMode?: 'normal' | 'firstlastframe'
-    [key: string]: string | number | boolean | undefined
+    [key: string]: string | number | boolean | undefined | unknown[]
   } | undefined,
   modelId?: string,
 ): {
@@ -678,7 +682,7 @@ function normalizeVideoGenerationOptions(
   generateAudio?: boolean
   lastFrameImageUrl?: string
   generationMode?: 'normal' | 'firstlastframe'
-  [key: string]: string | number | boolean | undefined
+  [key: string]: string | number | boolean | undefined | unknown[]
 } {
   const normalized = { ...(options || {}) }
   if (normalized.duration !== undefined) {

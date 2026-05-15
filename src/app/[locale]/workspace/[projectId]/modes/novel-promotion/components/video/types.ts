@@ -133,8 +133,26 @@ export interface FirstLastFrameParams {
   customPrompt?: string
 }
 
+// 组合分镜（kling-omni-video multi_prompt）单个分镜项
+export interface MultiPromptShot {
+  index: number
+  prompt: string
+  duration: string
+}
+
 export type VideoGenerationOptionValue = string | number | boolean
 export type VideoGenerationOptions = Record<string, VideoGenerationOptionValue>
+
+// 组合分镜 omni 合成专用选项。注意：这些字段不是 kling-v3-omni 的能力字段，
+// 必须收进 generationOptions.groupVideo 这个嵌套对象里，避免被 API 的能力校验
+// （toVideoRuntimeSelections）当作能力选择项处理。
+export interface GroupVideoGenerationOptions {
+  multiShot: true
+  shotType: 'customize'
+  multiPrompt: MultiPromptShot[]
+  sound: 'off'
+  groupPanelIndices: number[]
+}
 
 export interface BatchVideoGenerationParams {
   videoModel: string

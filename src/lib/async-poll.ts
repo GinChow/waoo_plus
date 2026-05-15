@@ -187,33 +187,37 @@ export function parseExternalId(externalId: string): {
     }
 
     if (externalId.startsWith('YUNWUOMNI:')) {
+        // 支持格式（pr_/ep_ 均可选，按顺序出现，兼容历史无 token 的格式）：
+        //   YUNWUOMNI:VIDEO:taskId
+        //   YUNWUOMNI:VIDEO:ep_{base64url}:taskId
+        //   YUNWUOMNI:VIDEO:pr_{providerToken}:taskId
+        //   YUNWUOMNI:VIDEO:pr_{providerToken}:ep_{base64url}:taskId
         const parts = externalId.split(':')
         const type = parts[1]
         if (type !== 'VIDEO') {
-            throw new Error(`无效 YUNWUOMNI externalId: "${externalId}"，应为 YUNWUOMNI:VIDEO:taskId`)
+            throw new Error(`无效 YUNWUOMNI externalId: "${externalId}"，应为 YUNWUOMNI:VIDEO:[pr_token:][ep_base64:]taskId`)
         }
-        const maybeEpToken = parts[2]
-        if (maybeEpToken && maybeEpToken.startsWith('ep_')) {
-            const requestId = parts.slice(3).join(':')
-            if (!requestId) {
-                throw new Error(`无效 YUNWUOMNI externalId: "${externalId}"，缺少 taskId`)
-            }
-            const customBaseUrl = Buffer.from(maybeEpToken.slice(3), 'base64url').toString('utf8')
-            return {
-                provider: 'YUNWUOMNI',
-                type: 'VIDEO',
-                requestId,
-                customBaseUrl,
-            }
+        let cursor = 2
+        let providerToken: string | undefined
+        let customBaseUrl: string | undefined
+        if (parts[cursor]?.startsWith('pr_')) {
+            providerToken = parts[cursor].slice(3)
+            cursor += 1
         }
-        const requestId = parts.slice(2).join(':')
+        if (parts[cursor]?.startsWith('ep_')) {
+            customBaseUrl = Buffer.from(parts[cursor].slice(3), 'base64url').toString('utf8')
+            cursor += 1
+        }
+        const requestId = parts.slice(cursor).join(':')
         if (!requestId) {
-            throw new Error(`无效 YUNWUOMNI externalId: "${externalId}"，应为 YUNWUOMNI:VIDEO:taskId`)
+            throw new Error(`无效 YUNWUOMNI externalId: "${externalId}"，缺少 taskId`)
         }
         return {
             provider: 'YUNWUOMNI',
             type: 'VIDEO',
             requestId,
+            ...(providerToken ? { providerToken } : {}),
+            ...(customBaseUrl ? { customBaseUrl } : {}),
         }
     }
 
@@ -316,7 +320,7 @@ export async function pollAsyncTask(
         case 'YUNWU':
             return await pollViduTask(parsed.requestId, userId, parsed.customBaseUrl, 'yunwu')
         case 'YUNWUOMNI':
-            return await pollYunwuOmniTask(parsed.requestId, userId, parsed.customBaseUrl)
+            return await pollYunwuOmniTask(parsed.requestId, userId, parsed.customBaseUrl, parsed.providerToken)
         case 'OPENAI':
             return await pollOpenAIVideoTask(parsed.requestId, userId, parsed.providerToken)
         case 'OCOMPAT':
@@ -797,10 +801,15 @@ async function pollYunwuOmniTask(
     taskId: string,
     userId: string,
     customBaseUrl: string | undefined,
+    providerToken?: string,
 ): Promise<PollResult> {
-    _ulogInfo(`[Poll Yunwu Omni] 开始轮询 task_id=${taskId}, userId=${userId}`)
+    // 用「创建任务的同一个 provider」解析 apiKey/baseUrl —— 任务可能由
+    // openai-compatible:<uuid> 这种自定义 provider 创建，硬编码 'yunwu' 会拿错 key。
+    // 旧格式 externalId 没带 providerToken，回退到 'yunwu' 保持兼容。
+    const providerId = providerToken ? decodeProviderId(providerToken) : 'yunwu'
+    _ulogInfo(`[Poll Yunwu Omni] 开始轮询 task_id=${taskId}, userId=${userId}, provider=${providerId}`)
 
-    const { apiKey, baseUrl: providerBaseUrl } = await getProviderConfig(userId, 'yunwu')
+    const { apiKey, baseUrl: providerBaseUrl } = await getProviderConfig(userId, providerId)
     const rawBaseUrl = customBaseUrl || providerBaseUrl || YUNWU_OMNI_DEFAULT_BASE_URL
     const baseUrl = normalizeYunwuOmniBaseUrl(rawBaseUrl)
     const result = await queryYunwuOmniTaskStatus(taskId, apiKey, baseUrl)

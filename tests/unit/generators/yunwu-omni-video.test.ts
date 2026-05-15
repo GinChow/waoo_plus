@@ -10,6 +10,12 @@ vi.mock('@/lib/api-config', () => ({
   getProviderConfig: getProviderConfigMock,
 }))
 
+// 生成器单测不应触达 COS：关闭出站 COS，保持 image_list 为内联 base64
+vi.mock('@/lib/media/outbound-cos', () => ({
+  isOutboundCosConfigured: () => false,
+  ensureOutboundImageUrl: async (source: string) => source,
+}))
+
 import { YunwuVideoGenerator } from '@/lib/generators/yunwu'
 
 describe('YunwuVideoGenerator omni video', () => {
@@ -50,12 +56,16 @@ describe('YunwuVideoGenerator omni video', () => {
       },
     })
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       success: true,
       async: true,
       requestId: 'omni-task-1',
-      externalId: 'YUNWUOMNI:VIDEO:omni-task-1',
     })
+    // externalId 始终携带 pr_（provider token）+ ep_（提交时解析的 omni baseUrl），
+    // 供轮询复用同一个 provider 与 baseUrl
+    expect(result.externalId).toMatch(/^YUNWUOMNI:VIDEO:pr_[^:]+:ep_[^:]+:omni-task-1$/)
+    const epToken = String(result.externalId).split(':').find((part) => part.startsWith('ep_'))!.slice(3)
+    expect(Buffer.from(epToken, 'base64url').toString('utf8')).toBe('https://yunwu.ai/kling/v1')
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     const [endpoint, request] = fetchSpy.mock.calls[0] as [string, RequestInit]
     expect(endpoint).toBe('https://yunwu.ai/kling/v1/videos/omni-video')
@@ -108,7 +118,9 @@ describe('YunwuVideoGenerator omni video', () => {
       mode: 'pro',
       sound: 'on',
     })
-    expect(result.externalId).toMatch(/^YUNWUOMNI:VIDEO:ep_[^:]+:omni-task-1$/)
+    expect(result.externalId).toMatch(/^YUNWUOMNI:VIDEO:pr_[^:]+:ep_[^:]+:omni-task-1$/)
+    const epToken = String(result.externalId).split(':').find((part) => part.startsWith('ep_'))!.slice(3)
+    expect(Buffer.from(epToken, 'base64url').toString('utf8')).toBe('https://proxy.example/yunwu/v1')
   })
 
   it('clamps duration to yunwu omni supported range', async () => {

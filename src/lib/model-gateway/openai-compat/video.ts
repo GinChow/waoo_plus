@@ -29,6 +29,9 @@ const OPENAI_COMPAT_VIDEO_OPTION_KEYS = new Set([
   'size',
   'generateAudio',
   'generationMode',
+  // 提交幂等用，openai-compat 自身不消费，仅放行避免 assert 误拒
+  'externalTaskId',
+  'external_task_id',
 ])
 
 function assertAllowedOptions(options: Record<string, unknown>) {

@@ -58,6 +58,124 @@ function readPositiveGroupNumber(value: unknown): number | null {
   return Math.trunc(value)
 }
 
+function isRecord(value: unknown): value is AnyObj {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+interface GroupMultiPromptItem {
+  index: number
+  prompt: string
+  duration: string
+}
+
+/**
+ * 校验并归一化组合分镜的 multi_prompt（来自 payload.generationOptions.multiPrompt）。
+ * kling-omni-video 的硬约束（分镜数、时长之和、prompt 长度）由生成器进一步校验。
+ */
+function normalizeGroupMultiPrompt(value: unknown): GroupMultiPromptItem[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error('VIDEO_GROUP_MULTI_PROMPT_REQUIRED')
+  }
+  return value.map((item, index) => {
+    if (!isRecord(item)) {
+      throw new Error(`VIDEO_GROUP_MULTI_PROMPT_INVALID: [${index}]`)
+    }
+    const prompt = typeof item.prompt === 'string' ? item.prompt.trim() : ''
+    const durationRaw = typeof item.duration === 'string'
+      ? item.duration.trim()
+      : String(item.duration ?? '')
+    if (!prompt) {
+      throw new Error(`VIDEO_GROUP_MULTI_PROMPT_INVALID: [${index}].prompt`)
+    }
+    if (!/^\d+$/.test(durationRaw) || Number(durationRaw) < 1) {
+      throw new Error(`VIDEO_GROUP_MULTI_PROMPT_INVALID: [${index}].duration`)
+    }
+    return { index: index + 1, prompt, duration: durationRaw }
+  })
+}
+
+/**
+ * 组合分镜视频合成：用 kling-omni-video 的 multi_prompt 接口把整组分镜
+ * 一次性合成为单条视频，结果写入组内首个面板的 videoUrl。
+ * groupVideoOptions 来自 payload.generationOptions.groupVideo 嵌套对象。
+ */
+async function generateOmniGroupVideo(
+  job: Job<TaskJobData>,
+  panel: PanelRecord,
+  modelId: string,
+  projectVideoRatio: string | null | undefined,
+  groupVideoOptions: AnyObj,
+): Promise<{ cosKey: string; actualVideoTokens?: number }> {
+  const multiPrompt = normalizeGroupMultiPrompt(groupVideoOptions.multiPrompt)
+  const totalDuration = multiPrompt.reduce((sum, item) => sum + Number(item.duration), 0)
+
+  // 把组内各分镜的图片作为参考图传入，并在对应子 prompt 前注入 <<<image_N>>>
+  // 引用标记，让 kling-omni-video 把每个分镜与其分镜图一一绑定，保持角色/风格一致性。
+  // image_list 为 1-based 引用：imageList.length 即当前图片的引用序号。
+  const groupPanelIndices = Array.isArray(groupVideoOptions.groupPanelIndices)
+    ? groupVideoOptions.groupPanelIndices.filter(
+        (value): value is number => typeof value === 'number' && Number.isFinite(value),
+      )
+    : []
+  const imageList: Array<{ image_url: string }> = []
+  if (groupPanelIndices.length > 0) {
+    const groupPanels = await prisma.novelPromotionPanel.findMany({
+      where: { storyboardId: panel.storyboardId, panelIndex: { in: groupPanelIndices } },
+      select: { panelIndex: true, imageUrl: true },
+    })
+    const imageUrlByPanelIndex = new Map(
+      groupPanels.map((groupPanel) => [groupPanel.panelIndex, groupPanel.imageUrl]),
+    )
+    for (let i = 0; i < groupPanelIndices.length; i += 1) {
+      const imageUrl = imageUrlByPanelIndex.get(groupPanelIndices[i])
+      if (!imageUrl) continue
+      const signed = toSignedUrlIfCos(imageUrl, 3600)
+      if (!signed) continue
+      imageList.push({ image_url: await normalizeToBase64ForGeneration(signed) })
+      const imageRef = `<<<image_${imageList.length}>>>`
+      const shot = multiPrompt[i]
+      if (shot && !shot.prompt.startsWith(imageRef)) {
+        shot.prompt = `${imageRef}${shot.prompt}`
+      }
+    }
+  }
+
+  // omni 多分镜模式不消费 first_frame（参考图全部走 image_list），
+  // resolveVideoSourceFromGeneration 形参要求 imageUrl，传空串即可。
+  const generatedVideo = await resolveVideoSourceFromGeneration(job, {
+    userId: job.data.userId,
+    modelId,
+    imageUrl: '',
+    options: {
+      multiShot: true,
+      shotType: 'customize',
+      multiPrompt,
+      duration: totalDuration,
+      sound: 'off',
+      // kling-v3-omni 的能力字段必须齐全，否则 resolveVideoSourceFromGeneration
+      // 内部的 requireAllFields 校验会因缺省值失败（omni 路径实际不消费这三项）
+      generationMode: 'normal',
+      generateAudio: false,
+      resolution: 'pro',
+      ...(projectVideoRatio ? { aspectRatio: projectVideoRatio } : {}),
+      ...(imageList.length > 0 ? { imageList } : {}),
+    },
+  })
+
+  const cosKey = await uploadVideoSourceToCos(
+    generatedVideo.url,
+    'panel-video',
+    panel.id,
+    generatedVideo.downloadHeaders,
+  )
+  return {
+    cosKey,
+    ...(typeof generatedVideo.actualVideoTokens === 'number'
+      ? { actualVideoTokens: generatedVideo.actualVideoTokens }
+      : {}),
+  }
+}
+
 function parseParentGroupByPanelNumber(raw: string | null | undefined): Map<number, number> {
   if (!raw) return new Map()
   try {
@@ -333,6 +451,41 @@ async function handleVideoPanelTask(job: Job<TaskJobData>) {
   if (!modelId) throw new Error('VIDEO_MODEL_REQUIRED: payload.videoModel is required')
 
   const panel = await getPanelForVideoTask(job)
+
+  // 组合分镜（kling-omni-video multi_prompt）合成：整组一次性生成单条视频。
+  // omni 专属参数收在 generationOptions.groupVideo 嵌套对象里。
+  const rawGenerationOptions = isRecord(payload.generationOptions) ? payload.generationOptions : {}
+  const groupVideoOptions = isRecord(rawGenerationOptions.groupVideo) ? rawGenerationOptions.groupVideo : null
+  if (
+    groupVideoOptions
+    && Array.isArray(groupVideoOptions.multiPrompt)
+    && groupVideoOptions.multiPrompt.length > 0
+  ) {
+    await reportTaskProgress(job, 10, {
+      stage: 'generate_group_video',
+      panelId: panel.id,
+    })
+    const { cosKey, actualVideoTokens } = await generateOmniGroupVideo(
+      job,
+      panel,
+      modelId,
+      projectModels.videoRatio,
+      groupVideoOptions,
+    )
+    await assertTaskActive(job, 'persist_group_video')
+    await prisma.novelPromotionPanel.update({
+      where: { id: panel.id },
+      data: {
+        videoUrl: cosKey,
+        videoGenerationMode: 'normal',
+      },
+    })
+    return {
+      panelId: panel.id,
+      videoUrl: cosKey,
+      ...(typeof actualVideoTokens === 'number' ? { actualVideoTokens } : {}),
+    }
+  }
 
   const generationOptions = extractGenerationOptions(payload)
 
