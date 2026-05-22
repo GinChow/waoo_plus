@@ -176,3 +176,53 @@ export function useDeleteProjectStoryboardGroupHistoryVideo(projectId: string) {
     },
   })
 }
+
+/**
+ * 切换单分镜历史视频为当前视频
+ */
+export function useSelectProjectPanelHistoryVideo(projectId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (payload: { panelId: string; videoUrl: string }) => {
+      const res = await apiFetch(`/api/novel-promotion/${projectId}/panel/select-video-history`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}))
+        throw new Error(resolveTaskErrorMessage(error, '切换历史视频失败'))
+      }
+      return res.json()
+    },
+    onSettled: () => {
+      invalidateQueryTemplates(queryClient, [queryKeys.projectAssets.all(projectId)])
+    },
+  })
+}
+
+/**
+ * 删除单分镜历史视频条目
+ */
+export function useDeleteProjectPanelHistoryVideo(projectId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (payload: { panelId: string; videoUrl: string }) => {
+      const res = await apiFetch(`/api/novel-promotion/${projectId}/panel/select-video-history`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}))
+        throw new Error(resolveTaskErrorMessage(error, '删除历史视频失败'))
+      }
+      return res.json()
+    },
+    onSettled: () => {
+      invalidateQueryTemplates(queryClient, [queryKeys.projectAssets.all(projectId)])
+    },
+  })
+}

@@ -134,6 +134,29 @@ async function attachMediaFieldsToPanel<T extends Record<string, unknown>>(panel
     }
   }
 
+  let resolvedVideoHistoryJson: unknown = panel.videoHistory
+  if (typeof panel.videoHistory === 'string' && panel.videoHistory.trim()) {
+    try {
+      const parsed = JSON.parse(panel.videoHistory)
+      if (Array.isArray(parsed)) {
+        const resolved = await Promise.all(parsed.map(async (entry) => {
+          if (!entry || typeof entry !== 'object') return entry
+          const record = entry as Record<string, unknown>
+          const videoUrl = typeof record.videoUrl === 'string' ? record.videoUrl : ''
+          if (!videoUrl || videoUrl.startsWith('PENDING:')) return record
+          const media = await resolveMediaRefFromLegacyValue(videoUrl)
+          return {
+            ...record,
+            videoUrl: media?.url || videoUrl,
+          }
+        }))
+        resolvedVideoHistoryJson = JSON.stringify(resolved)
+      }
+    } catch {
+      // keep original on parse failure
+    }
+  }
+
   return {
     ...panel,
     media: imageMedia,
@@ -149,6 +172,7 @@ async function attachMediaFieldsToPanel<T extends Record<string, unknown>>(panel
     previousImageUrl: previousImageMedia?.url || panel.previousImageUrl || null,
     candidateImages: candidateRaw.length > 0 ? JSON.stringify(candidateMediaUrls) : panel.candidateImages,
     imageHistory: resolvedImageHistoryJson,
+    videoHistory: resolvedVideoHistoryJson,
   }
 }
 

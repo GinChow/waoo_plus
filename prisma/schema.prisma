@@ -208,6 +208,7 @@ model NovelPromotionPanel {
   videoPrompt       String?                   @db.Text
   firstLastFramePrompt String?                @db.Text
   videoUrl          String?                   @db.Text
+  videoHistory      String?                   @db.Text
   videoGenerationMode String?                 @db.Text // 视频生成方式：normal | firstlastframe
   videoMediaId      String?
   videoMedia        MediaObject?              @relation("NovelPromotionPanelVideoMedia", fields: [videoMediaId], references: [id], onDelete: SetNull)

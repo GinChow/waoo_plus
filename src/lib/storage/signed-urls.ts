@@ -41,6 +41,7 @@ export interface PanelLike {
   candidateImages: string | null
   panelImageHistory?: string | null
   imageHistory?: string | null
+  videoHistory?: string | null
   [key: string]: unknown
 }
 
@@ -169,6 +170,30 @@ export function addSignedUrlsToStoryboard(storyboard: StoryboardLike) {
         }
       }
 
+      let signedVideoHistory = dbPanel.videoHistory || null
+      if (signedVideoHistory) {
+        try {
+          const history = JSON.parse(signedVideoHistory)
+          if (Array.isArray(history)) {
+            const signedHistory = history.map((entry) => {
+              if (!entry || typeof entry !== 'object') return entry
+              const record = entry as Record<string, unknown>
+              const videoUrl = typeof record.videoUrl === 'string' ? record.videoUrl : null
+              if (!videoUrl) return entry
+              return {
+                ...record,
+                videoUrl: videoUrl.startsWith('http')
+                  ? videoUrl
+                  : getSignedUrl(videoUrl, 7200) || videoUrl,
+              }
+            })
+            signedVideoHistory = JSON.stringify(signedHistory)
+          }
+        } catch {
+          signedVideoHistory = dbPanel.videoHistory || null
+        }
+      }
+
       let signedCandidateImages = dbPanel.candidateImages
       if (signedCandidateImages) {
         try {
@@ -198,6 +223,7 @@ export function addSignedUrlsToStoryboard(storyboard: StoryboardLike) {
           : dbPanel.lipSyncVideoUrl,
         candidateImages: signedCandidateImages,
         imageHistory: signedImageHistory,
+        videoHistory: signedVideoHistory,
         historyCount: panelHistoryCount,
       }
     })

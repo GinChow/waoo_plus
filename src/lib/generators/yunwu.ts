@@ -282,32 +282,31 @@ async function normalizeOmniImageItemsForOutbound(
         return items
     }
     const cosConfigured = isOutboundCosConfigured()
-    // 临时诊断：用 _ulogError 确保在 LOG_LEVEL=ERROR 下也可见
-    _ulogError(`[Yunwu Omni DIAG] 归一化 image_list: ${items.length} 张, cosConfigured=${cosConfigured}`)
+    _ulogInfo(`[Yunwu Omni] 归一化 image_list: ${items.length} 张, cosConfigured=${cosConfigured}`)
     return await Promise.all(
         items.map(async (item, index) => {
             const src = item.image_url?.trim()
             if (!src || /^https?:\/\//i.test(src)) {
-                _ulogError(`[Yunwu Omni DIAG] image[${index}] 跳过归一化（空或已是 URL）: ${String(src).slice(0, 80)}`)
+                _ulogInfo(`[Yunwu Omni] image[${index}] 跳过归一化（空或已是 URL）: ${String(src).slice(0, 80)}`)
                 return item
             }
             // omni 要求纯 base64（不带 data: 前缀），并需控制在单图上限内
             const pureBase64 = normalizeOmniImageSource(src)
             const compressed = await compressOmniImageBase64(pureBase64)
-            _ulogError(
-                `[Yunwu Omni DIAG] image[${index}] 原始≈${Math.round(Buffer.from(pureBase64, 'base64').length / 1024)}KB`
+            _ulogInfo(
+                `[Yunwu Omni] image[${index}] 原始≈${Math.round(Buffer.from(pureBase64, 'base64').length / 1024)}KB`
                 + ` 压缩后≈${Math.round(Buffer.from(compressed, 'base64').length / 1024)}KB`,
             )
             if (!cosConfigured) {
-                _ulogError(`[Yunwu Omni DIAG] image[${index}] COS 未配置，回退内联 base64`)
+                _ulogInfo(`[Yunwu Omni] image[${index}] COS 未配置，回退内联 base64`)
                 return { ...item, image_url: compressed }
             }
             try {
                 const url = await ensureOutboundImageUrl(compressed)
-                _ulogError(`[Yunwu Omni DIAG] image[${index}] 已上传 COS: ${url}`)
+                _ulogInfo(`[Yunwu Omni] image[${index}] 已上传 COS: ${url}`)
                 return { ...item, image_url: url }
             } catch (error) {
-                _ulogError('[Yunwu Omni DIAG] 出站图片上传 COS 失败，回退 base64:', error)
+                _ulogError('[Yunwu Omni] 出站图片上传 COS 失败，回退 base64:', error)
                 return { ...item, image_url: compressed }
             }
         }),
@@ -593,8 +592,8 @@ export class YunwuVideoGenerator extends ViduVideoGenerator {
         const logPrefix = `[Yunwu Omni Video ${modelName}]`
         _ulogInfo(`${logPrefix} 提交任务`)
         _ulogInfo(`${logPrefix} - Endpoint: ${requestUrl}`)
-        // 临时诊断：确认实际出站的 image_list 是 URL 还是内联 base64、各自多大
-        _ulogError(`[Yunwu Omni DIAG] 出站 image_list (${body.image_list?.length ?? 0} 张):`,
+        // 出站 image_list 摘要：URL 还是内联 base64、各自多大
+        _ulogInfo(`${logPrefix} - 出站 image_list (${body.image_list?.length ?? 0} 张):`,
             (body.image_list ?? []).map((img, i) => {
                 const u = img.image_url || ''
                 const isUrl = /^https?:\/\//i.test(u)

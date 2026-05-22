@@ -19,6 +19,11 @@ import { resolveBuiltinCapabilitiesByModelKey } from '@/lib/model-capabilities/l
 import { parseModelKeyStrict } from '@/lib/model-config-contract'
 import { getProviderConfig } from '@/lib/api-config'
 import { upsertCoarseGroupVideoState } from '@/lib/novel-promotion/coarse-group-image-state'
+import {
+  appendPanelVideoHistoryEntry,
+  parsePanelVideoHistory,
+  serializePanelVideoHistory,
+} from '@/lib/novel-promotion/panel-video-state'
 
 type AnyObj = Record<string, unknown>
 type VideoOptionValue = string | number | boolean
@@ -473,11 +478,22 @@ async function handleVideoPanelTask(job: Job<TaskJobData>) {
       groupVideoOptions,
     )
     await assertTaskActive(job, 'persist_group_video')
+    const nowGroup = new Date()
+    const groupNextHistory = appendPanelVideoHistoryEntry(parsePanelVideoHistory(panel.videoHistory), {
+      videoUrl: cosKey,
+      generatedAt: nowGroup.toISOString(),
+      source: 'generate',
+      videoPrompt: typeof panel.videoPrompt === 'string' ? panel.videoPrompt : undefined,
+      videoModel: modelId,
+      generationMode: 'normal',
+      taskId: job.data.taskId,
+    })
     await prisma.novelPromotionPanel.update({
       where: { id: panel.id },
       data: {
         videoUrl: cosKey,
         videoGenerationMode: 'normal',
+        videoHistory: serializePanelVideoHistory(groupNextHistory),
       },
     })
     return {
@@ -505,11 +521,21 @@ async function handleVideoPanelTask(job: Job<TaskJobData>) {
 
   await assertTaskActive(job, 'persist_panel_video')
   const now = new Date()
+  const panelNextHistory = appendPanelVideoHistoryEntry(parsePanelVideoHistory(panel.videoHistory), {
+    videoUrl: cosKey,
+    generatedAt: now.toISOString(),
+    source: generationMode === 'firstlastframe' ? 'firstlastframe' : 'generate',
+    videoPrompt: prompt,
+    videoModel: model,
+    generationMode,
+    taskId: job.data.taskId,
+  })
   await prisma.novelPromotionPanel.update({
     where: { id: panel.id },
     data: {
       videoUrl: cosKey,
       videoGenerationMode: generationMode,
+      videoHistory: serializePanelVideoHistory(panelNextHistory),
     },
   })
 

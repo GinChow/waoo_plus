@@ -6,6 +6,7 @@ import type {
   Storyboard,
   VideoPanel,
 } from '@/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video'
+import { parsePanelVideoHistory } from '@/lib/novel-promotion/panel-video-state'
 
 interface TaskStateLike {
   phase?: string | null
@@ -174,6 +175,15 @@ export function useVideoPanelsProjection({
           coarseGroupVideoPrompt: coarseGroupState?.videoPrompt || null,
           coarseGroupDuration: coarseGroupState?.duration || null,
           coarseGroupVideoHistory: coarseGroupState?.videoHistory || [],
+          videoHistory: parsePanelVideoHistory(panel.videoHistory || null).map((entry) => ({
+            videoUrl: entry.videoUrl,
+            generatedAt: entry.generatedAt,
+            videoPrompt: entry.videoPrompt,
+            videoModel: entry.videoModel,
+            generationMode: entry.generationMode,
+            source: entry.source,
+            taskId: entry.taskId,
+          })),
           textPanel: {
             panel_number: panelNumber,
             parent_group_number: parentGroupNumber,
