@@ -113,6 +113,9 @@ async function generateOmniGroupVideo(
 ): Promise<{ cosKey: string; actualVideoTokens?: number }> {
   const multiPrompt = normalizeGroupMultiPrompt(groupVideoOptions.multiPrompt)
   const totalDuration = multiPrompt.reduce((sum, item) => sum + Number(item.duration), 0)
+  // 声音开关：尊重前端传入的 groupVideo.sound，缺省默认 'on'（omni 路径由 sound 字段控制
+  // 是否生成音轨，generateAudio 在该路径不被消费）。
+  const groupSound = groupVideoOptions.sound === 'off' ? 'off' : 'on'
 
   // 把组内各分镜的图片作为参考图传入，并在对应子 prompt 前注入 <<<image_N>>>
   // 引用标记，让 kling-omni-video 把每个分镜与其分镜图一一绑定，保持角色/风格一致性。
@@ -156,7 +159,7 @@ async function generateOmniGroupVideo(
       shotType: 'customize',
       multiPrompt,
       duration: totalDuration,
-      sound: 'off',
+      sound: groupSound,
       // kling-v3-omni 的能力字段必须齐全，否则 resolveVideoSourceFromGeneration
       // 内部的 requireAllFields 校验会因缺省值失败（omni 路径实际不消费这三项）
       generationMode: 'normal',

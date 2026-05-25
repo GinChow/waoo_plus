@@ -449,8 +449,10 @@ function validateOmniRequest(body: YunwuOmniRequestBody) {
         }
         const totalDuration = Number(body.duration)
         const sum = body.multi_prompt.reduce((acc, item, index) => {
-            if (item.prompt.length > 512) {
-                throw new Error(`YUNWU_OMNI_VIDEO_OPTION_UNSUPPORTED: multi_prompt[${index}].prompt length > 512`)
+            // 服务端按 UTF-8 字节计 512 上限（中文每字 3 字节），不是字符数；
+            // 此处校验的是已注入 <<<image_N>>> 前缀后的最终 prompt。
+            if (Buffer.byteLength(item.prompt, 'utf8') > 512) {
+                throw new Error(`YUNWU_OMNI_VIDEO_OPTION_UNSUPPORTED: multi_prompt[${index}].prompt bytes > 512`)
             }
             const duration = Number(item.duration)
             if (!Number.isFinite(duration) || duration < 1) {

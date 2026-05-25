@@ -142,6 +142,32 @@ describe('YunwuVideoGenerator omni video', () => {
     expect(body.duration).toBe('15')
   })
 
+  it('rejects multi_prompt prompt over 512 UTF-8 bytes even when char count is under 512', async () => {
+    const generator = new YunwuVideoGenerator()
+    // 200 个中文字 = 200 字符（< 512）但 600 字节（> 512），服务端按字节算
+    const longPrompt = '镜'.repeat(200)
+    expect(longPrompt.length).toBeLessThan(512)
+    expect(Buffer.byteLength(longPrompt, 'utf8')).toBeGreaterThan(512)
+
+    const result = await generator.generate({
+      userId: 'user-1',
+      imageUrl: '',
+      options: {
+        provider: 'yunwu',
+        modelId: 'kling-v3-omni',
+        multiShot: true,
+        shotType: 'customize',
+        multiPrompt: [{ index: 1, prompt: longPrompt, duration: '5' }],
+        duration: 5,
+      },
+    })
+
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/multi_prompt\[0\]\.prompt bytes > 512/)
+    // 校验在出站前完成，不应发起请求
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
   it('joins provider base URL and configured omni endpoint path', async () => {
     getProviderConfigMock.mockResolvedValueOnce({
       id: 'yunwu',

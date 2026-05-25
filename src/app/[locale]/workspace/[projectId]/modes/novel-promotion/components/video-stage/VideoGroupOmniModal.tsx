@@ -10,8 +10,28 @@ import type { MultiPromptShot, VideoPanel } from '../video'
 const MAX_SHOTS = 6
 const MIN_TOTAL_DURATION = 3
 const MAX_TOTAL_DURATION = 15
-// 接口上限 512；worker 会在每个子 prompt 前注入 <<<image_N>>> 引用标记，预留余量
-const MAX_PROMPT_LENGTH = 490
+// 接口按 UTF-8 字节计上限 512（中文每字 3 字节，并非字符数）；
+// worker 会在每个子 prompt 前注入 <<<image_N>>> 引用标记（最多 13 字节），预留余量。
+const MAX_PROMPT_BYTES = 512 - 16
+
+// 按 UTF-8 字节计长度
+function byteLength(text: string): number {
+  return new TextEncoder().encode(text).length
+}
+
+// 在不切断多字节字符的前提下，把文本截断到不超过 maxBytes 个 UTF-8 字节
+function truncateToBytes(text: string, maxBytes: number): string {
+  if (byteLength(text) <= maxBytes) return text
+  let result = ''
+  let used = 0
+  for (const char of text) {
+    const charBytes = byteLength(char)
+    if (used + charBytes > maxBytes) break
+    result += char
+    used += charBytes
+  }
+  return result
+}
 
 interface ShotDraft {
   panelIndex: number
@@ -37,7 +57,7 @@ function buildInitialShots(groupPanels: VideoPanel[]): ShotDraft[] {
       : 0
     return {
       panelIndex: panel.panelIndex,
-      prompt: rawPrompt.slice(0, MAX_PROMPT_LENGTH),
+      prompt: truncateToBytes(rawPrompt, MAX_PROMPT_BYTES),
       duration: Math.max(1, rounded || 3),
     }
   })
@@ -65,8 +85,8 @@ export default function VideoGroupOmniModal({
     if (shots.length > MAX_SHOTS) return t('panelGroup.omni.errorTooManyShots', { max: MAX_SHOTS })
     for (const shot of shots) {
       if (!shot.prompt.trim()) return t('panelGroup.omni.errorPromptEmpty')
-      if (shot.prompt.length > MAX_PROMPT_LENGTH) {
-        return t('panelGroup.omni.errorPromptTooLong', { max: MAX_PROMPT_LENGTH })
+      if (byteLength(shot.prompt) > MAX_PROMPT_BYTES) {
+        return t('panelGroup.omni.errorPromptTooLong', { max: MAX_PROMPT_BYTES })
       }
       if (!Number.isInteger(shot.duration) || shot.duration < 1) {
         return t('panelGroup.omni.errorDurationInvalid')
@@ -155,14 +175,14 @@ export default function VideoGroupOmniModal({
                 <div className="flex-1 min-w-0 space-y-2">
                   <textarea
                     value={shot.prompt}
-                    onChange={(event) => updateShot(index, { prompt: event.target.value.slice(0, MAX_PROMPT_LENGTH) })}
+                    onChange={(event) => updateShot(index, { prompt: truncateToBytes(event.target.value, MAX_PROMPT_BYTES) })}
                     rows={3}
                     placeholder={t('panelGroup.omni.promptPlaceholder')}
                     className="w-full resize-none rounded-md border border-[var(--glass-stroke-strong)] px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-[var(--glass-tone-info-fg)] focus:border-[var(--glass-stroke-focus)]"
                   />
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] text-[var(--glass-text-tertiary)]">
-                      {shot.prompt.length}/{MAX_PROMPT_LENGTH}
+                      {byteLength(shot.prompt)}/{MAX_PROMPT_BYTES}
                     </span>
                     <label className="flex items-center gap-1.5 text-xs text-[var(--glass-text-secondary)]">
                       <AppIcon name="clock" className="h-3 w-3" />

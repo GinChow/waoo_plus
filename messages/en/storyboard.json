@@ -448,7 +448,7 @@
             "errorEmpty": "At least 1 shot is required",
             "errorTooManyShots": "At most {max} shots are supported",
             "errorPromptEmpty": "Each shot prompt cannot be empty",
-            "errorPromptTooLong": "Shot prompt cannot exceed {max} characters",
+            "errorPromptTooLong": "Shot prompt cannot exceed {max} bytes (CJK chars are ~3 bytes each)",
             "errorDurationInvalid": "Shot duration must be an integer no less than 1",
             "errorTotalRange": "Total duration must be between {min}-{max} seconds"
         }

@@ -160,7 +160,7 @@ export interface GroupVideoGenerationOptions {
   multiShot: true
   shotType: 'customize'
   multiPrompt: MultiPromptShot[]
-  sound: 'off'
+  sound: 'on' | 'off'
   groupPanelIndices: number[]
 }
 

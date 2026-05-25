@@ -167,7 +167,14 @@ function inferCodeFromMessage(message: string): UnifiedErrorCode | null {
       if (parsedStatus === 404) return 'NOT_FOUND'
       if (parsedStatus === 409) return 'CONFLICT'
       if (parsedStatus === 422) return 'SENSITIVE_CONTENT'
-      if (parsedStatus === 429) return 'RATE_LIMIT'
+      // 部分网关（如云雾/Kling）会用 429 返回内容校验错误（如 prompt 超长），
+      // 这类错误重试也不会成功，不能归为可重试的 RATE_LIMIT。
+      if (parsedStatus === 429) {
+        if (/must be\s*<=|too long|exceed|length|characters|字符|过长|超过/i.test(message)) {
+          return 'INVALID_PARAMS'
+        }
+        return 'RATE_LIMIT'
+      }
       if (parsedStatus === 502 || parsedStatus === 503) return 'EXTERNAL_ERROR'
       if (parsedStatus === 504) return 'GENERATION_TIMEOUT'
       if (parsedStatus >= 500) return 'EXTERNAL_ERROR'

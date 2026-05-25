@@ -81,7 +81,7 @@ export default function VideoGroupPanelCard({
         multiShot: true,
         shotType: 'customize',
         multiPrompt,
-        sound: 'off',
+        sound: 'on',
         groupPanelIndices: groupPanels.map((panel) => panel.panelIndex),
       }
       // kling-v3-omni 的能力字段（duration / generateAudio / resolution）必须齐全，

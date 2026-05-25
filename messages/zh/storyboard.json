@@ -452,7 +452,7 @@
             "errorEmpty": "至少需要 1 个分镜",
             "errorTooManyShots": "最多支持 {max} 个分镜",
             "errorPromptEmpty": "每个分镜的提示词不能为空",
-            "errorPromptTooLong": "分镜提示词长度不能超过 {max} 字",
+            "errorPromptTooLong": "分镜提示词长度不能超过 {max} 字节（中文每字约 3 字节）",
             "errorDurationInvalid": "分镜时长必须是不小于 1 的整数",
             "errorTotalRange": "总时长需在 {min}-{max} 秒之间"
         }
