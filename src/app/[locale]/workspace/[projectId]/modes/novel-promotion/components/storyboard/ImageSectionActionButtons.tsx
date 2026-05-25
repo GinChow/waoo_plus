@@ -19,6 +19,7 @@ interface ImageSectionActionButtonsProps {
   isModifying: boolean
   onRegeneratePanelImage: (panelId: string, count?: number, force?: boolean) => void
   onOpenEditModal: () => void
+  onOpenLocalEditor?: () => void
   onOpenAIDataModal: () => void
   onUndo?: (panelId: string) => void
   onDeleteImage?: (panelId: string) => void
@@ -39,6 +40,7 @@ export default function ImageSectionActionButtons({
   isModifying,
   onRegeneratePanelImage,
   onOpenEditModal,
+  onOpenLocalEditor,
   onOpenAIDataModal,
   onUndo,
   onDeleteImage,
@@ -114,6 +116,18 @@ export default function ImageSectionActionButtons({
                 title={t('image.editImage')}
               >
                 <AISparklesIcon className={`w-2.5 h-2.5 ${AI_EDIT_ICON_CLASS}`} />
+              </button>
+            )}
+
+            {imageUrl && onOpenLocalEditor && (
+              <button
+                onClick={onOpenLocalEditor}
+                disabled={isSubmittingPanelImageTask || isModifying}
+                className={`glass-btn-base glass-btn-secondary flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] transition-all active:scale-95 disabled:opacity-50`}
+                title={t('image.localEditor.openTitle')}
+              >
+                <AppIcon name="editSquare" className="w-2.5 h-2.5" />
+                <span>{t('image.localEditor.openLabel')}</span>
               </button>
             )}
 

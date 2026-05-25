@@ -8,6 +8,7 @@ import TaskStatusOverlay from '@/components/task/TaskStatusOverlay'
 import { resolveTaskPresentationState } from '@/lib/task/presentation'
 import ImageSectionCandidateMode from './ImageSectionCandidateMode'
 import ImageSectionActionButtons from './ImageSectionActionButtons'
+import StoryboardImageEditorModal from './StoryboardImageEditorModal'
 import { AppIcon } from '@/components/ui/icons'
 
 interface PanelCandidateData {
@@ -78,6 +79,7 @@ export default function ImageSection({
 }: ImageSectionProps) {
   const t = useTranslations('storyboard')
   const [isTaskPulseAnimating, setIsTaskPulseAnimating] = useState(false)
+  const [localEditorOpen, setLocalEditorOpen] = useState(false)
   const cssAspectRatio = videoRatio.replace(':', '/')
   const hasValidCandidates = !!candidateData && candidateData.candidates.some((url) => !url.startsWith('PENDING:'))
 
@@ -220,6 +222,7 @@ export default function ImageSection({
           isModifying={isModifying}
           onRegeneratePanelImage={onRegeneratePanelImage}
           onOpenEditModal={onOpenEditModal}
+          onOpenLocalEditor={onUploadImage ? () => setLocalEditorOpen(true) : undefined}
           onOpenAIDataModal={onOpenAIDataModal}
           onUndo={onUndo}
           onDeleteImage={onDeleteImage}
@@ -229,6 +232,17 @@ export default function ImageSection({
           onPreviewImage={onPreviewImage}
           isUploading={isUploading}
           triggerPulse={triggerPulse}
+        />
+      )}
+
+      {onUploadImage && imageUrl && (
+        <StoryboardImageEditorModal
+          open={localEditorOpen}
+          panelId={panelId}
+          imageUrl={imageUrl}
+          videoRatio={videoRatio}
+          onApply={onUploadImage}
+          onClose={() => setLocalEditorOpen(false)}
         />
       )}
     </div>

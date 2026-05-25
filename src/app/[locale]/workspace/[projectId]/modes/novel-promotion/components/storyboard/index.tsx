@@ -238,11 +238,28 @@ export default function StoryboardStage({
       const formData = new FormData()
       formData.append('file', file)
       formData.append('panelId', panelId)
-      await fetch(`/api/novel-promotion/${projectId}/panel/update-image`, {
+      const response = await fetch(`/api/novel-promotion/${projectId}/panel/update-image`, {
         method: 'POST',
         body: formData,
       })
+      const result = await response.json().catch(() => null) as { imageUrl?: string } | null
+      const nextImageUrl = result?.imageUrl
+      if (nextImageUrl) {
+        setLocalStoryboards((previous) => previous.map((storyboard) => {
+          const panels = storyboard.panels || []
+          let changed = false
+          const nextPanels = panels.map((panel) => {
+            if (panel.id !== panelId) return panel
+            changed = true
+            return { ...panel, imageUrl: nextImageUrl, candidateImages: null }
+          })
+          return changed ? { ...storyboard, panels: nextPanels } : storyboard
+        }))
+        patchPanelInEpisodeCache(panelId, { imageUrl: nextImageUrl, candidateImages: null })
+      }
       onRefresh()
+      refreshEpisodeData()
+      refreshStoryboards()
     } catch {
       // ignore
     } finally {
@@ -252,7 +269,7 @@ export default function StoryboardStage({
         return next
       })
     }
-  }, [projectId, onRefresh])
+  }, [projectId, onRefresh, refreshEpisodeData, refreshStoryboards, patchPanelInEpisodeCache, setLocalStoryboards])
 
   return (
       <StoryboardStageShell
