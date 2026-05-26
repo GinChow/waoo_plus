@@ -51,6 +51,7 @@ export interface Panel {
   videoGenerationMode?: VideoGenerationMode | null
   videoModel?: string | null
   linkedToNextPanel?: boolean | null
+  firstLastFrameEnabled?: boolean | null
   videoTaskRunning?: boolean | null
   videoErrorMessage?: string | null  // 视频生成错误消息
   videoErrorCode?: string | null
@@ -109,6 +110,7 @@ export interface VideoPanel {
   }>
   textPanel?: TextPanel
   firstLastFramePrompt?: string
+  firstLastFrameEnabled?: boolean
   imageUrl?: string
   videoUrl?: string
   videoGenerationMode?: VideoGenerationMode
@@ -162,6 +164,10 @@ export interface GroupVideoGenerationOptions {
   multiPrompt: MultiPromptShot[]
   sound: 'on' | 'off'
   groupPanelIndices: number[]
+  // 两张图组合时：true=首尾帧模式（首帧+尾帧），false/缺省=多镜头模式
+  firstLastFrame?: boolean
+  // 首尾帧模式下的融合提示词（单条），后端优先采用
+  firstLastFramePrompt?: string
 }
 
 export interface BatchVideoGenerationParams {

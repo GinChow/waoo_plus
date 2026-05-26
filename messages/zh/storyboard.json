@@ -456,7 +456,18 @@
     },
     "firstLastFrame": {
         "placeholder": "输入首尾帧视频提示词...",
-        "modelTitle": "首尾帧模型"
+        "modelTitle": "首尾帧模型",
+        "label": "首尾帧视频提示词",
+        "aiGenerate": "AI 合成提示词",
+        "aiGenerating": "合成中...",
+        "userInstructionPlaceholder": "可选：输入修改指令，优先按指令改写；留空则结合前后分镜提示词融合",
+        "modeLabel": "首尾帧模式",
+        "modeFirstLast": "首尾帧模式",
+        "modeMultiShot": "多镜头模式",
+        "multiShotHint": "多镜头模式：两个分镜按 multi-shot 一次性合成，不使用首尾帧。",
+        "firstFrame": "首帧",
+        "lastFrame": "尾帧",
+        "combinedPromptLabel": "融合视频提示词"
     },
     "panelGroup": {
         "title": "组合分镜 #{start}→{end}",

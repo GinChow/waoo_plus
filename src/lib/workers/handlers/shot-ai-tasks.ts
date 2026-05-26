@@ -5,6 +5,7 @@ import {
   handleModifyLocationTask,
   handleModifyPropTask,
   handleModifyShotPromptTask,
+  handleFirstLastFramePromptTask,
   type AnyObj,
 } from './shot-ai-prompt'
 import { handleAnalyzeShotVariantsTask } from './shot-ai-variants'
@@ -20,6 +21,8 @@ export async function handleShotAITask(job: Job<TaskJobData>) {
       return await handleModifyPropTask(job, payload)
     case TASK_TYPE.AI_MODIFY_SHOT_PROMPT:
       return await handleModifyShotPromptTask(job, payload)
+    case TASK_TYPE.AI_FIRST_LAST_FRAME_PROMPT:
+      return await handleFirstLastFramePromptTask(job, payload)
     case TASK_TYPE.ANALYZE_SHOT_VARIANTS:
       return await handleAnalyzeShotVariantsTask(job, payload)
     default:

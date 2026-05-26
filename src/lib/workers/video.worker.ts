@@ -125,15 +125,77 @@ async function generateOmniGroupVideo(
         (value): value is number => typeof value === 'number' && Number.isFinite(value),
       )
     : []
-  const imageList: Array<{ image_url: string }> = []
+
+  // 两张图组合分镜有两种模式：
+  // - 首尾帧模式：第一个分镜为首帧、第二个为尾帧，image_list 附带 type(first_frame/end_frame)，
+  //   单 prompt，不走 multi_shot（omni 不允许 multi_shot 与首尾帧并存）；
+  // - 非首尾帧模式：仍走多镜头 multi_prompt 合成。
+  // 模式由前端显式传入 groupVideo.firstLastFrame，缺省回退到首帧分镜的 firstLastFrameEnabled。
+  // 两张以上的组合恒为多镜头合成。
+  const firstLastFrameModeFromOption = typeof groupVideoOptions.firstLastFrame === 'boolean'
+    ? groupVideoOptions.firstLastFrame
+    : undefined
+  const firstLastFrameModeEnabled = firstLastFrameModeFromOption
+    ?? (panel.firstLastFrameEnabled !== false)
+  const isFirstLastFrameGroup = groupPanelIndices.length === 2 && firstLastFrameModeEnabled
+
+  const imageUrlByPanelIndex = new Map<number, string | null>()
   if (groupPanelIndices.length > 0) {
     const groupPanels = await prisma.novelPromotionPanel.findMany({
       where: { storyboardId: panel.storyboardId, panelIndex: { in: groupPanelIndices } },
       select: { panelIndex: true, imageUrl: true },
     })
-    const imageUrlByPanelIndex = new Map(
-      groupPanels.map((groupPanel) => [groupPanel.panelIndex, groupPanel.imageUrl]),
-    )
+    for (const groupPanel of groupPanels) {
+      imageUrlByPanelIndex.set(groupPanel.panelIndex, groupPanel.imageUrl)
+    }
+  }
+
+  let generatedVideo: { url: string; actualVideoTokens?: number; downloadHeaders?: Record<string, string> }
+
+  if (isFirstLastFrameGroup) {
+    const firstImageUrl = imageUrlByPanelIndex.get(groupPanelIndices[0])
+    const lastImageUrl = imageUrlByPanelIndex.get(groupPanelIndices[1])
+    const firstSigned = firstImageUrl ? toSignedUrlIfCos(firstImageUrl, 3600) : null
+    const lastSigned = lastImageUrl ? toSignedUrlIfCos(lastImageUrl, 3600) : null
+    if (!firstSigned || !lastSigned) {
+      throw new Error('VIDEO_FIRSTLASTFRAME_GROUP_MISSING_IMAGE')
+    }
+    const flImageList = [
+      { image_url: await normalizeToBase64ForGeneration(firstSigned), type: 'first_frame' as const },
+      { image_url: await normalizeToBase64ForGeneration(lastSigned), type: 'end_frame' as const },
+    ]
+    // 首尾帧提示词：优先用前端传入的融合提示词，其次用首帧分镜上已合成的 firstLastFramePrompt，
+    // 最后回退拼接组内分镜提示词。
+    const optionFlPrompt = typeof groupVideoOptions.firstLastFramePrompt === 'string'
+      ? groupVideoOptions.firstLastFramePrompt.trim()
+      : ''
+    const fusedPrompt = optionFlPrompt
+      || (typeof panel.firstLastFramePrompt === 'string' && panel.firstLastFramePrompt.trim()
+        ? panel.firstLastFramePrompt.trim()
+        : multiPrompt.map((item) => item.prompt).filter(Boolean).join(' '))
+    generatedVideo = await resolveVideoSourceFromGeneration(job, {
+      userId: job.data.userId,
+      modelId,
+      imageUrl: '',
+      options: {
+        multiShot: false,
+        prompt: fusedPrompt,
+        duration: totalDuration,
+        sound: groupSound,
+        generationMode: 'firstlastframe',
+        generateAudio: false,
+        resolution: 'pro',
+        // 首帧/尾帧已显式放进 image_list，禁止生成器再把空的入参图片当首帧
+        omniUseInputImage: false,
+        ...(projectVideoRatio ? { aspectRatio: projectVideoRatio } : {}),
+        imageList: flImageList,
+      },
+    })
+  } else {
+    // 把组内各分镜的图片作为参考图传入，并在对应子 prompt 前注入 <<<image_N>>>
+    // 引用标记，让 kling-omni-video 把每个分镜与其分镜图一一绑定，保持角色/风格一致性。
+    // image_list 为 1-based 引用：imageList.length 即当前图片的引用序号。
+    const imageList: Array<{ image_url: string }> = []
     for (let i = 0; i < groupPanelIndices.length; i += 1) {
       const imageUrl = imageUrlByPanelIndex.get(groupPanelIndices[i])
       if (!imageUrl) continue
@@ -146,29 +208,29 @@ async function generateOmniGroupVideo(
         shot.prompt = `${imageRef}${shot.prompt}`
       }
     }
-  }
 
-  // omni 多分镜模式不消费 first_frame（参考图全部走 image_list），
-  // resolveVideoSourceFromGeneration 形参要求 imageUrl，传空串即可。
-  const generatedVideo = await resolveVideoSourceFromGeneration(job, {
-    userId: job.data.userId,
-    modelId,
-    imageUrl: '',
-    options: {
-      multiShot: true,
-      shotType: 'customize',
-      multiPrompt,
-      duration: totalDuration,
-      sound: groupSound,
-      // kling-v3-omni 的能力字段必须齐全，否则 resolveVideoSourceFromGeneration
-      // 内部的 requireAllFields 校验会因缺省值失败（omni 路径实际不消费这三项）
-      generationMode: 'normal',
-      generateAudio: false,
-      resolution: 'pro',
-      ...(projectVideoRatio ? { aspectRatio: projectVideoRatio } : {}),
-      ...(imageList.length > 0 ? { imageList } : {}),
-    },
-  })
+    // omni 多分镜模式不消费 first_frame（参考图全部走 image_list），
+    // resolveVideoSourceFromGeneration 形参要求 imageUrl，传空串即可。
+    generatedVideo = await resolveVideoSourceFromGeneration(job, {
+      userId: job.data.userId,
+      modelId,
+      imageUrl: '',
+      options: {
+        multiShot: true,
+        shotType: 'customize',
+        multiPrompt,
+        duration: totalDuration,
+        sound: groupSound,
+        // kling-v3-omni 的能力字段必须齐全，否则 resolveVideoSourceFromGeneration
+        // 内部的 requireAllFields 校验会因缺省值失败（omni 路径实际不消费这三项）
+        generationMode: 'normal',
+        generateAudio: false,
+        resolution: 'pro',
+        ...(projectVideoRatio ? { aspectRatio: projectVideoRatio } : {}),
+        ...(imageList.length > 0 ? { imageList } : {}),
+      },
+    })
+  }
 
   const cosKey = await uploadVideoSourceToCos(
     generatedVideo.url,

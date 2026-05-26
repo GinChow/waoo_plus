@@ -4,12 +4,12 @@ import { resolveTaskPresentationState } from '@/lib/task/presentation'
 import { ModelCapabilityDropdown } from '@/components/ui/config-modals/ModelCapabilityDropdown'
 import { AppIcon } from '@/components/ui/icons'
 import {
-  useDeleteProjectPanelHistoryVideo,
+  useAiFirstLastFramePrompt,
   useDeleteProjectStoryboardGroupHistoryVideo,
-  useSelectProjectPanelHistoryVideo,
   useSelectProjectStoryboardGroupVideo,
 } from '@/lib/query/hooks'
 import type { VideoPanelRuntime } from './hooks/useVideoPanelActions'
+import { HistoryVideoThumbnail, PanelVideoHistoryDropdown } from './PanelVideoHistoryDropdown'
 
 interface VideoPanelCardBodyProps {
   runtime: VideoPanelRuntime
@@ -61,6 +61,29 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
   const videoHistory = panel.coarseGroupVideoHistory || []
   const panelVideoHistory = panel.videoHistory || []
   const isCoarseGroupPanel = !!panel.videoTargetGroupNumber
+
+  // 首尾帧组合分镜：结合相邻两个分镜的视频提示词，AI 合成首尾帧视频提示词
+  const aiFlPromptMutation = useAiFirstLastFramePrompt(projectId)
+  const [isAiGeneratingFlPrompt, setIsAiGeneratingFlPrompt] = useState(false)
+  const [flUserInstruction, setFlUserInstruction] = useState('')
+  const handleAiGenerateFlPrompt = useCallback(async () => {
+    const nextLinkedPanel = layout.nextPanel
+    if (!nextLinkedPanel) return
+    setIsAiGeneratingFlPrompt(true)
+    try {
+      const result = await aiFlPromptMutation.mutateAsync({
+        firstVideoPrompt: panel.textPanel?.video_prompt || promptEditor.localPrompt || '',
+        lastVideoPrompt: nextLinkedPanel.textPanel?.video_prompt || '',
+        userInput: flUserInstruction.trim() || undefined,
+        panelId: panel.panelId,
+      })
+      if (result?.firstLastFramePrompt) {
+        actions.onFlCustomPromptChange(panelKey, result.firstLastFramePrompt)
+      }
+    } finally {
+      setIsAiGeneratingFlPrompt(false)
+    }
+  }, [actions, aiFlPromptMutation, flUserInstruction, layout.nextPanel, panel.panelId, panel.textPanel?.video_prompt, panelKey, promptEditor.localPrompt])
 
   return (
     <div className="p-4 space-y-2">
@@ -132,7 +155,46 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
 
             {showsFirstLastFrameActions ? (() => {
               const linkedNextPanel = layout.nextPanel!
+              const flPromptValue = layout.flCustomPrompt || layout.defaultFlPrompt || ''
               return (
+                <>
+                <div className="mt-2 p-2 rounded-lg bg-[var(--glass-tone-info-bg)] border border-[var(--glass-stroke-focus)] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-[var(--glass-tone-info-fg)]">{t('firstLastFrame.combinedPromptLabel')}</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleAiGenerateFlPrompt}
+                        disabled={isAiGeneratingFlPrompt}
+                        className="inline-flex items-center gap-1 text-xs text-[var(--glass-tone-info-fg)] hover:text-[var(--glass-text-primary)] disabled:opacity-50"
+                      >
+                        <AppIcon name="sparkles" className="w-3.5 h-3.5" />
+                        {isAiGeneratingFlPrompt ? t('firstLastFrame.aiGenerating') : t('firstLastFrame.aiGenerate')}
+                      </button>
+                      {layout.flCustomPrompt && (
+                        <button
+                          onClick={() => actions.onResetFlPrompt(panelKey)}
+                          className="text-xs text-[var(--glass-tone-info-fg)] hover:text-[var(--glass-text-primary)] underline"
+                        >
+                          {t('firstLastFrame.useDefault')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    value={flUserInstruction}
+                    onChange={(event) => setFlUserInstruction(event.target.value)}
+                    className="w-full text-xs p-2 border border-[var(--glass-stroke-base)] rounded bg-[var(--glass-bg-surface)] text-[var(--glass-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--glass-tone-info-fg)]"
+                    placeholder={t('firstLastFrame.userInstructionPlaceholder')}
+                  />
+                  <textarea
+                    value={flPromptValue}
+                    onChange={(event) => actions.onFlCustomPromptChange(panelKey, event.target.value)}
+                    className="w-full text-xs p-2 border border-[var(--glass-stroke-focus)] rounded bg-[var(--glass-bg-surface)] text-[var(--glass-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--glass-tone-info-fg)] resize-none"
+                    rows={3}
+                    placeholder={t('firstLastFrame.promptPlaceholder')}
+                  />
+                </div>
                 <div className="mt-2 flex items-center gap-2">
                   <button
                     onClick={() => actions.onGenerateFirstLastFrame(
@@ -173,6 +235,7 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
                     />
                   </div>
                 </div>
+                </>
               )
             })() : (
               <>
@@ -237,7 +300,6 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
                     panelId={panel.panelId}
                     currentVideoUrl={panel.videoUrl || ''}
                     videoHistory={panelVideoHistory}
-                    t={t}
                   />
                 )}
 
@@ -441,167 +503,6 @@ function CoarseGroupVideoHistoryDropdown({
                     className="glass-btn-base glass-btn-danger rounded-md px-2 py-1 text-xs disabled:opacity-60"
                     disabled={isSelecting || isDeleting}
                     onClick={() => handleDeleteHistoryVideo(entry.videoUrl)}
-                    title={t('panelCard.deleteHistoryVideo')}
-                  >
-                    {isDeleting ? (
-                      <span>{t('panelCard.deleting')}</span>
-                    ) : (
-                      <AppIcon name="trashAlt" className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function HistoryVideoThumbnail({ videoUrl, title }: { videoUrl: string; title: string }) {
-  const handleSeekToFirstFrame = useCallback((event: React.SyntheticEvent<HTMLVideoElement>) => {
-    const el = event.currentTarget
-    try {
-      if (el.currentTime === 0 && el.duration > 0) {
-        el.currentTime = Math.min(0.1, el.duration / 10)
-      }
-    } catch {
-      // ignore seek errors
-    }
-  }, [])
-
-  const handleOpenPreview = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      window.open(videoUrl, '_blank', 'noopener,noreferrer')
-    }
-  }, [videoUrl])
-
-  return (
-    <button
-      type="button"
-      onClick={handleOpenPreview}
-      title={title}
-      className="group relative h-16 w-[112px] overflow-hidden rounded border border-[var(--glass-stroke-base)] bg-black"
-    >
-      <video
-        src={videoUrl}
-        className="h-full w-full object-cover pointer-events-none"
-        muted
-        playsInline
-        preload="metadata"
-        onLoadedMetadata={handleSeekToFirstFrame}
-      />
-      <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100">
-        <AppIcon name="play" className="h-5 w-5 text-white" />
-      </span>
-    </button>
-  )
-}
-
-function PanelVideoHistoryDropdown({
-  projectId,
-  panelId,
-  currentVideoUrl,
-  videoHistory,
-  t,
-}: {
-  projectId: string
-  panelId: string
-  currentVideoUrl: string
-  videoHistory: NonNullable<VideoPanelRuntime['panel']['videoHistory']>
-  t: (key: string, values?: Record<string, number>) => string
-}) {
-  const [open, setOpen] = useState(false)
-  const selectMutation = useSelectProjectPanelHistoryVideo(projectId)
-  const deleteMutation = useDeleteProjectPanelHistoryVideo(projectId)
-  const [selectingUrl, setSelectingUrl] = useState<string | null>(null)
-  const [deletingUrl, setDeletingUrl] = useState<string | null>(null)
-
-  const formatHistoryTime = useCallback((value: string) => {
-    if (!value) return ''
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return ''
-    return date.toLocaleString()
-  }, [])
-
-  const handleSelect = useCallback(async (videoUrl: string) => {
-    setSelectingUrl(videoUrl)
-    try {
-      await selectMutation.mutateAsync({ panelId, videoUrl })
-    } finally {
-      setSelectingUrl(null)
-    }
-  }, [panelId, selectMutation])
-
-  const handleDelete = useCallback(async (videoUrl: string) => {
-    if (typeof window !== 'undefined' && !window.confirm(t('panelCard.deleteHistoryVideo'))) return
-    setDeletingUrl(videoUrl)
-    try {
-      await deleteMutation.mutateAsync({ panelId, videoUrl })
-    } finally {
-      setDeletingUrl(null)
-    }
-  }, [deleteMutation, panelId, t])
-
-  return (
-    <div className="relative mt-2">
-      <button
-        type="button"
-        className="flex h-8 w-full items-center justify-between rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)] px-2 text-xs text-[var(--glass-text-secondary)] hover:bg-[var(--glass-bg-surface-hover)]"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span>{t('panelCard.videoHistoryCount', { count: videoHistory.length })}</span>
-        <AppIcon
-          name="chevronDown"
-          className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open && (
-        <div className="absolute left-0 right-0 top-9 z-20 max-h-80 overflow-y-auto rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-surface)] p-2 shadow-xl">
-          <div className="grid gap-2">
-            {[...videoHistory].reverse().map((entry, historyIndex) => {
-              const isCurrent = entry.videoUrl === currentVideoUrl
-              const isSelecting = selectingUrl === entry.videoUrl
-              const isDeleting = deletingUrl === entry.videoUrl
-              return (
-                <div
-                  key={`${entry.videoUrl}-${historyIndex}`}
-                  className={`grid grid-cols-[112px_1fr_auto_auto] items-center gap-2 rounded-md border p-1.5 ${
-                    isCurrent
-                      ? 'border-[var(--glass-accent-from)] bg-[var(--glass-bg-muted)]'
-                      : 'border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)]/60'
-                  }`}
-                >
-                  <HistoryVideoThumbnail
-                    videoUrl={entry.videoUrl}
-                    title={isCurrent ? t('panelCard.currentVideo') : t('panelCard.historyVideo', { number: videoHistory.length - historyIndex })}
-                  />
-                  <div className="min-w-0">
-                    <div className="truncate text-xs text-[var(--glass-text-primary)]">
-                      {isCurrent ? t('panelCard.currentVideo') : t('panelCard.historyVideo', { number: videoHistory.length - historyIndex })}
-                    </div>
-                    <div className="truncate text-[11px] text-[var(--glass-text-tertiary)]">
-                      {formatHistoryTime(entry.generatedAt)}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="glass-btn-base glass-btn-soft rounded-md px-2 py-1 text-xs disabled:opacity-60"
-                    disabled={isCurrent || isSelecting || isDeleting}
-                    onClick={() => handleSelect(entry.videoUrl)}
-                  >
-                    {isCurrent ? (
-                      <AppIcon name="check" className="h-3.5 w-3.5" />
-                    ) : (
-                      <span>{isSelecting ? t('panelCard.saving') : t('panelCard.useHistoryVideo')}</span>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className="glass-btn-base glass-btn-danger rounded-md px-2 py-1 text-xs disabled:opacity-60"
-                    disabled={isCurrent || isSelecting || isDeleting}
-                    onClick={() => handleDelete(entry.videoUrl)}
                     title={t('panelCard.deleteHistoryVideo')}
                   >
                     {isDeleting ? (

@@ -48,6 +48,32 @@ export function useUpdateProjectPanelLink(projectId: string) {
 }
 
 /**
+ * 更新两张图组合分镜的「首尾帧模式」开关
+ */
+export function useUpdateProjectPanelFirstLastFrameMode(projectId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: {
+      storyboardId: string
+      panelIndex: number
+      enabled: boolean
+    }) =>
+      await requestJsonWithError(
+        `/api/novel-promotion/${projectId}/panel-flframe-mode`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        },
+        '保存首尾帧模式失败',
+      ),
+    onSettled: () => {
+      invalidateQueryTemplates(queryClient, [queryKeys.projectData(projectId)])
+    },
+  })
+}
+
+/**
  * 更新 Panel 视频提示词
  */
 export function useUpdateProjectPanelVideoPrompt(projectId: string) {

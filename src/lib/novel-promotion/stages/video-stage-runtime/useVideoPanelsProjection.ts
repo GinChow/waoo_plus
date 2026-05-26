@@ -200,6 +200,7 @@ export function useVideoPanelsProjection({
           },
           imageUrl: panel.imageUrl || undefined,
           firstLastFramePrompt: panel.firstLastFramePrompt || undefined,
+          firstLastFrameEnabled: panel.firstLastFrameEnabled ?? undefined,
           videoUrl: coarseGroupState?.videoUrl || panel.videoUrl || undefined,
           videoGenerationMode: panel.videoGenerationMode || undefined,
           videoTaskRunning: panelVideoState?.phase === 'queued' || panelVideoState?.phase === 'processing',

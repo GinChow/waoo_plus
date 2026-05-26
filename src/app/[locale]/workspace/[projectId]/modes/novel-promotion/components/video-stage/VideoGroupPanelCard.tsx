@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { GlassSurface } from '@/components/ui/primitives'
 import { MediaImageWithLoading } from '@/components/media/MediaImageWithLoading'
 import { AppIcon } from '@/components/ui/icons'
+import { useUpdateProjectPanelFirstLastFrameMode } from '@/lib/query/hooks'
 import type {
   FirstLastFrameParams,
   GroupVideoGenerationOptions,
@@ -14,6 +15,7 @@ import type {
   VideoPanel,
 } from '../video'
 import VideoGroupOmniModal from './VideoGroupOmniModal'
+import { PanelVideoHistoryDropdown } from '../video/panel-card/PanelVideoHistoryDropdown'
 
 // kling-omni-video multi_prompt 最多支持 6 个分镜
 const MAX_OMNI_SHOTS = 6
@@ -22,6 +24,7 @@ const MAX_OMNI_SHOTS = 6
 const OMNI_MODEL_ID = 'kling-v3-omni'
 
 interface VideoGroupPanelCardProps {
+  projectId: string
   groupPanels: VideoPanel[]
   groupStartGlobalNumber: number
   videoRatio: string
@@ -42,6 +45,7 @@ interface VideoGroupPanelCardProps {
 }
 
 export default function VideoGroupPanelCard({
+  projectId,
   groupPanels,
   groupStartGlobalNumber,
   videoRatio,
@@ -63,7 +67,33 @@ export default function VideoGroupPanelCard({
 
   const [modalOpen, setModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [groupVideoPlaying, setGroupVideoPlaying] = useState(false)
+  const groupVideoRef = useRef<HTMLVideoElement>(null)
   const firstPanel = groupPanels[0]
+  // 组合（omni）合成视频写入组内首个面板的 videoUrl
+  const groupVideoUrl = firstPanel?.videoUrl
+
+  // 仅两张图组合支持「首尾帧 / 多镜头」模式切换（与分镜面板共享同一持久化标记）
+  const isTwoPanelGroup = groupPanels.length === 2
+  const flModeMutation = useUpdateProjectPanelFirstLastFrameMode(projectId)
+  const [flModeEnabled, setFlModeEnabled] = useState(firstPanel?.firstLastFrameEnabled ?? true)
+  const handleToggleFlMode = () => {
+    if (!firstPanel) return
+    const next = !flModeEnabled
+    setFlModeEnabled(next)
+    flModeMutation.mutate({
+      storyboardId: firstPanel.storyboardId,
+      panelIndex: firstPanel.panelIndex,
+      enabled: next,
+    })
+  }
+
+  const handlePlayGroupVideo = () => {
+    setGroupVideoPlaying(true)
+    setTimeout(() => {
+      groupVideoRef.current?.play().catch(() => {})
+    }, 100)
+  }
   const isGroupVideoRunning = !!firstPanel?.videoTaskRunning
   const tooManyShots = groupPanels.length > MAX_OMNI_SHOTS
   const missingImage = groupPanels.some((panel) => !panel.imageUrl)
@@ -73,7 +103,7 @@ export default function VideoGroupPanelCard({
   const generateDisabled =
     tooManyShots || missingImage || !omniModelEnabled || isGroupVideoRunning || submitting
 
-  const handleConfirmGenerate = async (multiPrompt: MultiPromptShot[], shotTotalDuration: number) => {
+  const handleConfirmGenerate = async (multiPrompt: MultiPromptShot[], shotTotalDuration: number, fusedPrompt?: string) => {
     if (!firstPanel || !omniModel) return
     setSubmitting(true)
     try {
@@ -83,6 +113,10 @@ export default function VideoGroupPanelCard({
         multiPrompt,
         sound: 'on',
         groupPanelIndices: groupPanels.map((panel) => panel.panelIndex),
+        // 两张图组合时携带模式标记：首尾帧 or 多镜头
+        ...(isTwoPanelGroup ? { firstLastFrame: flModeEnabled } : {}),
+        // 首尾帧模式：携带融合后的单条提示词，后端优先采用
+        ...(isTwoPanelGroup && flModeEnabled && fusedPrompt ? { firstLastFramePrompt: fusedPrompt } : {}),
       }
       // kling-v3-omni 的能力字段（duration / generateAudio / resolution）必须齐全，
       // 否则 API 的 requireAllFields 校验会因缺省值而失败；generationMode 由 API 自动补。
@@ -170,6 +204,26 @@ export default function VideoGroupPanelCard({
         </div>
       </div>
 
+      {/* 两张图组合：首尾帧 / 多镜头 模式切换 */}
+      {isTwoPanelGroup && (
+        <div className="flex items-center justify-between gap-2 border-t border-[var(--glass-stroke-base)] px-2.5 pt-2">
+          <span className="text-[11px] font-medium text-[var(--glass-text-secondary)] inline-flex items-center gap-1">
+            <AppIcon name="unplug" className="w-3 h-3" />
+            {flModeEnabled ? t('firstLastFrame.modeFirstLast') : t('firstLastFrame.modeMultiShot')}
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={flModeEnabled}
+            onClick={handleToggleFlMode}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${flModeEnabled ? 'bg-[var(--glass-accent-from)]' : 'bg-[var(--glass-stroke-base)]'}`}
+            title={t('firstLastFrame.modeLabel')}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${flModeEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+      )}
+
       {/* 底部信息条 + 操作 */}
       <div className="flex items-center justify-between gap-2 p-2.5">
         <div className="min-w-0 text-xs text-[var(--glass-text-secondary)]">
@@ -220,12 +274,65 @@ export default function VideoGroupPanelCard({
         </div>
       </div>
 
+      {/* 组合视频播放区：合成完成后直接在卡片下方播放，无需展开 */}
+      {groupVideoUrl && (
+        <div className="border-t border-[var(--glass-stroke-base)] p-2.5">
+          <div
+            className="relative w-full overflow-hidden rounded-lg bg-black"
+            style={{ aspectRatio: cssAspectRatio }}
+          >
+            {groupVideoPlaying ? (
+              <video
+                ref={groupVideoRef}
+                key={groupVideoUrl}
+                src={groupVideoUrl}
+                controls
+                playsInline
+                className="h-full w-full object-contain bg-black"
+                onEnded={() => setGroupVideoPlaying(false)}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={handlePlayGroupVideo}
+                className="group relative block h-full w-full"
+                title={t('panelGroup.subtitle')}
+              >
+                {firstPanel?.imageUrl ? (
+                  <MediaImageWithLoading
+                    src={firstPanel.imageUrl}
+                    alt="group-video"
+                    containerClassName="h-full w-full"
+                    className="h-full w-full object-cover"
+                  />
+                ) : null}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/35 transition-colors group-hover:bg-black/45">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--glass-bg-surface-strong)] shadow-lg transition-transform group-hover:scale-110">
+                    <AppIcon name="play" className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+              </button>
+            )}
+          </div>
+          {firstPanel?.panelId && (firstPanel?.videoHistory?.length ?? 0) > 0 && (
+            <PanelVideoHistoryDropdown
+              projectId={projectId}
+              panelId={firstPanel.panelId}
+              currentVideoUrl={groupVideoUrl}
+              videoHistory={firstPanel.videoHistory ?? []}
+            />
+          )}
+        </div>
+      )}
+
       {modalOpen && firstPanel && (
         <VideoGroupOmniModal
           groupPanels={groupPanels}
           startNumber={startNumber}
           videoRatio={videoRatio}
           submitting={submitting}
+          firstLastFrameMode={isTwoPanelGroup && flModeEnabled}
+          initialFirstLastFramePrompt={firstPanel?.firstLastFramePrompt}
           onClose={() => { if (!submitting) setModalOpen(false) }}
           onConfirm={handleConfirmGenerate}
         />

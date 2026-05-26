@@ -70,6 +70,7 @@
     "aiModifyLocation": "Location description modify",
     "aiModifyProp": "Prop description modify",
     "aiModifyShotPrompt": "Shot prompt modify",
+    "aiFirstLastFramePrompt": "First/last frame prompt compose",
     "analyzeShotVariants": "Shot variant analysis",
     "aiCreateCharacter": "Project character design",
     "aiCreateLocation": "Project location design",

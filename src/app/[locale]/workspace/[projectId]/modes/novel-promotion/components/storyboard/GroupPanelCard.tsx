@@ -1,15 +1,20 @@
 'use client'
 
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { GlassSurface } from '@/components/ui/primitives'
 import { MediaImageWithLoading } from '@/components/media/MediaImageWithLoading'
 import { AppIcon } from '@/components/ui/icons'
+import { useUpdateProjectPanelFirstLastFrameMode } from '@/lib/query/hooks'
 import type { StoryboardPanel } from './hooks/useStoryboardState'
+import FirstLastFramePromptSection from './FirstLastFramePromptSection'
 
 interface GroupPanelCardProps {
   groupPanels: StoryboardPanel[]
   groupStartGlobalNumber: number
   videoRatio: string
+  projectId?: string  // 用于首尾帧提示词 AI 合成与持久化
+  storyboardId?: string
   onExpand: () => void
   onUnlinkAll: () => void
   onPreviewImage?: (url: string) => void
@@ -23,6 +28,8 @@ export default function GroupPanelCard({
   groupPanels,
   groupStartGlobalNumber,
   videoRatio,
+  projectId,
+  storyboardId,
   onExpand,
   onUnlinkAll,
   onPreviewImage,
@@ -36,6 +43,19 @@ export default function GroupPanelCard({
   const startNumber = groupStartGlobalNumber
   const endNumber = groupStartGlobalNumber + groupPanels.length - 1
   const generatedImageCount = groupPanels.filter((panel) => panel.imageUrl).length
+  // 首尾帧：组内第一个分镜作为首帧，最后一个分镜作为尾帧
+  const firstPanel = groupPanels[0]
+  const lastPanel = groupPanels[groupPanels.length - 1]
+  // 仅两张图组合支持「首尾帧 / 多镜头」模式切换
+  const isTwoPanelGroup = groupPanels.length === 2
+  const flModeMutation = useUpdateProjectPanelFirstLastFrameMode(projectId || '')
+  const [flModeEnabled, setFlModeEnabled] = useState(firstPanel?.first_last_frame_enabled ?? true)
+  const handleToggleFlMode = () => {
+    if (!projectId || !storyboardId || !firstPanel) return
+    const next = !flModeEnabled
+    setFlModeEnabled(next)
+    flModeMutation.mutate({ storyboardId, panelIndex: firstPanel.panelIndex, enabled: next })
+  }
 
   return (
     <GlassSurface
@@ -160,6 +180,43 @@ export default function GroupPanelCard({
           </button>
         </div>
       </div>
+
+      {/* 两张图组合：支持「首尾帧 / 多镜头」模式切换 */}
+      {isTwoPanelGroup && projectId && storyboardId && firstPanel?.id && (
+        <div className="px-2.5 pb-2.5 space-y-2">
+          <div className="flex items-center justify-between rounded-lg bg-[var(--glass-bg-muted)] px-2 py-1.5">
+            <span className="text-xs font-medium text-[var(--glass-text-secondary)] inline-flex items-center gap-1">
+              <AppIcon name="unplug" className="w-3.5 h-3.5" />
+              {t('firstLastFrame.modeLabel')}
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={flModeEnabled}
+              onClick={handleToggleFlMode}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${flModeEnabled ? 'bg-[var(--glass-accent-from)]' : 'bg-[var(--glass-stroke-base)]'}`}
+              title={flModeEnabled ? t('firstLastFrame.modeFirstLast') : t('firstLastFrame.modeMultiShot')}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${flModeEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+          {flModeEnabled ? (
+            <FirstLastFramePromptSection
+              projectId={projectId}
+              storyboardId={storyboardId}
+              panelIndex={firstPanel.panelIndex}
+              panelId={firstPanel.id}
+              firstVideoPrompt={firstPanel.video_prompt}
+              lastVideoPrompt={lastPanel?.video_prompt}
+              initialPrompt={firstPanel.first_frame_image_prompt || ''}
+            />
+          ) : (
+            <div className="text-[11px] text-[var(--glass-text-tertiary)] px-1">
+              {t('firstLastFrame.multiShotHint')}
+            </div>
+          )}
+        </div>
+      )}
     </GlassSurface>
   )
 }

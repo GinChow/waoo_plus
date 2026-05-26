@@ -211,6 +211,7 @@ model NovelPromotionPanel {
   sceneType         String?
   candidateImages   String?
   linkedToNextPanel Boolean                   @default(false)
+  firstLastFrameEnabled Boolean               @default(true)
   lipSyncTaskId     String?
   lipSyncVideoUrl   String?
   lipSyncVideoMediaId String?

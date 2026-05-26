@@ -65,6 +65,7 @@ export const TASK_TYPE = {
   AI_MODIFY_LOCATION: 'ai_modify_location',
   AI_MODIFY_PROP: 'ai_modify_prop',
   AI_MODIFY_SHOT_PROMPT: 'ai_modify_shot_prompt',
+  AI_FIRST_LAST_FRAME_PROMPT: 'ai_first_last_frame_prompt',
   ANALYZE_SHOT_VARIANTS: 'analyze_shot_variants',
   AI_CREATE_CHARACTER: 'ai_create_character',
   AI_CREATE_LOCATION: 'ai_create_location',

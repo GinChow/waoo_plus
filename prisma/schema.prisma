@@ -217,6 +217,7 @@ model NovelPromotionPanel {
   sceneType         String?
   candidateImages   String?                   @db.Text
   linkedToNextPanel Boolean                   @default(false)
+  firstLastFrameEnabled Boolean               @default(true) // 两张图组合时：true=首尾帧模式，false=多镜头模式
   lipSyncTaskId     String?
   lipSyncVideoUrl   String?
   lipSyncVideoMediaId String?

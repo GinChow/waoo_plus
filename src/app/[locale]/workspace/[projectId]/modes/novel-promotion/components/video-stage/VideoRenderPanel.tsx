@@ -297,6 +297,7 @@ export default function VideoRenderPanel({
           return [(
             <div key={group.groupKey} className="relative h-full">
               <VideoGroupPanelCard
+                projectId={projectId}
                 groupPanels={groupPanels}
                 groupStartGlobalNumber={groupStartGlobalNumber}
                 videoRatio={videoRatio}

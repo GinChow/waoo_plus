@@ -693,6 +693,7 @@ async function processTextTask(job: Job<TaskJobData>) {
     case TASK_TYPE.AI_MODIFY_LOCATION:
     case TASK_TYPE.AI_MODIFY_PROP:
     case TASK_TYPE.AI_MODIFY_SHOT_PROMPT:
+    case TASK_TYPE.AI_FIRST_LAST_FRAME_PROMPT:
     case TASK_TYPE.ANALYZE_SHOT_VARIANTS:
       return await handleShotAITask(job)
     case TASK_TYPE.CHARACTER_PROFILE_CONFIRM:

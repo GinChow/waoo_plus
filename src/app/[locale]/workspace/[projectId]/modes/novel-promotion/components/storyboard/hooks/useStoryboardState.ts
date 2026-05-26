@@ -36,6 +36,7 @@ export interface StoryboardPanel {
   actingNotes?: string | null       // 演技指导数据JSON
   imageTaskRunning?: boolean  // 任务态运行状态（由 tasks 派生）
   linkedToNextPanel?: boolean  // 是否与下一个相邻分镜链接（组合生成视频）
+  first_last_frame_enabled?: boolean  // 两张图组合时：true=首尾帧模式，false=多镜头模式
 }
 
 function parseParentGroupByPanelNumber(raw: string | null): Map<number, number> {
@@ -199,6 +200,7 @@ export function useStoryboardState({
         actingNotes: p.actingNotes,
         imageTaskRunning: p.imageTaskRunning || false,
         linkedToNextPanel: p.linkedToNextPanel ?? false,
+        first_last_frame_enabled: p.firstLastFrameEnabled ?? undefined,
       }
     })
   }

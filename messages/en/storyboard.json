@@ -491,6 +491,17 @@
     },
     "firstLastFrame": {
         "placeholder": "Enter first/last frame video prompt...",
-        "modelTitle": "First/Last Frame Model"
+        "modelTitle": "First/Last Frame Model",
+        "label": "First/Last Frame Video Prompt",
+        "aiGenerate": "AI Compose Prompt",
+        "aiGenerating": "Composing...",
+        "userInstructionPlaceholder": "Optional: enter an instruction to rewrite by; leave empty to fuse both shots' prompts",
+        "modeLabel": "First/Last Frame Mode",
+        "modeFirstLast": "First/Last Frame Mode",
+        "modeMultiShot": "Multi-shot Mode",
+        "multiShotHint": "Multi-shot mode: the two shots are synthesized together as multi-shot, without first/last frame.",
+        "firstFrame": "First Frame",
+        "lastFrame": "Last Frame",
+        "combinedPromptLabel": "Fused Video Prompt"
     }
 }

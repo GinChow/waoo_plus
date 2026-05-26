@@ -174,6 +174,10 @@ export const PROMPT_CATALOG: Record<PromptId, PromptCatalogEntry> = {
     pathStem: 'novel-promotion/episode_split',
     variableKeys: ['CONTENT'],
   },
+  [PROMPT_IDS.NP_FIRST_LAST_FRAME_PROMPT]: {
+    pathStem: 'novel-promotion/first_last_frame_prompt',
+    variableKeys: ['first_video_prompt', 'last_video_prompt', 'user_input'],
+  },
   [PROMPT_IDS.NP_IMAGE_PROMPT_MODIFY]: {
     pathStem: 'novel-promotion/image_prompt_modify',
     variableKeys: ['prompt_input', 'user_input', 'video_prompt_input'],

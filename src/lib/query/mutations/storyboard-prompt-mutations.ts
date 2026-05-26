@@ -44,6 +44,34 @@ export function useAiModifyProjectShotPrompt(projectId: string) {
 }
 
 /**
+ * 首尾帧组合分镜：结合相邻两个分镜的视频提示词，AI 合成首尾帧视频提示词
+ */
+export function useAiFirstLastFramePrompt(projectId: string) {
+    return useMutation({
+        mutationFn: async (payload: {
+            firstVideoPrompt: string
+            lastVideoPrompt: string
+            userInput?: string
+            panelId?: string
+            episodeId?: string
+        }) => {
+            const response = await requestTaskResponseWithError(
+                `/api/novel-promotion/${projectId}/ai-first-last-frame-prompt`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                },
+                'Failed to generate first-last frame prompt',
+            )
+            return await resolveTaskResponse<{
+                firstLastFramePrompt: string
+            }>(response)
+        },
+    })
+}
+
+/**
  * 设计音色（项目）
  */
 

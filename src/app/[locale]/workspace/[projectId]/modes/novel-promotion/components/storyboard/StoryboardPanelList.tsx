@@ -17,6 +17,7 @@ interface PanelGroup {
 }
 
 interface StoryboardPanelListProps {
+  projectId: string
   storyboardId: string
   textPanels: StoryboardPanel[]
   storyboardStartIndex: number
@@ -62,6 +63,7 @@ interface StoryboardPanelListProps {
 }
 
 export default function StoryboardPanelList({
+  projectId,
   storyboardId,
   textPanels,
   storyboardStartIndex,
@@ -296,6 +298,8 @@ export default function StoryboardPanelList({
                 groupPanels={groupPanels}
                 groupStartGlobalNumber={groupStartGlobalNumber}
                 videoRatio={videoRatio}
+                projectId={projectId}
+                storyboardId={storyboardId}
                 onExpand={() => toggleExpand(group.groupKey)}
                 onUnlinkAll={() => { void handleUnlinkGroup(group) }}
                 onPreviewImage={onPreviewImage}
