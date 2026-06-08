@@ -44,6 +44,8 @@
     "historyVideo": "历史视频 {number}",
     "useHistoryVideo": "使用",
     "deleteHistoryVideo": "删除历史视频",
+    "deleteCurrentVideo": "删除当前视频",
+    "deleteCurrentVideoConfirm": "确定删除当前视频吗？",
     "saving": "保存中...",
     "deleting": "删除中",
     "selectModel": "选择视频模型",

@@ -176,7 +176,7 @@ export function PanelVideoHistoryDropdown({
                   <button
                     type="button"
                     className="glass-btn-base glass-btn-danger rounded-md px-2 py-1 text-xs disabled:opacity-60"
-                    disabled={isCurrent || isSelecting || isDeleting}
+                    disabled={isSelecting || isDeleting}
                     onClick={() => handleDelete(entry.videoUrl)}
                     title={t('panelCard.deleteHistoryVideo')}
                   >

@@ -214,6 +214,7 @@ export function addSignedUrlsToStoryboard(storyboard: StoryboardLike) {
       return {
         ...dbPanel,
         imageUrl: dbPanel.imageUrl ? keyToSignedUrl(dbPanel.imageUrl) : null,
+        videoStorageKey: dbPanel.videoUrl,
         sketchImageUrl: keyToSignedUrl(dbPanel.sketchImageUrl),
         videoUrl: dbPanel.videoUrl && !dbPanel.videoUrl.startsWith('http')
           ? getSignedUrl(dbPanel.videoUrl, 7200)

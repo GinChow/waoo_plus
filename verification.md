@@ -88,3 +88,27 @@ Implemented and verified coarse shot video history in the video render panel, mi
 ### Residual Notes
 
 - `npm run test:unit:all -- tests/unit/novel-promotion/coarse-group-image-state.test.ts` ran the whole unit suite and failed on unrelated existing assertions in prompt suffix, project global analyze mutation, and Yunwu Omni async poll tests. Related failures found during that run were fixed and verified with focused tests.
+
+## Video Panel Preview Playback Stuck
+
+Date: 2026-06-08
+Executor: Codex
+
+Fixed the video render panel preview player so native video play failures and media abort/error events reset the card back to the poster state instead of leaving the browser video element mounted with an indefinite loading spinner.
+
+### Commands
+
+- `BILLING_TEST_BOOTSTRAP=0 npx vitest run tests/unit/novel-promotion/use-panel-player.test.ts tests/unit/novel-promotion/video-panel-card-body.test.ts` passed.
+- `npm run typecheck` passed.
+- `npx eslint src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/panel-card/runtime/hooks/usePanelPlayer.ts src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/panel-card/VideoPanelCardHeader.tsx tests/unit/novel-promotion/use-panel-player.test.ts tests/unit/novel-promotion/video-panel-card-body.test.ts` passed.
+
+### Coverage
+
+- Unit coverage confirms native play failures that should reset playback are classified correctly.
+- Component-adjacent coverage confirms the existing video card body render path remains stable after adding query hook mocks.
+- TypeScript and ESLint coverage confirm the new header event handlers match the runtime shape.
+
+### Residual Notes
+
+- No browser screenshot run was executed for this UI-only playback state; local automated verification covered unit logic, type safety, and linting.
+- Direct `cross-env ... vitest` shell invocation failed because `cross-env` was not on PATH outside npm scripts; tests passed with `BILLING_TEST_BOOTSTRAP=0 npx vitest run ...`.

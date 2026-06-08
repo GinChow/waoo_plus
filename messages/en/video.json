@@ -44,6 +44,8 @@
     "historyVideo": "Historical video {number}",
     "useHistoryVideo": "Use",
     "deleteHistoryVideo": "Delete historical video",
+    "deleteCurrentVideo": "Delete current video",
+    "deleteCurrentVideoConfirm": "Delete the current video?",
     "saving": "Saving...",
     "deleting": "Deleting",
     "selectModel": "Select Video Model",

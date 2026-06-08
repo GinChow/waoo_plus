@@ -45,3 +45,14 @@ Executor: Codex
 - 工具降级：当前会话没有可调用的 `sequential-thinking`、`shrimp-task-manager`、`code-index` MCP 工具入口，因此使用 `rg`、`sed` 和本地测试替代上下文收集与任务拆分。
 - 复用 `NovelPromotionStoryboard.coarseGroupsJson` 作为粗镜头级状态源，在同一 group 内增加 `videoUrl`、`videoHistory`、`videoModel`、`videoGenerationMode`，避免新增表或并行状态。
 - 生成完成时记录粗镜头视频历史；项目数据签名/媒体附加处理视频历史；成片面板展示历史视频并支持选择/删除；新增 `storyboard-group/select-video` API；补充中英文文案和单元测试。
+
+## Task: Video Panel Preview Playback Stuck
+
+Date: 2026-06-08
+Executor: Codex
+
+- 工具降级：当前会话没有可调用的 `sequential-thinking`、`shrimp-task-manager`、`code-index`、`exa` MCP 工具入口，因此使用 `rg`、`sed`、`git diff`、本地测试和类型检查替代。
+- 使用 `rg` 定位成片面板播放器状态，确认主路径为 `usePanelPlayer` 控制 `isPlaying`，`VideoPanelCardHeader` 根据该状态在封面和原生 `<video>` 之间切换。
+- 根因判断：播放失败、媒体 error/abort 或 ref 不存在时没有复位 `isPlaying`，导致原生视频元素保持挂载并持续显示浏览器加载转圈。
+- 实施：在 `usePanelPlayer` 中增加播放失败复位逻辑、统一退出处理和媒体错误处理；在 `VideoPanelCardHeader` 绑定 `onEnded`、`onError`、`onAbort`。
+- 测试：新增 `tests/unit/novel-promotion/use-panel-player.test.ts`，并补齐相邻 `video-panel-card-body` 测试的 query hook mock。

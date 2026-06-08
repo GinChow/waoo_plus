@@ -84,3 +84,21 @@ Executor: Codex
 ### Noted
 
 - `npm run test:unit:all -- tests/unit/novel-promotion/coarse-group-image-state.test.ts` runs the whole `tests/unit` suite because the script includes a fixed `tests/unit` argument. The run had unrelated existing failures in prompt suffix, project global analyze mutation, and Yunwu Omni async poll tests; the initially exposed related worker/card issues were fixed and passed in the focused rerun.
+
+## Video Panel Preview Playback Stuck
+
+Date: 2026-06-08
+Executor: Codex
+
+### Passed
+
+- `BILLING_TEST_BOOTSTRAP=0 npx vitest run tests/unit/novel-promotion/use-panel-player.test.ts tests/unit/novel-promotion/video-panel-card-body.test.ts`
+  - 2 files passed, 3 tests passed.
+- `npm run typecheck`
+  - TypeScript check passed.
+- `npx eslint src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/panel-card/runtime/hooks/usePanelPlayer.ts src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/panel-card/VideoPanelCardHeader.tsx tests/unit/novel-promotion/use-panel-player.test.ts tests/unit/novel-promotion/video-panel-card-body.test.ts`
+  - ESLint passed for touched implementation and test files.
+
+### Noted
+
+- `cross-env BILLING_TEST_BOOTSTRAP=0 vitest run tests/unit/novel-promotion/use-panel-player.test.ts tests/unit/novel-promotion/video-panel-card-body.test.ts` failed because direct shell invocation could not find `cross-env`; the same focused tests passed through `npx vitest` with the environment variable set directly.

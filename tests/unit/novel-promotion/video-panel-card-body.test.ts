@@ -16,6 +16,21 @@ vi.mock('@/components/ui/icons', () => ({
   AppIcon: ({ name }: { name: string }) => React.createElement('span', null, name),
 }))
 
+vi.mock('@/lib/query/hooks', () => ({
+  useAiFirstLastFramePrompt: () => ({
+    mutateAsync: vi.fn(async () => ({ firstLastFramePrompt: '' })),
+  }),
+  useDeleteProjectPanelHistoryVideo: () => ({
+    mutateAsync: vi.fn(async () => undefined),
+  }),
+  useDeleteProjectStoryboardGroupHistoryVideo: () => ({
+    mutateAsync: vi.fn(async () => undefined),
+  }),
+  useSelectProjectStoryboardGroupVideo: () => ({
+    mutateAsync: vi.fn(async () => ({ videoUrl: '' })),
+  }),
+}))
+
 function createRuntime(overrides: Partial<VideoPanelRuntime> = {}): VideoPanelRuntime {
   const translate = (key: string, values?: Record<string, unknown>) => {
     if (key === 'firstLastFrame.asLastFrameFor') {
@@ -31,6 +46,7 @@ function createRuntime(overrides: Partial<VideoPanelRuntime> = {}): VideoPanelRu
     if (key === 'panelCard.clickToEditPrompt') return '点击编辑提示词...'
     if (key === 'panelCard.selectModel') return '选择模型'
     if (key === 'panelCard.generateVideo') return '生成视频'
+    if (key === 'panelCard.deleteCurrentVideo') return '删除当前视频'
     if (key === 'panelCard.unknownShotType') return '未知镜头'
     if (key === 'stage.hasSynced') return '已生成'
     if (key === 'promptModal.duration') return '秒'
@@ -163,5 +179,29 @@ describe('VideoPanelCardBody', () => {
     expect(markup).toContain('作为镜头 4 的首帧')
     expect(markup).toContain('视频提示词')
     expect(markup).toContain('生成首尾帧视频')
+  })
+
+  it('renders a current video delete action even without video history', () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(VideoPanelCardBody, {
+        runtime: createRuntime({
+          panel: {
+            ...createRuntime().panel,
+            videoUrl: 'https://example.com/current.mp4',
+            videoHistory: [],
+          },
+          layout: {
+            ...createRuntime().layout,
+            isLinked: false,
+            isLastFrame: false,
+            nextPanel: null,
+            prevPanel: null,
+          },
+        }),
+      }),
+    )
+
+    expect(markup).toContain('title="删除当前视频"')
+    expect(markup).not.toContain('历史视频')
   })
 })

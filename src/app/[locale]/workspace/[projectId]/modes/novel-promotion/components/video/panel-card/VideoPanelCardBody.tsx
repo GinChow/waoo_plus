@@ -6,6 +6,7 @@ import { AppIcon } from '@/components/ui/icons'
 import { logInfo as _ulogInfo } from '@/lib/logging/core'
 import {
   useAiFirstLastFramePrompt,
+  useDeleteProjectPanelHistoryVideo,
   useDeleteProjectStoryboardGroupHistoryVideo,
   useSelectProjectStoryboardGroupVideo,
 } from '@/lib/query/hooks'
@@ -68,6 +69,9 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
   const videoHistory = panel.coarseGroupVideoHistory || []
   const panelVideoHistory = panel.videoHistory || []
   const isCoarseGroupPanel = !!panel.videoTargetGroupNumber
+  const deletePanelVideoMutation = useDeleteProjectPanelHistoryVideo(projectId, episodeId)
+  const deleteGroupVideoMutation = useDeleteProjectStoryboardGroupHistoryVideo(projectId, episodeId)
+  const [isDeletingCurrentVideo, setIsDeletingCurrentVideo] = useState(false)
 
   // 首尾帧组合分镜：结合相邻两个分镜的视频提示词，AI 合成首尾帧视频提示词
   const aiFlPromptMutation = useAiFirstLastFramePrompt(projectId)
@@ -91,6 +95,43 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
       setIsAiGeneratingFlPrompt(false)
     }
   }, [actions, aiFlPromptMutation, flUserInstruction, layout.nextPanel, panel.panelId, panel.textPanel?.video_prompt, panelKey, promptEditor.localPrompt])
+
+  const handleDeleteCurrentVideo = useCallback(async () => {
+    if (!panel.videoUrl) return
+    if (typeof window !== 'undefined' && !window.confirm(t('panelCard.deleteCurrentVideoConfirm'))) return
+    const deleteTargetVideoUrl = panel.videoStorageKey || panel.videoUrl
+    setIsDeletingCurrentVideo(true)
+    try {
+      if (isCoarseGroupPanel) {
+        if (!panel.videoTargetGroupNumber) return
+        await deleteGroupVideoMutation.mutateAsync({
+          storyboardId: panel.storyboardId,
+          groupNumber: panel.videoTargetGroupNumber,
+          videoUrl: deleteTargetVideoUrl,
+          clearCurrent: true,
+        })
+        return
+      }
+      if (!panel.panelId) return
+      await deletePanelVideoMutation.mutateAsync({
+        panelId: panel.panelId,
+        videoUrl: deleteTargetVideoUrl,
+        clearCurrent: true,
+      })
+    } finally {
+      setIsDeletingCurrentVideo(false)
+    }
+  }, [
+    deleteGroupVideoMutation,
+    deletePanelVideoMutation,
+    isCoarseGroupPanel,
+    panel.panelId,
+    panel.storyboardId,
+    panel.videoStorageKey,
+    panel.videoTargetGroupNumber,
+    panel.videoUrl,
+    t,
+  ])
 
   return (
     <div className="p-4 space-y-2">
@@ -224,6 +265,21 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
                   >
                     {isFirstLastFrameGenerated ? t('firstLastFrame.generated') : taskStatus.isVideoTaskRunning ? taskStatus.taskRunningVideoLabel : t('firstLastFrame.generate')}
                   </button>
+                  {panel.videoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteCurrentVideo()}
+                      disabled={taskStatus.isVideoTaskRunning || isDeletingCurrentVideo}
+                      className="glass-btn-base glass-btn-danger flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg disabled:opacity-60"
+                      title={t('panelCard.deleteCurrentVideo')}
+                    >
+                      {isDeletingCurrentVideo ? (
+                        <span className="text-xs">{t('panelCard.deleting')}</span>
+                      ) : (
+                        <AppIcon name="trashAlt" className="h-4 w-4" />
+                      )}
+                    </button>
+                  )}
                   <div className="flex-1 min-w-0">
                     <ModelCapabilityDropdown
                       compact
@@ -269,6 +325,21 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
                   >
                     {panel.videoUrl ? t('stage.hasSynced') : taskStatus.isVideoTaskRunning ? taskStatus.taskRunningVideoLabel : t('panelCard.generateVideo')}
                   </button>
+                  {panel.videoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteCurrentVideo()}
+                      disabled={taskStatus.isVideoTaskRunning || isDeletingCurrentVideo}
+                      className="glass-btn-base glass-btn-danger flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg disabled:opacity-60"
+                      title={t('panelCard.deleteCurrentVideo')}
+                    >
+                      {isDeletingCurrentVideo ? (
+                        <span className="text-xs">{t('panelCard.deleting')}</span>
+                      ) : (
+                        <AppIcon name="trashAlt" className="h-4 w-4" />
+                      )}
+                    </button>
+                  )}
                   <div className="flex-1 min-w-0">
                     <ModelCapabilityDropdown
                       compact

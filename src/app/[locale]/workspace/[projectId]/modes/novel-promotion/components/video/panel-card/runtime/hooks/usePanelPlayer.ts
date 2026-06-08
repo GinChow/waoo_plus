@@ -1,6 +1,10 @@
 import { logError as _ulogError, logInfo as _ulogInfo } from '@/lib/logging/core'
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 
+export function shouldResetPlaybackAfterPlayError(error: unknown): boolean {
+  return !!error
+}
+
 interface UsePanelPlayerParams {
   videoRatio: string
   traceKey?: string
@@ -53,17 +57,43 @@ export function usePanelPlayer({
       lipSyncVideoUrl: lipSyncVideoUrl || '',
       showLipSyncVideo,
     })
+    if (!currentVideoUrl) {
+      setIsPlaying(false)
+      return
+    }
     setIsPlaying(true)
     setTimeout(async () => {
-      if (!videoRef.current) return
+      if (!videoRef.current) {
+        setIsPlaying(false)
+        return
+      }
       try {
         await videoRef.current.play()
       } catch (error: unknown) {
-        if ((error as { name?: string }).name !== 'AbortError') {
+        if (shouldResetPlaybackAfterPlayError(error)) {
+          setIsPlaying(false)
+        }
+        if ((error as { name?: string } | null)?.name !== 'AbortError') {
           _ulogError('Video play error:', error)
         }
       }
     }, 100)
+  }, [currentVideoUrl, lipSyncVideoUrl, showLipSyncVideo, traceKey, videoUrl])
+
+  const handlePlaybackExit = useCallback(() => {
+    setIsPlaying(false)
+  }, [])
+
+  const handleMediaError = useCallback((eventName: string) => {
+    _ulogError('[VideoHistoryTrace][player] media playback interrupted', {
+      traceKey,
+      eventName,
+      currentVideoUrl: currentVideoUrl || '',
+      baseVideoUrl: videoUrl || '',
+      lipSyncVideoUrl: lipSyncVideoUrl || '',
+      showLipSyncVideo,
+    })
+    setIsPlaying(false)
   }, [currentVideoUrl, lipSyncVideoUrl, showLipSyncVideo, traceKey, videoUrl])
 
   return {
@@ -74,5 +104,7 @@ export function usePanelPlayer({
     videoRef,
     handlePreviewImage,
     handlePlayClick,
+    handlePlaybackExit,
+    handleMediaError,
   }
 }

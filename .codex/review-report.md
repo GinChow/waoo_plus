@@ -51,3 +51,25 @@ Overall score: 91/100
 
 - No live Yunwu API call was executed; verification used local unit tests with mocked fetch responses.
 - `check:pricing-catalog` remains blocked by an unrelated existing Ark pricing catalog mismatch.
+
+## Video Panel Preview Playback Stuck Review
+
+Date: 2026-06-08
+Reviewer: Codex
+
+Recommendation: Pass
+
+Technical score: 91/100
+Strategic score: 90/100
+Overall score: 91/100
+
+### Findings
+
+- The fix is scoped to the existing `usePanelPlayer` playback state and `VideoPanelCardHeader` native video event bindings.
+- `play()` failures now reset `isPlaying` when appropriate, so a failed native preview does not keep the card in video mode indefinitely.
+- Native media `error` and `abort` events now return the card to its poster state, matching the existing ended/source-switch behavior.
+- Focused unit tests, TypeScript, and ESLint passed.
+
+### Residual Risk
+
+- No browser-level reproduction was run in this turn, so the remaining risk is limited to browser-specific native video event timing. The implemented handlers cover the failure paths visible from the code and user screenshot.

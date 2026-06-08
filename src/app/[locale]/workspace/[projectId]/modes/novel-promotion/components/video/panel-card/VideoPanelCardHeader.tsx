@@ -43,7 +43,9 @@ export default function VideoPanelCardHeader({ runtime }: VideoPanelCardHeaderPr
           controls
           playsInline
           className="w-full h-full object-contain bg-black"
-          onEnded={() => player.setIsPlaying(false)}
+          onEnded={player.handlePlaybackExit}
+          onError={() => player.handleMediaError('error')}
+          onAbort={() => player.handleMediaError('abort')}
         />
       ) : hasVisibleBaseVideo ? (
         <div

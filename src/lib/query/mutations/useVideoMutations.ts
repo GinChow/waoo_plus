@@ -23,7 +23,7 @@ function readMutationVideoUrl(data: unknown, fallback: string): string {
 
 function patchEpisodeCoarseGroupVideo(
   previous: unknown,
-  params: { storyboardId: string; groupNumber: number; videoUrl: string },
+  params: { storyboardId: string; groupNumber: number; videoUrl: string | null },
 ): unknown {
   if (!previous || typeof previous !== 'object' || Array.isArray(previous)) {
     _ulogWarn('[VideoHistoryTrace][cache patch group] skip: invalid episode cache', {
@@ -93,7 +93,7 @@ function patchEpisodeCoarseGroupVideo(
 
 function patchEpisodePanelVideo(
   previous: unknown,
-  params: { panelId: string; videoUrl: string },
+  params: { panelId: string; videoUrl: string | null },
 ): unknown {
   if (!previous || typeof previous !== 'object' || Array.isArray(previous)) return previous
   const episode = previous as EpisodeCache
@@ -358,7 +358,7 @@ export function useDeleteProjectStoryboardGroupHistoryVideo(projectId: string, e
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (payload: { storyboardId: string; groupNumber: number; videoUrl: string }) => {
+    mutationFn: async (payload: { storyboardId: string; groupNumber: number; videoUrl: string; clearCurrent?: boolean }) => {
       const res = await apiFetch(`/api/novel-promotion/${projectId}/storyboard-group/select-video`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -369,6 +369,22 @@ export function useDeleteProjectStoryboardGroupHistoryVideo(projectId: string, e
         throw new Error(resolveTaskErrorMessage(error, '删除粗镜头历史视频失败'))
       }
       return res.json()
+    },
+    onSuccess: (data, variables) => {
+      const deletedCurrent = !!(
+        data
+        && typeof data === 'object'
+        && (data as { deletedCurrent?: unknown }).deletedCurrent === true
+      )
+      if (!deletedCurrent || !episodeId) return
+      queryClient.setQueryData(
+        queryKeys.episodeData(projectId, episodeId),
+        (previous: unknown) => patchEpisodeCoarseGroupVideo(previous, {
+          storyboardId: variables.storyboardId,
+          groupNumber: variables.groupNumber,
+          videoUrl: null,
+        }),
+      )
     },
     onSettled: () => {
       invalidateQueryTemplates(queryClient, [
@@ -460,7 +476,7 @@ export function useDeleteProjectPanelHistoryVideo(projectId: string, episodeId?:
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (payload: { panelId: string; videoUrl: string }) => {
+    mutationFn: async (payload: { panelId: string; videoUrl: string; clearCurrent?: boolean }) => {
       const res = await apiFetch(`/api/novel-promotion/${projectId}/panel/select-video-history`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -471,6 +487,21 @@ export function useDeleteProjectPanelHistoryVideo(projectId: string, episodeId?:
         throw new Error(resolveTaskErrorMessage(error, '删除历史视频失败'))
       }
       return res.json()
+    },
+    onSuccess: (data, variables) => {
+      const deletedCurrent = !!(
+        data
+        && typeof data === 'object'
+        && (data as { deletedCurrent?: unknown }).deletedCurrent === true
+      )
+      if (!deletedCurrent || !episodeId) return
+      queryClient.setQueryData(
+        queryKeys.episodeData(projectId, episodeId),
+        (previous: unknown) => patchEpisodePanelVideo(previous, {
+          panelId: variables.panelId,
+          videoUrl: null,
+        }),
+      )
     },
     onSettled: () => {
       invalidateQueryTemplates(queryClient, [

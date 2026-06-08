@@ -46,6 +46,20 @@ interface GroupSelectMutation extends SettledMutation {
   ) => void
 }
 
+interface GroupDeleteMutation extends SettledMutation {
+  onSuccess: (
+    data: { deletedCurrent?: boolean; videoUrl?: string | null },
+    variables: { storyboardId: string; groupNumber: number; videoUrl: string; clearCurrent?: boolean },
+  ) => void
+}
+
+interface PanelDeleteMutation extends SettledMutation {
+  onSuccess: (
+    data: { deletedCurrent?: boolean; videoUrl?: string | null },
+    variables: { panelId: string; videoUrl: string },
+  ) => void
+}
+
 describe('video history mutations', () => {
   beforeEach(() => {
     queryClient.invalidateQueries.mockClear()
@@ -105,5 +119,65 @@ describe('video history mutations', () => {
     }) as { storyboards: Array<{ coarseGroupsJson: string }> }
     const [group] = JSON.parse(next.storyboards[0].coarseGroupsJson)
     expect(group.videoUrl).toBe('/m/new-video')
+  })
+
+  it('clears current panel video in episode cache after deleting the active history video', () => {
+    const projectId = 'project-1'
+    const episodeId = 'episode-1'
+    const mutation = useDeleteProjectPanelHistoryVideo(projectId, episodeId) as unknown as PanelDeleteMutation
+
+    mutation.onSuccess(
+      { deletedCurrent: true, videoUrl: null },
+      { panelId: 'panel-1', videoUrl: '/m/current-video' },
+    )
+
+    expect(queryClient.setQueryData).toHaveBeenCalledTimes(1)
+    const [queryKey, updater] = queryClient.setQueryData.mock.calls[0]
+    expect(queryKey).toEqual(queryKeys.episodeData(projectId, episodeId))
+    expect(typeof updater).toBe('function')
+
+    const next = (updater as (previous: unknown) => unknown)({
+      storyboards: [{
+        id: 'storyboard-1',
+        panels: [
+          { id: 'panel-1', videoUrl: '/m/current-video' },
+          { id: 'panel-2', videoUrl: '/m/other-video' },
+        ],
+      }],
+    }) as { storyboards: Array<{ panels: Array<{ id: string; videoUrl: string | null }> }> }
+
+    expect(next.storyboards[0].panels[0].videoUrl).toBeNull()
+    expect(next.storyboards[0].panels[1].videoUrl).toBe('/m/other-video')
+  })
+
+  it('clears current coarse group video in episode cache after deleting the active group video', () => {
+    const projectId = 'project-1'
+    const episodeId = 'episode-1'
+    const mutation = useDeleteProjectStoryboardGroupHistoryVideo(projectId, episodeId) as unknown as GroupDeleteMutation
+
+    mutation.onSuccess(
+      { deletedCurrent: true, videoUrl: null },
+      { storyboardId: 'storyboard-1', groupNumber: 7, videoUrl: '/m/current-video', clearCurrent: true },
+    )
+
+    expect(queryClient.setQueryData).toHaveBeenCalledTimes(1)
+    const [queryKey, updater] = queryClient.setQueryData.mock.calls[0]
+    expect(queryKey).toEqual(queryKeys.episodeData(projectId, episodeId))
+    expect(typeof updater).toBe('function')
+
+    const next = (updater as (previous: unknown) => unknown)({
+      storyboards: [{
+        id: 'storyboard-1',
+        coarseGroupsJson: JSON.stringify([
+          { groupNumber: 7, videoUrl: '/m/current-video', videoHistory: [{ videoUrl: '/m/old-video' }] },
+          { groupNumber: 8, videoUrl: '/m/other-video', videoHistory: [] },
+        ]),
+        panels: [],
+      }],
+    }) as { storyboards: Array<{ coarseGroupsJson: string }> }
+
+    const groups = JSON.parse(next.storyboards[0].coarseGroupsJson) as Array<{ groupNumber: number; videoUrl: string | null }>
+    expect(groups.find((group) => group.groupNumber === 7)?.videoUrl).toBeNull()
+    expect(groups.find((group) => group.groupNumber === 8)?.videoUrl).toBe('/m/other-video')
   })
 })

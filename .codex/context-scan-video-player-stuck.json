@@ -1,0 +1,26 @@
+{
+  "date": "2026-06-08",
+  "executor": "Codex",
+  "task": "修复成片面板播放预览视频后卡住转圈",
+  "toolFallback": "当前会话未暴露 sequential-thinking、shrimp-task-manager、code-index、exa；使用 rg、sed、git diff、本地测试和类型检查替代。",
+  "location": {
+    "playerHook": "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/panel-card/runtime/hooks/usePanelPlayer.ts",
+    "playerHeader": "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/panel-card/VideoPanelCardHeader.tsx"
+  },
+  "currentBehavior": {
+    "playState": "usePanelPlayer 通过 isPlaying 控制封面和 video 元素切换。",
+    "failureGap": "handlePlayClick 在 native video play 失败或 ref 不存在时没有可靠退出播放态；VideoPanelCardHeader 只在 ended 时退出播放态，没有处理 error 或 abort。",
+    "visibleSymptom": "video 元素保留在播放态，浏览器原生视频区域持续显示加载转圈。"
+  },
+  "similarPatterns": [
+    "TaskStatusOverlay 只由 videoTaskRunning/lipSyncTaskRunning 控制，不是本次卡住来源。",
+    "PanelVideoHistoryDropdown 只处理历史视频缩略图首帧，不参与主预览播放态。",
+    "VideoPanelCardHeader 已在切换口型同步视频时调用 player.setIsPlaying(false)，说明视频源变化时回到封面是既有模式。"
+  ],
+  "sufficiencyCheck": {
+    "interfaceContractKnown": true,
+    "technicalChoiceKnown": true,
+    "risksIdentified": true,
+    "verificationKnown": true
+  }
+}

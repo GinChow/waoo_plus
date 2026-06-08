@@ -47,6 +47,7 @@ export interface Panel {
   videoPrompt?: string | null
   firstLastFramePrompt?: string | null
   videoUrl?: string | null
+  videoStorageKey?: string | null
   videoHistory?: string | null  // panel 级视频历史（JSON 字符串）
   videoGenerationMode?: VideoGenerationMode | null
   videoModel?: string | null
@@ -113,6 +114,7 @@ export interface VideoPanel {
   firstLastFrameEnabled?: boolean
   imageUrl?: string
   videoUrl?: string
+  videoStorageKey?: string
   videoGenerationMode?: VideoGenerationMode
   videoTaskRunning?: boolean
   videoErrorMessage?: string  // 视频生成错误消息

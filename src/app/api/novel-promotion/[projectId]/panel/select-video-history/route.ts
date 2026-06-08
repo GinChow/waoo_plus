@@ -16,6 +16,57 @@ function summarizeVideoUrl(value: string | null | undefined): string {
   return value.length > 96 ? `${value.slice(0, 48)}...${value.slice(-24)}` : value
 }
 
+async function clearMatchingCoarseGroupVideos(params: {
+  storyboardId: string
+  requestedVideoUrl: string
+  targetKey: string | null
+  currentVideoKey: string | null
+}) {
+  const storyboard = await prisma.novelPromotionStoryboard.findUnique({
+    where: { id: params.storyboardId },
+    select: { id: true, coarseGroupsJson: true },
+  })
+  if (!storyboard?.coarseGroupsJson) return
+
+  let groups: unknown
+  try {
+    groups = JSON.parse(storyboard.coarseGroupsJson)
+  } catch {
+    return
+  }
+  if (!Array.isArray(groups)) return
+
+  let changed = false
+  const now = new Date().toISOString()
+  const nextGroups = await Promise.all(groups.map(async (group) => {
+    if (!group || typeof group !== 'object' || Array.isArray(group)) return group
+    const record = group as Record<string, unknown>
+    const groupVideoUrl = typeof record.videoUrl === 'string' ? record.videoUrl : ''
+    if (!groupVideoUrl) return group
+
+    const groupVideoKey = await resolveStorageKeyFromMediaValue(groupVideoUrl)
+    const matches = groupVideoUrl === params.requestedVideoUrl
+      || (!!params.targetKey && groupVideoKey === params.targetKey)
+      || (!!params.currentVideoKey && groupVideoKey === params.currentVideoKey)
+    if (!matches) return group
+
+    changed = true
+    return {
+      ...record,
+      videoUrl: null,
+      videoModel: null,
+      videoGenerationMode: null,
+      updatedAt: now,
+    }
+  }))
+
+  if (!changed) return
+  await prisma.novelPromotionStoryboard.update({
+    where: { id: params.storyboardId },
+    data: { coarseGroupsJson: JSON.stringify(nextGroups, null, 2) },
+  })
+}
+
 /**
  * POST /api/novel-promotion/[projectId]/panel/select-video-history
  * Restore a video from panel history as the current panel video.
@@ -46,7 +97,7 @@ export const POST = apiHandler(async (
 
   const panel = await prisma.novelPromotionPanel.findUnique({
     where: { id: panelId },
-    select: { id: true, videoUrl: true, videoHistory: true },
+    select: { id: true, storyboardId: true, videoUrl: true, videoHistory: true },
   })
   if (!panel) throw new ApiError('NOT_FOUND')
 
@@ -119,7 +170,7 @@ export const POST = apiHandler(async (
  * DELETE /api/novel-promotion/[projectId]/panel/select-video-history
  * Remove a video entry from panel history.
  * body: { panelId, videoUrl }
- * The current panel videoUrl entry cannot be deleted.
+ * When the deleted entry is the current video, also clear the panel video output.
  */
 export const DELETE = apiHandler(async (
   request: NextRequest,
@@ -133,6 +184,7 @@ export const DELETE = apiHandler(async (
   const body = await request.json()
   const panelId = typeof body?.panelId === 'string' ? body.panelId.trim() : ''
   const requestedVideoUrl = typeof body?.videoUrl === 'string' ? body.videoUrl.trim() : ''
+  const clearCurrent = body?.clearCurrent === true
 
   if (!panelId || !requestedVideoUrl) {
     throw new ApiError('INVALID_PARAMS')
@@ -140,38 +192,80 @@ export const DELETE = apiHandler(async (
 
   const panel = await prisma.novelPromotionPanel.findUnique({
     where: { id: panelId },
-    select: { id: true, videoUrl: true, videoHistory: true },
+    select: { id: true, storyboardId: true, videoUrl: true, videoHistory: true },
   })
   if (!panel) throw new ApiError('NOT_FOUND')
 
   const targetKey = await resolveStorageKeyFromMediaValue(requestedVideoUrl)
-  if (!targetKey) throw new ApiError('INVALID_PARAMS')
-
-  if (targetKey === panel.videoUrl) {
-    throw new ApiError('INVALID_PARAMS', {
-      code: 'CANNOT_DELETE_CURRENT_VIDEO',
-      message: '不能删除当前正在使用的视频',
-    })
-  }
+  if (!targetKey && !clearCurrent) throw new ApiError('INVALID_PARAMS')
 
   const history = parsePanelVideoHistory(panel.videoHistory)
+  const currentVideoKey = await resolveStorageKeyFromMediaValue(panel.videoUrl)
+  const deletedCurrent = clearCurrent || targetKey === currentVideoKey || requestedVideoUrl === panel.videoUrl
   const matchEntry = await (async () => {
+    if (!targetKey) return null
     for (const entry of history) {
       const key = await resolveStorageKeyFromMediaValue(entry.videoUrl)
       if (key === targetKey) return entry
     }
     return null
   })()
-  if (!matchEntry) throw new ApiError('NOT_FOUND')
+  if (!matchEntry && !deletedCurrent) throw new ApiError('NOT_FOUND')
 
-  const nextHistory = removePanelVideoHistoryEntry(history, matchEntry.videoUrl)
+  const nextHistory = matchEntry
+    ? removePanelVideoHistoryEntry(history, matchEntry.videoUrl)
+    : history
 
   await prisma.novelPromotionPanel.update({
     where: { id: panelId },
     data: {
       videoHistory: serializePanelVideoHistory(nextHistory),
+      ...(deletedCurrent
+        ? {
+            videoUrl: null,
+            videoMediaId: null,
+            videoGenerationMode: null,
+            lipSyncTaskId: null,
+            lipSyncVideoUrl: null,
+            lipSyncVideoMediaId: null,
+          }
+        : {}),
     },
   })
 
-  return NextResponse.json({ success: true })
+  if (deletedCurrent && panel.storyboardId) {
+    const matchingVideoValues = Array.from(new Set([
+      panel.videoUrl,
+      requestedVideoUrl,
+      targetKey,
+      currentVideoKey,
+    ].filter((value): value is string => typeof value === 'string' && value.length > 0)))
+
+    if (matchingVideoValues.length > 0) {
+      await prisma.novelPromotionPanel.updateMany({
+        where: {
+          storyboardId: panel.storyboardId,
+          id: { not: panelId },
+          videoUrl: { in: matchingVideoValues },
+        },
+        data: {
+          videoUrl: null,
+          videoMediaId: null,
+          videoGenerationMode: null,
+          lipSyncTaskId: null,
+          lipSyncVideoUrl: null,
+          lipSyncVideoMediaId: null,
+        },
+      })
+    }
+
+    await clearMatchingCoarseGroupVideos({
+      storyboardId: panel.storyboardId,
+      requestedVideoUrl,
+      targetKey,
+      currentVideoKey,
+    })
+  }
+
+  return NextResponse.json({ success: true, deletedCurrent, videoUrl: deletedCurrent ? null : undefined })
 })

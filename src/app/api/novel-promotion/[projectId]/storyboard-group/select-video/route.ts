@@ -188,6 +188,7 @@ export const DELETE = apiHandler(async (
   const body = await request.json()
   const storyboardId = typeof body?.storyboardId === 'string' ? body.storyboardId : ''
   const videoUrl = typeof body?.videoUrl === 'string' ? body.videoUrl : ''
+  const clearCurrent = body?.clearCurrent === true
   const groupNumberRaw = typeof body?.groupNumber === 'number' ? body.groupNumber : Number(body?.groupNumber)
   const groupNumber = Number.isFinite(groupNumberRaw) ? Math.floor(groupNumberRaw) : null
 
@@ -201,18 +202,42 @@ export const DELETE = apiHandler(async (
   })
   if (!storyboard) throw new ApiError('NOT_FOUND')
 
-  const videoKey = await resolveSelectableCoarseGroupVideoUrl(
-    storyboard.coarseGroupsJson,
-    groupNumber,
-    videoUrl,
-  )
-  if (!videoKey) throw new ApiError('INVALID_PARAMS')
+  const videoKey = clearCurrent
+    ? await resolveStorageKeyFromMediaValue(videoUrl)
+    : await resolveSelectableCoarseGroupVideoUrl(
+        storyboard.coarseGroupsJson,
+        groupNumber,
+        videoUrl,
+      )
+  if (!videoKey && !clearCurrent) throw new ApiError('INVALID_PARAMS')
 
-  const coarseGroupsJson = deleteCoarseGroupHistoryVideo({
-    raw: storyboard.coarseGroupsJson,
-    groupNumber,
-    videoUrl: videoKey,
-  })
+  const coarseGroupsJson = clearCurrent
+    ? (() => {
+        const groups = parseCoarseGroupsJson(storyboard.coarseGroupsJson)
+        const matched = groups.some((group) => group.groupNumber === groupNumber)
+        if (!matched) return null
+        const now = new Date().toISOString()
+        const nextGroups = groups.map((group) => {
+          if (group.groupNumber !== groupNumber) return group
+          return {
+            ...group,
+            videoUrl: null,
+            videoModel: null,
+            videoGenerationMode: null,
+            videoHistory: videoKey
+              ? group.videoHistory.filter((entry) => entry.videoUrl !== videoKey)
+              : group.videoHistory,
+            updatedAt: now,
+          }
+        })
+        nextGroups.sort((left, right) => left.groupNumber - right.groupNumber)
+        return JSON.stringify(nextGroups, null, 2)
+      })()
+    : deleteCoarseGroupHistoryVideo({
+        raw: storyboard.coarseGroupsJson,
+        groupNumber,
+        videoUrl: videoKey || '',
+      })
   if (!coarseGroupsJson) throw new ApiError('INVALID_PARAMS')
 
   const nextGroup = parseCoarseGroupsJson(coarseGroupsJson).find((item) => item.groupNumber === groupNumber)
@@ -227,11 +252,17 @@ export const DELETE = apiHandler(async (
         where: { id: panelId },
         data: {
           videoUrl: nextGroup?.videoUrl || null,
-          videoGenerationMode: nextGroup?.videoGenerationMode === 'firstlastframe' ? 'firstlastframe' : 'normal',
+          videoMediaId: null,
+          videoGenerationMode: clearCurrent
+            ? null
+            : nextGroup?.videoGenerationMode === 'firstlastframe' ? 'firstlastframe' : 'normal',
+          lipSyncTaskId: clearCurrent ? null : undefined,
+          lipSyncVideoUrl: clearCurrent ? null : undefined,
+          lipSyncVideoMediaId: clearCurrent ? null : undefined,
         },
       })
     }
   })
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, deletedCurrent: clearCurrent, videoUrl: clearCurrent ? null : undefined })
 })
