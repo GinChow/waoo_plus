@@ -19,6 +19,7 @@ interface ModifyPanelMutationLike {
     panelIndex: number
     modifyPrompt: string
     extraImageUrls: string[]
+    ignoreBaseImage?: boolean
     selectedAssets: SelectedAsset[]
   }) => Promise<unknown>
 }
@@ -50,6 +51,7 @@ export function usePanelImageModification({
       prompt: string,
       images: string[],
       assets: SelectedAsset[],
+      ignoreBaseImage = false,
     ) => {
       const storyboard = localStoryboards.find((item) => item.id === storyboardId)
       const panels = storyboard ? getStoryboardPanels(storyboard) : []
@@ -70,6 +72,7 @@ export function usePanelImageModification({
           panelIndex,
           modifyPrompt: prompt,
           extraImageUrls: images,
+          ignoreBaseImage,
           selectedAssets: assets,
         })
         const result = (data || {}) as StoryboardImageMutationResult

@@ -329,7 +329,17 @@
         "selectedAssetsLabel": "参考资产",
         "selectedAssetsCount": "{count}个",
         "addAsset": "添加资产",
-        "noAssets": "暂无资产，点击“添加资产”选择"
+        "noAssets": "暂无资产，点击“添加资产”选择",
+        "clearReferences": "清空参考",
+        "baseImage": "原图",
+        "adjacentPanelsHint": "快捷添加相邻分镜作为参考",
+        "adjacentLabel": {
+            "prev2": "上两镜",
+            "prev": "上一镜",
+            "current": "当前镜",
+            "next": "下一镜",
+            "next2": "下两镜"
+        }
     },
     "screenplay": {
         "tabs": {

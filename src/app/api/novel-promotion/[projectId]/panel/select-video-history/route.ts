@@ -9,6 +9,12 @@ import {
   removePanelVideoHistoryEntry,
   serializePanelVideoHistory,
 } from '@/lib/novel-promotion/panel-video-state'
+import { logInfo as _ulogInfo } from '@/lib/logging/core'
+
+function summarizeVideoUrl(value: string | null | undefined): string {
+  if (!value) return ''
+  return value.length > 96 ? `${value.slice(0, 48)}...${value.slice(-24)}` : value
+}
 
 /**
  * POST /api/novel-promotion/[projectId]/panel/select-video-history
@@ -32,6 +38,12 @@ export const POST = apiHandler(async (
     throw new ApiError('INVALID_PARAMS')
   }
 
+  _ulogInfo('[VideoHistoryTrace][API panel select] request', {
+    projectId,
+    panelId,
+    requestedVideoUrl: summarizeVideoUrl(requestedVideoUrl),
+  })
+
   const panel = await prisma.novelPromotionPanel.findUnique({
     where: { id: panelId },
     select: { id: true, videoUrl: true, videoHistory: true },
@@ -39,6 +51,13 @@ export const POST = apiHandler(async (
   if (!panel) throw new ApiError('NOT_FOUND')
 
   const history = parsePanelVideoHistory(panel.videoHistory)
+  _ulogInfo('[VideoHistoryTrace][API panel select] loaded panel state', {
+    projectId,
+    panelId,
+    currentVideoUrl: summarizeVideoUrl(panel.videoUrl),
+    historyCount: history.length,
+    historyUrls: history.map((entry) => summarizeVideoUrl(entry.videoUrl)),
+  })
   const targetKey = await resolveStorageKeyFromMediaValue(requestedVideoUrl)
   if (!targetKey) throw new ApiError('INVALID_PARAMS')
 
@@ -51,7 +70,20 @@ export const POST = apiHandler(async (
   const match = historyKeys.find((item) => item.key === targetKey)
   if (!match || !match.key) throw new ApiError('INVALID_PARAMS')
 
+  _ulogInfo('[VideoHistoryTrace][API panel select] resolved selected key', {
+    projectId,
+    panelId,
+    targetKey,
+    currentVideoUrl: summarizeVideoUrl(panel.videoUrl),
+    matchedGenerationMode: match.entry.generationMode || null,
+  })
+
   if (match.key === panel.videoUrl) {
+    _ulogInfo('[VideoHistoryTrace][API panel select] noop current video already selected', {
+      projectId,
+      panelId,
+      targetKey,
+    })
     return NextResponse.json({
       success: true,
       videoUrl: getSignedUrl(match.key, 7 * 24 * 3600),
@@ -66,6 +98,14 @@ export const POST = apiHandler(async (
       videoUrl: match.key,
       videoGenerationMode: match.entry.generationMode || undefined,
     },
+  })
+
+  _ulogInfo('[VideoHistoryTrace][API panel select] persisted', {
+    projectId,
+    panelId,
+    previousVideoUrl: summarizeVideoUrl(panel.videoUrl),
+    nextVideoUrl: targetKey,
+    responseVideoUrl: summarizeVideoUrl(getSignedUrl(match.key, 7 * 24 * 3600)),
   })
 
   return NextResponse.json({

@@ -3,6 +3,7 @@ import TaskStatusInline from '@/components/task/TaskStatusInline'
 import { resolveTaskPresentationState } from '@/lib/task/presentation'
 import { ModelCapabilityDropdown } from '@/components/ui/config-modals/ModelCapabilityDropdown'
 import { AppIcon } from '@/components/ui/icons'
+import { logInfo as _ulogInfo } from '@/lib/logging/core'
 import {
   useAiFirstLastFramePrompt,
   useDeleteProjectStoryboardGroupHistoryVideo,
@@ -10,6 +11,11 @@ import {
 } from '@/lib/query/hooks'
 import type { VideoPanelRuntime } from './hooks/useVideoPanelActions'
 import { HistoryVideoThumbnail, PanelVideoHistoryDropdown } from './PanelVideoHistoryDropdown'
+
+function summarizeVideoUrl(value: string | null | undefined): string {
+  if (!value) return ''
+  return value.length > 96 ? `${value.slice(0, 48)}...${value.slice(-24)}` : value
+}
 
 interface VideoPanelCardBodyProps {
   runtime: VideoPanelRuntime
@@ -21,6 +27,7 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
     t,
     tCommon,
     projectId,
+    episodeId,
     panel,
     panelIndex,
     panelKey,
@@ -286,6 +293,7 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
                 {isCoarseGroupPanel && videoHistory.length > 0 && (
                   <CoarseGroupVideoHistoryDropdown
                     projectId={projectId}
+                    episodeId={episodeId}
                     storyboardId={panel.storyboardId}
                     groupNumber={panel.videoTargetGroupNumber}
                     currentVideoUrl={panel.videoUrl || ''}
@@ -297,6 +305,7 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
                 {!isCoarseGroupPanel && panelVideoHistory.length > 0 && panel.panelId && (
                   <PanelVideoHistoryDropdown
                     projectId={projectId}
+                    episodeId={episodeId}
                     panelId={panel.panelId}
                     currentVideoUrl={panel.videoUrl || ''}
                     videoHistory={panelVideoHistory}
@@ -391,6 +400,7 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
 
 function CoarseGroupVideoHistoryDropdown({
   projectId,
+  episodeId,
   storyboardId,
   groupNumber,
   currentVideoUrl,
@@ -398,6 +408,7 @@ function CoarseGroupVideoHistoryDropdown({
   t,
 }: {
   projectId: string
+  episodeId?: string
   storyboardId: string
   groupNumber?: number
   currentVideoUrl: string
@@ -405,8 +416,8 @@ function CoarseGroupVideoHistoryDropdown({
   t: (key: string, values?: Record<string, number>) => string
 }) {
   const [openVideoHistory, setOpenVideoHistory] = useState(false)
-  const selectHistoryVideoMutation = useSelectProjectStoryboardGroupVideo(projectId)
-  const deleteHistoryVideoMutation = useDeleteProjectStoryboardGroupHistoryVideo(projectId)
+  const selectHistoryVideoMutation = useSelectProjectStoryboardGroupVideo(projectId, episodeId)
+  const deleteHistoryVideoMutation = useDeleteProjectStoryboardGroupHistoryVideo(projectId, episodeId)
   const [selectingHistoryVideoUrl, setSelectingHistoryVideoUrl] = useState<string | null>(null)
   const [deletingHistoryVideoUrl, setDeletingHistoryVideoUrl] = useState<string | null>(null)
 
@@ -419,17 +430,38 @@ function CoarseGroupVideoHistoryDropdown({
 
   const handleSelectHistoryVideo = useCallback(async (videoUrl: string) => {
     if (!groupNumber) return
+    _ulogInfo('[VideoHistoryTrace][UI group history] click use history video', {
+      projectId,
+      episodeId,
+      storyboardId,
+      groupNumber,
+      currentVideoUrl: summarizeVideoUrl(currentVideoUrl),
+      selectedVideoUrl: summarizeVideoUrl(videoUrl),
+      historyCount: videoHistory.length,
+    })
     setSelectingHistoryVideoUrl(videoUrl)
     try {
-      await selectHistoryVideoMutation.mutateAsync({
+      const result = await selectHistoryVideoMutation.mutateAsync({
         storyboardId,
         groupNumber,
         videoUrl,
       })
+      _ulogInfo('[VideoHistoryTrace][UI group history] use history video completed', {
+        projectId,
+        episodeId,
+        storyboardId,
+        groupNumber,
+        selectedVideoUrl: summarizeVideoUrl(videoUrl),
+        responseVideoUrl: summarizeVideoUrl(
+          result && typeof result === 'object' && typeof (result as { videoUrl?: unknown }).videoUrl === 'string'
+            ? (result as { videoUrl: string }).videoUrl
+            : '',
+        ),
+      })
     } finally {
       setSelectingHistoryVideoUrl(null)
     }
-  }, [groupNumber, selectHistoryVideoMutation, storyboardId])
+  }, [currentVideoUrl, episodeId, groupNumber, projectId, selectHistoryVideoMutation, storyboardId, videoHistory.length])
 
   const handleDeleteHistoryVideo = useCallback(async (videoUrl: string) => {
     if (!groupNumber) return

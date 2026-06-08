@@ -192,6 +192,8 @@ describe('worker image-task-handlers-core', () => {
         options: expect.objectContaining({
           aspectRatio: '16:9',
           resolution: '2048x1152',
+          quality: 'high',
+          size: '3840x2160',
           referenceImages: [
             'base64-required-reference',
             'normalized-reference-image',
@@ -206,5 +208,57 @@ describe('worker image-task-handlers-core', () => {
     expect(updateData.previousImageUrl).toBe('cos/panel-old.png')
     expect(updateData.imageUrl).toBe('cos/new-image.png')
     expect(updateData.candidateImages).toBeNull()
+  })
+
+  it('passes storyboard modify image quality and size through from generation options', async () => {
+    prismaMock.novelPromotionPanel.findUnique.mockResolvedValue({
+      id: 'panel-1',
+      storyboardId: 'storyboard-1',
+      panelIndex: 0,
+      imageUrl: 'cos/panel-old.png',
+      previousImageUrl: null,
+    })
+
+    await handleModifyAssetImageTask(buildJob({
+      type: 'storyboard',
+      panelId: 'panel-1',
+      modifyPrompt: 'make the light softer',
+      generationOptions: { quality: 'medium', size: '2048x1152' },
+    }))
+
+    const calls = utilsMock.resolveImageSourceFromGeneration.mock.calls as unknown as Array<[unknown, Record<string, unknown>]>
+    const call = calls.at(-1)
+    expect(call?.[1]).toEqual(expect.objectContaining({
+      options: expect.objectContaining({
+        quality: 'medium',
+        size: '2048x1152',
+      }),
+    }))
+  })
+
+  it('falls back to storyboard image default size when modify payload size is unsupported', async () => {
+    prismaMock.novelPromotionPanel.findUnique.mockResolvedValue({
+      id: 'panel-1',
+      storyboardId: 'storyboard-1',
+      panelIndex: 0,
+      imageUrl: 'cos/panel-old.png',
+      previousImageUrl: null,
+    })
+
+    await handleModifyAssetImageTask(buildJob({
+      type: 'storyboard',
+      panelId: 'panel-1',
+      modifyPrompt: 'add a rim light',
+      generationOptions: { quality: 'auto', size: '4096x2160' },
+    }))
+
+    const calls = utilsMock.resolveImageSourceFromGeneration.mock.calls as unknown as Array<[unknown, Record<string, unknown>]>
+    const call = calls.at(-1)
+    expect(call?.[1]).toEqual(expect.objectContaining({
+      options: expect.objectContaining({
+        quality: 'auto',
+        size: '3840x2160',
+      }),
+    }))
   })
 })

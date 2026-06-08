@@ -75,6 +75,7 @@ export function useVideoPanelActions({
 
   const player = usePanelPlayer({
     videoRatio,
+    traceKey: `${panel.storyboardId}:${panel.videoTargetGroupNumber ?? panel.panelIndex}`,
     imageUrl: panel.imageUrl,
     videoUrl: visibleBaseVideoUrl,
     lipSyncVideoUrl: panel.lipSyncVideoUrl,
@@ -109,6 +110,7 @@ export function useVideoPanelActions({
     t,
     tCommon,
     projectId,
+    episodeId,
     panel,
     panelIndex,
     panelKey,

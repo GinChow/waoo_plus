@@ -6,6 +6,37 @@ import { requireProjectAuthLight, isErrorResponse } from '@/lib/api-auth'
 import { apiHandler, ApiError } from '@/lib/api-errors'
 import { attachMediaFieldsToProject } from '@/lib/media/attach'
 import { resolveMediaRefFromLegacyValue } from '@/lib/media/service'
+import { logInfo as _ulogInfo } from '@/lib/logging/core'
+
+function summarizeVideoUrl(value: string | null | undefined): string {
+  if (!value) return ''
+  return value.length > 96 ? `${value.slice(0, 48)}...${value.slice(-24)}` : value
+}
+
+function summarizeStoryboardCoarseVideos(storyboards: Array<{ id: string; coarseGroupsJson: string | null }>) {
+  return storyboards.flatMap((storyboard) => {
+    if (!storyboard.coarseGroupsJson) return []
+    try {
+      const groups = JSON.parse(storyboard.coarseGroupsJson)
+      if (!Array.isArray(groups)) return []
+      return groups.flatMap((group) => {
+        if (!group || typeof group !== 'object') return []
+        const record = group as { groupNumber?: unknown; videoUrl?: unknown; videoHistory?: unknown }
+        const videoUrl = typeof record.videoUrl === 'string' ? record.videoUrl : ''
+        const videoHistory = Array.isArray(record.videoHistory) ? record.videoHistory : []
+        if (!videoUrl && videoHistory.length === 0) return []
+        return [{
+          storyboardId: storyboard.id,
+          groupNumber: typeof record.groupNumber === 'number' ? record.groupNumber : null,
+          videoUrl: summarizeVideoUrl(videoUrl),
+          historyCount: videoHistory.length,
+        }]
+      })
+    } catch {
+      return []
+    }
+  })
+}
 
 function extractPanelsFromArtifactPayload(payload: unknown): unknown[] {
   if (!payload || typeof payload !== 'object') return []
@@ -126,6 +157,12 @@ export const GET = apiHandler(async (
   if (!episode) {
     throw new ApiError('NOT_FOUND')
   }
+
+  _ulogInfo('[VideoHistoryTrace][API episode detail] loaded episode storyboards', {
+    projectId,
+    episodeId,
+    storyboards: summarizeStoryboardCoarseVideos(episode.storyboards),
+  })
 
   await backfillStoryboardTextJsonFromArtifacts({
     projectId,

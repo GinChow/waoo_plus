@@ -329,7 +329,17 @@
         "selectedAssetsLabel": "Referenced Assets",
         "selectedAssetsCount": "{count}",
         "addAsset": "Add Asset",
-        "noAssets": "No assets selected. Click \"Add Asset\" to choose."
+        "noAssets": "No assets selected. Click \"Add Asset\" to choose.",
+        "clearReferences": "Clear References",
+        "baseImage": "Source",
+        "adjacentPanelsHint": "Quick-add adjacent panels as reference",
+        "adjacentLabel": {
+            "prev2": "-2",
+            "prev": "Prev",
+            "current": "Current",
+            "next": "Next",
+            "next2": "+2"
+        }
     },
     "screenplay": {
         "tabs": {

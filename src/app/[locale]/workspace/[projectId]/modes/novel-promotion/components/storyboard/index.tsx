@@ -364,6 +364,8 @@ export default function StoryboardStage({
           <ImageEditModal
             projectId={modalRuntime.projectId}
             defaultAssets={modalRuntime.imageEditDefaults}
+            baseImageUrl={modalRuntime.imageEditBaseImage}
+            adjacentImages={modalRuntime.imageEditAdjacentImages}
             onSubmit={modalRuntime.handleEditSubmit}
             onClose={modalRuntime.closeImageEditModal}
           />

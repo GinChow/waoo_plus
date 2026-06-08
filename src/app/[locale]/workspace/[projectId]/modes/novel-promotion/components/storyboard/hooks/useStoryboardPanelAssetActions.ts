@@ -29,6 +29,7 @@ interface UseStoryboardPanelAssetActionsProps {
     prompt: string,
     images: string[],
     assets: SelectedAsset[],
+    ignoreBaseImage?: boolean,
   ) => Promise<void>
   addCharacterToPanel: (
     panel: StoryboardPanel,
@@ -87,11 +88,11 @@ export function useStoryboardPanelAssetActions({
   )
 
   const handleEditSubmit = useCallback(
-    async (prompt: string, images: string[], assets: SelectedAsset[]) => {
+    async (prompt: string, images: string[], assets: SelectedAsset[], options?: { ignoreBaseImage?: boolean }) => {
       if (!editingPanel) return
       const { storyboardId, panelIndex } = editingPanel
       setEditingPanel(null)
-      await modifyPanelImage(storyboardId, panelIndex, prompt, images, assets)
+      await modifyPanelImage(storyboardId, panelIndex, prompt, images, assets, options?.ignoreBaseImage ?? false)
     },
     [editingPanel, modifyPanelImage, setEditingPanel],
   )

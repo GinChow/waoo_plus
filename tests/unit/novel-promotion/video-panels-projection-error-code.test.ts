@@ -41,4 +41,36 @@ describe('video panels projection error code', () => {
     expect(result.allPanels[0]?.videoErrorCode).toBe('EXTERNAL_ERROR')
     expect(result.allPanels[0]?.videoErrorMessage).toBe('upstream failed')
   })
+
+  it('prefers panel videoUrl over stale coarse group videoUrl', () => {
+    const result = useVideoPanelsProjection({
+      clips: [{ id: 'clip-1', start: 0, end: 5, summary: 'clip' }],
+      storyboards: [{
+        id: 'sb-1',
+        clipId: 'clip-1',
+        storyboardTextJson: JSON.stringify([[1, 47]]),
+        coarseGroupsJson: JSON.stringify([{
+          groupNumber: 47,
+          videoUrl: 'video/stale-coarse.mp4',
+          videoHistory: [{ videoUrl: 'video/stale-coarse.mp4', generatedAt: 't1' }],
+        }]),
+        panels: [{
+          id: 'panel-1',
+          panelIndex: 0,
+          panelNumber: 1,
+          description: 'panel',
+          videoUrl: 'video/selected-panel-history.mp4',
+        }],
+      }],
+      panelVideoStates: {
+        getTaskState: () => null,
+      },
+      panelLipStates: {
+        getTaskState: () => null,
+      },
+    })
+
+    expect(result.allPanels).toHaveLength(1)
+    expect(result.allPanels[0]?.videoUrl).toBe('video/selected-panel-history.mp4')
+  })
 })

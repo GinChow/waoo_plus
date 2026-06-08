@@ -7,6 +7,7 @@ import type {
   VideoPanel,
 } from '@/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video'
 import { parsePanelVideoHistory } from '@/lib/novel-promotion/panel-video-state'
+import { logInfo as _ulogInfo, logWarn as _ulogWarn } from '@/lib/logging/core'
 
 interface TaskStateLike {
   phase?: string | null
@@ -36,6 +37,11 @@ interface CoarseGroupState {
     videoModel: string
     generationMode: string
   }>
+}
+
+function summarizeVideoUrl(value: string | null | undefined): string {
+  if (!value) return ''
+  return value.length > 96 ? `${value.slice(0, 48)}...${value.slice(-24)}` : value
 }
 
 function parseCoarseGroupStates(raw: string | null | undefined): Map<number, CoarseGroupState> {
@@ -81,6 +87,9 @@ function parseCoarseGroupStates(raw: string | null | undefined): Map<number, Coa
     }
     return states
   } catch {
+    _ulogWarn('[VideoHistoryTrace][projection] failed to parse coarseGroupsJson', {
+      rawPreview: raw.slice(0, 200),
+    })
     return new Map()
   }
 }
@@ -145,6 +154,21 @@ export function useVideoPanelsProjection({
     sortedStoryboards.forEach((storyboard) => {
       const parentGroupMap = parseParentGroupByPanelNumber(storyboard.storyboardTextJson)
       const coarseGroupStates = parseCoarseGroupStates(storyboard.coarseGroupsJson)
+      const tracedGroups = Array.from(coarseGroupStates.entries())
+        .filter(([, state]) => state.videoUrl || state.videoHistory.length > 0)
+        .map(([groupNumber, state]) => ({
+          groupNumber,
+          videoUrl: summarizeVideoUrl(state.videoUrl),
+          historyCount: state.videoHistory.length,
+          historyUrls: state.videoHistory.map((entry) => summarizeVideoUrl(entry.videoUrl)),
+        }))
+      if (tracedGroups.length > 0) {
+        _ulogInfo('[VideoHistoryTrace][projection] parsed coarse group video states', {
+          storyboardId: storyboard.id,
+          coarseGroupsJsonLength: typeof storyboard.coarseGroupsJson === 'string' ? storyboard.coarseGroupsJson.length : 0,
+          groups: tracedGroups,
+        })
+      }
       const storyboardPanels = storyboard.panels || []
       storyboardPanels.forEach((panel, index) => {
         const actualPanelIndex = panel.panelIndex ?? index
@@ -164,6 +188,19 @@ export function useVideoPanelsProjection({
         const panelVideoState = panelId ? panelVideoStates.getTaskState(`panel-video:${panelId}`) : null
         const panelLipState = panelId ? panelLipStates.getTaskState(`panel-lip:${panelId}`) : null
         const coarseGroupState = parentGroupNumber ? coarseGroupStates.get(parentGroupNumber) : null
+        const projectedVideoUrl = panel.videoUrl || coarseGroupState?.videoUrl || undefined
+        if (parentGroupNumber && (coarseGroupState?.videoUrl || coarseGroupState?.videoHistory.length)) {
+          _ulogInfo('[VideoHistoryTrace][projection] project panel video url', {
+            storyboardId: storyboard.id,
+            panelId,
+            panelIndex: actualPanelIndex,
+            panelNumber,
+            parentGroupNumber,
+            coarseGroupVideoUrl: summarizeVideoUrl(coarseGroupState?.videoUrl),
+            panelVideoUrl: summarizeVideoUrl(panel.videoUrl || null),
+            projectedVideoUrl: summarizeVideoUrl(projectedVideoUrl || null),
+          })
+        }
 
         panels.push({
           panelId,
@@ -201,7 +238,7 @@ export function useVideoPanelsProjection({
           imageUrl: panel.imageUrl || undefined,
           firstLastFramePrompt: panel.firstLastFramePrompt || undefined,
           firstLastFrameEnabled: panel.firstLastFrameEnabled ?? undefined,
-          videoUrl: coarseGroupState?.videoUrl || panel.videoUrl || undefined,
+          videoUrl: projectedVideoUrl,
           videoGenerationMode: panel.videoGenerationMode || undefined,
           videoTaskRunning: panelVideoState?.phase === 'queued' || panelVideoState?.phase === 'processing',
           videoErrorCode:

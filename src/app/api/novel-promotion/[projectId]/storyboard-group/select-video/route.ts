@@ -9,6 +9,12 @@ import {
 } from '@/lib/novel-promotion/coarse-group-image-state'
 import { resolveStorageKeyFromMediaValue } from '@/lib/media/service'
 import { getSignedUrl } from '@/lib/storage'
+import { logInfo as _ulogInfo } from '@/lib/logging/core'
+
+function summarizeVideoUrl(value: string | null | undefined): string {
+  if (!value) return ''
+  return value.length > 96 ? `${value.slice(0, 48)}...${value.slice(-24)}` : value
+}
 
 function parseParentGroupByPanelNumber(raw: string | null | undefined): Map<number, number> {
   if (!raw) return new Map()
@@ -87,11 +93,28 @@ export const POST = apiHandler(async (
     throw new ApiError('INVALID_PARAMS')
   }
 
+  _ulogInfo('[VideoHistoryTrace][API group select] request', {
+    projectId,
+    storyboardId,
+    groupNumber,
+    selectedVideoUrl: summarizeVideoUrl(selectedVideoUrl),
+  })
+
   const storyboard = await prisma.novelPromotionStoryboard.findUnique({
     where: { id: storyboardId },
     select: { id: true, storyboardTextJson: true, coarseGroupsJson: true },
   })
   if (!storyboard) throw new ApiError('NOT_FOUND')
+
+  const beforeGroup = parseCoarseGroupsJson(storyboard.coarseGroupsJson).find((item) => item.groupNumber === groupNumber)
+  _ulogInfo('[VideoHistoryTrace][API group select] loaded storyboard state', {
+    projectId,
+    storyboardId,
+    groupNumber,
+    currentVideoUrl: summarizeVideoUrl(beforeGroup?.videoUrl),
+    historyCount: beforeGroup?.videoHistory.length ?? 0,
+    historyUrls: beforeGroup?.videoHistory.map((entry) => summarizeVideoUrl(entry.videoUrl)) ?? [],
+  })
 
   const selectedKey = await resolveSelectableCoarseGroupVideoUrl(
     storyboard.coarseGroupsJson,
@@ -100,12 +123,29 @@ export const POST = apiHandler(async (
   )
   if (!selectedKey) throw new ApiError('INVALID_PARAMS')
 
+  _ulogInfo('[VideoHistoryTrace][API group select] resolved selected key', {
+    projectId,
+    storyboardId,
+    groupNumber,
+    selectedKey,
+  })
+
   const coarseGroupsJson = selectCoarseGroupVideo({
     raw: storyboard.coarseGroupsJson,
     groupNumber,
     selectedVideoUrl: selectedKey,
   })
   if (!coarseGroupsJson) throw new ApiError('INVALID_PARAMS')
+
+  const afterGroup = parseCoarseGroupsJson(coarseGroupsJson).find((item) => item.groupNumber === groupNumber)
+  _ulogInfo('[VideoHistoryTrace][API group select] computed next state', {
+    projectId,
+    storyboardId,
+    groupNumber,
+    nextVideoUrl: summarizeVideoUrl(afterGroup?.videoUrl),
+    nextVideoModel: afterGroup?.videoModel || null,
+    nextGenerationMode: afterGroup?.videoGenerationMode || null,
+  })
 
   const panelId = await resolveRepresentativePanelId(storyboardId, storyboard.storyboardTextJson, groupNumber)
   await prisma.$transaction(async (tx) => {
@@ -119,6 +159,15 @@ export const POST = apiHandler(async (
         data: { videoUrl: selectedKey },
       })
     }
+  })
+
+  _ulogInfo('[VideoHistoryTrace][API group select] persisted', {
+    projectId,
+    storyboardId,
+    groupNumber,
+    representativePanelId: panelId,
+    selectedKey,
+    responseVideoUrl: summarizeVideoUrl(getSignedUrl(selectedKey, 7200)),
   })
 
   return NextResponse.json({

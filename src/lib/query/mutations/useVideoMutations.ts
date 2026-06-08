@@ -3,6 +3,118 @@ import { queryKeys } from '../keys'
 import { apiFetch } from '@/lib/api-fetch'
 import { resolveTaskErrorMessage } from '@/lib/task/error-message'
 import { invalidateQueryTemplates, requestJsonWithError } from './mutation-shared'
+import { logInfo as _ulogInfo, logWarn as _ulogWarn } from '@/lib/logging/core'
+
+type EpisodeCache = {
+  storyboards?: Array<Record<string, unknown>>
+}
+
+function summarizeVideoUrl(value: string | null | undefined): string {
+  if (!value) return ''
+  return value.length > 96 ? `${value.slice(0, 48)}...${value.slice(-24)}` : value
+}
+
+function readMutationVideoUrl(data: unknown, fallback: string): string {
+  if (data && typeof data === 'object' && typeof (data as { videoUrl?: unknown }).videoUrl === 'string') {
+    return (data as { videoUrl: string }).videoUrl
+  }
+  return fallback
+}
+
+function patchEpisodeCoarseGroupVideo(
+  previous: unknown,
+  params: { storyboardId: string; groupNumber: number; videoUrl: string },
+): unknown {
+  if (!previous || typeof previous !== 'object' || Array.isArray(previous)) {
+    _ulogWarn('[VideoHistoryTrace][cache patch group] skip: invalid episode cache', {
+      storyboardId: params.storyboardId,
+      groupNumber: params.groupNumber,
+      videoUrl: summarizeVideoUrl(params.videoUrl),
+      previousType: typeof previous,
+    })
+    return previous
+  }
+  const episode = previous as EpisodeCache
+  if (!Array.isArray(episode.storyboards)) {
+    _ulogWarn('[VideoHistoryTrace][cache patch group] skip: no storyboards in episode cache', {
+      storyboardId: params.storyboardId,
+      groupNumber: params.groupNumber,
+      videoUrl: summarizeVideoUrl(params.videoUrl),
+      episodeKeys: Object.keys(episode),
+    })
+    return previous
+  }
+
+  return {
+    ...episode,
+    storyboards: episode.storyboards.map((storyboard) => {
+      if (storyboard.id !== params.storyboardId || typeof storyboard.coarseGroupsJson !== 'string') return storyboard
+      try {
+        const groups = JSON.parse(storyboard.coarseGroupsJson)
+        if (!Array.isArray(groups)) {
+          _ulogWarn('[VideoHistoryTrace][cache patch group] skip: coarseGroupsJson is not array', {
+            storyboardId: params.storyboardId,
+            groupNumber: params.groupNumber,
+          })
+          return storyboard
+        }
+        const before = groups.find((group) =>
+          group && typeof group === 'object' && (group as { groupNumber?: unknown }).groupNumber === params.groupNumber
+        ) as { videoUrl?: string; videoHistory?: unknown[] } | undefined
+        let matched = false
+        const nextGroups = groups.map((group) => {
+          if (!group || typeof group !== 'object') return group
+          if ((group as { groupNumber?: unknown }).groupNumber !== params.groupNumber) return group
+          matched = true
+          return { ...group, videoUrl: params.videoUrl }
+        })
+        _ulogInfo('[VideoHistoryTrace][cache patch group] patched episode coarse group', {
+          storyboardId: params.storyboardId,
+          groupNumber: params.groupNumber,
+          matched,
+          beforeVideoUrl: summarizeVideoUrl(before?.videoUrl),
+          nextVideoUrl: summarizeVideoUrl(params.videoUrl),
+          historyCount: before?.videoHistory?.length ?? 0,
+        })
+        return {
+          ...storyboard,
+          coarseGroupsJson: JSON.stringify(nextGroups),
+        }
+      } catch {
+        _ulogWarn('[VideoHistoryTrace][cache patch group] skip: coarseGroupsJson parse failed', {
+          storyboardId: params.storyboardId,
+          groupNumber: params.groupNumber,
+        })
+        return storyboard
+      }
+    }),
+  }
+}
+
+function patchEpisodePanelVideo(
+  previous: unknown,
+  params: { panelId: string; videoUrl: string },
+): unknown {
+  if (!previous || typeof previous !== 'object' || Array.isArray(previous)) return previous
+  const episode = previous as EpisodeCache
+  if (!Array.isArray(episode.storyboards)) return previous
+
+  return {
+    ...episode,
+    storyboards: episode.storyboards.map((storyboard) => {
+      const panels = Array.isArray(storyboard.panels) ? storyboard.panels : null
+      if (!panels) return storyboard
+      return {
+        ...storyboard,
+        panels: panels.map((panel) => {
+          if (!panel || typeof panel !== 'object') return panel
+          if ((panel as { id?: unknown }).id !== params.panelId) return panel
+          return { ...panel, videoUrl: params.videoUrl }
+        }),
+      }
+    }),
+  }
+}
 
 /**
  * 获取剧集可下载视频列表（项目）
@@ -156,24 +268,85 @@ export function useUpdateProjectPanelDuration(projectId: string) {
 /**
  * 选择粗镜头历史视频
  */
-export function useSelectProjectStoryboardGroupVideo(projectId: string) {
+export function useSelectProjectStoryboardGroupVideo(projectId: string, episodeId?: string | null) {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (payload: { storyboardId: string; groupNumber: number; videoUrl: string }) => {
+      _ulogInfo('[VideoHistoryTrace][mutation group select] request', {
+        projectId,
+        episodeId,
+        storyboardId: payload.storyboardId,
+        groupNumber: payload.groupNumber,
+        requestedVideoUrl: summarizeVideoUrl(payload.videoUrl),
+      })
       const res = await apiFetch(`/api/novel-promotion/${projectId}/storyboard-group/select-video`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
+      _ulogInfo('[VideoHistoryTrace][mutation group select] response status', {
+        projectId,
+        episodeId,
+        storyboardId: payload.storyboardId,
+        groupNumber: payload.groupNumber,
+        ok: res.ok,
+        status: res.status,
+      })
       if (!res.ok) {
         const error = await res.json().catch(() => ({}))
+        _ulogWarn('[VideoHistoryTrace][mutation group select] response error', {
+          projectId,
+          episodeId,
+          storyboardId: payload.storyboardId,
+          groupNumber: payload.groupNumber,
+          error,
+        })
         throw new Error(resolveTaskErrorMessage(error, '选择粗镜头历史视频失败'))
       }
-      return res.json()
+      const data = await res.json()
+      _ulogInfo('[VideoHistoryTrace][mutation group select] response data', {
+        projectId,
+        episodeId,
+        storyboardId: payload.storyboardId,
+        groupNumber: payload.groupNumber,
+        responseVideoUrl: summarizeVideoUrl(typeof data?.videoUrl === 'string' ? data.videoUrl : ''),
+        responseCosKey: typeof data?.cosKey === 'string' ? data.cosKey : '',
+      })
+      return data
+    },
+    onSuccess: (data, variables) => {
+      _ulogInfo('[VideoHistoryTrace][mutation group select] onSuccess', {
+        projectId,
+        episodeId,
+        storyboardId: variables.storyboardId,
+        groupNumber: variables.groupNumber,
+        requestedVideoUrl: summarizeVideoUrl(variables.videoUrl),
+        selectedVideoUrl: summarizeVideoUrl(readMutationVideoUrl(data, variables.videoUrl)),
+      })
+      if (!episodeId) {
+        _ulogWarn('[VideoHistoryTrace][mutation group select] skip cache patch: no episodeId', {
+          projectId,
+          storyboardId: variables.storyboardId,
+          groupNumber: variables.groupNumber,
+        })
+        return
+      }
+      queryClient.setQueryData(
+        queryKeys.episodeData(projectId, episodeId),
+        (previous: unknown) => patchEpisodeCoarseGroupVideo(previous, {
+          storyboardId: variables.storyboardId,
+          groupNumber: variables.groupNumber,
+          videoUrl: readMutationVideoUrl(data, variables.videoUrl),
+        }),
+      )
     },
     onSettled: () => {
-      invalidateQueryTemplates(queryClient, [queryKeys.projectAssets.all(projectId)])
+      invalidateQueryTemplates(queryClient, [
+        queryKeys.projectAssets.all(projectId),
+        queryKeys.projectData(projectId),
+        ...(episodeId ? [queryKeys.episodeData(projectId, episodeId)] : []),
+      ])
     },
   })
 }
@@ -181,7 +354,7 @@ export function useSelectProjectStoryboardGroupVideo(projectId: string) {
 /**
  * 删除粗镜头历史视频
  */
-export function useDeleteProjectStoryboardGroupHistoryVideo(projectId: string) {
+export function useDeleteProjectStoryboardGroupHistoryVideo(projectId: string, episodeId?: string | null) {
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -198,7 +371,11 @@ export function useDeleteProjectStoryboardGroupHistoryVideo(projectId: string) {
       return res.json()
     },
     onSettled: () => {
-      invalidateQueryTemplates(queryClient, [queryKeys.projectAssets.all(projectId)])
+      invalidateQueryTemplates(queryClient, [
+        queryKeys.projectAssets.all(projectId),
+        queryKeys.projectData(projectId),
+        ...(episodeId ? [queryKeys.episodeData(projectId, episodeId)] : []),
+      ])
     },
   })
 }
@@ -206,24 +383,72 @@ export function useDeleteProjectStoryboardGroupHistoryVideo(projectId: string) {
 /**
  * 切换单分镜历史视频为当前视频
  */
-export function useSelectProjectPanelHistoryVideo(projectId: string) {
+export function useSelectProjectPanelHistoryVideo(projectId: string, episodeId?: string | null) {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (payload: { panelId: string; videoUrl: string }) => {
+      _ulogInfo('[VideoHistoryTrace][mutation panel select] request', {
+        projectId,
+        episodeId,
+        panelId: payload.panelId,
+        requestedVideoUrl: summarizeVideoUrl(payload.videoUrl),
+      })
       const res = await apiFetch(`/api/novel-promotion/${projectId}/panel/select-video-history`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
+      _ulogInfo('[VideoHistoryTrace][mutation panel select] response status', {
+        projectId,
+        episodeId,
+        panelId: payload.panelId,
+        ok: res.ok,
+        status: res.status,
+      })
       if (!res.ok) {
         const error = await res.json().catch(() => ({}))
+        _ulogWarn('[VideoHistoryTrace][mutation panel select] response error', {
+          projectId,
+          episodeId,
+          panelId: payload.panelId,
+          error,
+        })
         throw new Error(resolveTaskErrorMessage(error, '切换历史视频失败'))
       }
-      return res.json()
+      const data = await res.json()
+      _ulogInfo('[VideoHistoryTrace][mutation panel select] response data', {
+        projectId,
+        episodeId,
+        panelId: payload.panelId,
+        responseVideoUrl: summarizeVideoUrl(typeof data?.videoUrl === 'string' ? data.videoUrl : ''),
+        responseCosKey: typeof data?.cosKey === 'string' ? data.cosKey : '',
+      })
+      return data
+    },
+    onSuccess: (data, variables) => {
+      _ulogInfo('[VideoHistoryTrace][mutation panel select] onSuccess', {
+        projectId,
+        episodeId,
+        panelId: variables.panelId,
+        requestedVideoUrl: summarizeVideoUrl(variables.videoUrl),
+        selectedVideoUrl: summarizeVideoUrl(readMutationVideoUrl(data, variables.videoUrl)),
+      })
+      if (!episodeId) return
+      queryClient.setQueryData(
+        queryKeys.episodeData(projectId, episodeId),
+        (previous: unknown) => patchEpisodePanelVideo(previous, {
+          panelId: variables.panelId,
+          videoUrl: readMutationVideoUrl(data, variables.videoUrl),
+        }),
+      )
     },
     onSettled: () => {
-      invalidateQueryTemplates(queryClient, [queryKeys.projectAssets.all(projectId)])
+      invalidateQueryTemplates(queryClient, [
+        queryKeys.projectAssets.all(projectId),
+        queryKeys.projectData(projectId),
+        ...(episodeId ? [queryKeys.episodeData(projectId, episodeId)] : []),
+      ])
     },
   })
 }
@@ -231,7 +456,7 @@ export function useSelectProjectPanelHistoryVideo(projectId: string) {
 /**
  * 删除单分镜历史视频条目
  */
-export function useDeleteProjectPanelHistoryVideo(projectId: string) {
+export function useDeleteProjectPanelHistoryVideo(projectId: string, episodeId?: string | null) {
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -248,7 +473,11 @@ export function useDeleteProjectPanelHistoryVideo(projectId: string) {
       return res.json()
     },
     onSettled: () => {
-      invalidateQueryTemplates(queryClient, [queryKeys.projectAssets.all(projectId)])
+      invalidateQueryTemplates(queryClient, [
+        queryKeys.projectAssets.all(projectId),
+        queryKeys.projectData(projectId),
+        ...(episodeId ? [queryKeys.episodeData(projectId, episodeId)] : []),
+      ])
     },
   })
 }

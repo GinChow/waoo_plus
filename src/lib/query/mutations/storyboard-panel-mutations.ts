@@ -154,6 +154,7 @@ export function useModifyProjectStoryboardImage(projectId: string) {
             panelIndex: number
             modifyPrompt: string
             extraImageUrls: string[]
+            ignoreBaseImage?: boolean
             selectedAssets: Array<{
                 id: string
                 name: string

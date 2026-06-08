@@ -1,11 +1,12 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { GlassSurface } from '@/components/ui/primitives'
 import { MediaImageWithLoading } from '@/components/media/MediaImageWithLoading'
 import { AppIcon } from '@/components/ui/icons'
 import { useUpdateProjectPanelFirstLastFrameMode } from '@/lib/query/hooks'
+import { logInfo as _ulogInfo } from '@/lib/logging/core'
 import type {
   FirstLastFrameParams,
   GroupVideoGenerationOptions,
@@ -25,6 +26,7 @@ const OMNI_MODEL_ID = 'kling-v3-omni'
 
 interface VideoGroupPanelCardProps {
   projectId: string
+  episodeId: string
   groupPanels: VideoPanel[]
   groupStartGlobalNumber: number
   videoRatio: string
@@ -46,6 +48,7 @@ interface VideoGroupPanelCardProps {
 
 export default function VideoGroupPanelCard({
   projectId,
+  episodeId,
   groupPanels,
   groupStartGlobalNumber,
   videoRatio,
@@ -73,6 +76,20 @@ export default function VideoGroupPanelCard({
   // 组合（omni）合成视频写入组内首个面板的 videoUrl
   const groupVideoUrl = firstPanel?.videoUrl
 
+  useEffect(() => {
+    _ulogInfo('[VideoHistoryTrace][group card] group video url changed', {
+      projectId,
+      episodeId,
+      storyboardId: firstPanel?.storyboardId,
+      panelId: firstPanel?.panelId,
+      panelIndex: firstPanel?.panelIndex,
+      groupVideoUrl: groupVideoUrl || '',
+      historyCount: firstPanel?.videoHistory?.length ?? 0,
+    })
+    setGroupVideoPlaying(false)
+    groupVideoRef.current?.load()
+  }, [episodeId, firstPanel?.panelId, firstPanel?.panelIndex, firstPanel?.storyboardId, firstPanel?.videoHistory?.length, groupVideoUrl, projectId])
+
   // 仅两张图组合支持「首尾帧 / 多镜头」模式切换（与分镜面板共享同一持久化标记）
   const isTwoPanelGroup = groupPanels.length === 2
   const flModeMutation = useUpdateProjectPanelFirstLastFrameMode(projectId)
@@ -89,6 +106,14 @@ export default function VideoGroupPanelCard({
   }
 
   const handlePlayGroupVideo = () => {
+    _ulogInfo('[VideoHistoryTrace][group card] play group video', {
+      projectId,
+      episodeId,
+      storyboardId: firstPanel?.storyboardId,
+      panelId: firstPanel?.panelId,
+      panelIndex: firstPanel?.panelIndex,
+      groupVideoUrl: groupVideoUrl || '',
+    })
     setGroupVideoPlaying(true)
     setTimeout(() => {
       groupVideoRef.current?.play().catch(() => {})
@@ -317,6 +342,7 @@ export default function VideoGroupPanelCard({
           {firstPanel?.panelId && (firstPanel?.videoHistory?.length ?? 0) > 0 && (
             <PanelVideoHistoryDropdown
               projectId={projectId}
+              episodeId={episodeId}
               panelId={firstPanel.panelId}
               currentVideoUrl={groupVideoUrl}
               videoHistory={firstPanel.videoHistory ?? []}

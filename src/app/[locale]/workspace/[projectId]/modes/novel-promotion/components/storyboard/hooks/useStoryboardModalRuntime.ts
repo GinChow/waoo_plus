@@ -7,6 +7,13 @@ import type { StoryboardPanel } from './useStoryboardState'
 import type { SelectedAsset } from './useImageGeneration'
 import { useStoryboardAiDataRuntime } from './useStoryboardAiDataRuntime'
 
+export type AdjacentPanelPosition = 'prev2' | 'prev' | 'current' | 'next' | 'next2'
+
+export interface AdjacentPanelImage {
+  position: AdjacentPanelPosition
+  imageUrl: string
+}
+
 interface AssetPickerPanelRef {
   panelId: string
   type: 'character' | 'location'
@@ -42,7 +49,7 @@ interface UseStoryboardModalRuntimeParams {
   updatePanelEdit: (panelId: string, panel: StoryboardPanel, updates: Partial<PanelEditData>) => void
   savePanelWithData: (storyboardId: string, panelIdOrData: string | PanelEditData) => void | Promise<void>
   getDefaultAssetsForClip: (clipId: string) => SelectedAsset[]
-  handleEditSubmit: (prompt: string, images: string[], assets: SelectedAsset[]) => Promise<void>
+  handleEditSubmit: (prompt: string, images: string[], assets: SelectedAsset[], options?: { ignoreBaseImage?: boolean }) => Promise<void>
   handleAddCharacter: (characterName: string, appearance: string) => void
   handleSetLocation: (locationName: string) => void
   updatePhotographyPlanMutation: PhotographyPlanMutation
@@ -100,6 +107,33 @@ export function useStoryboardModalRuntime({
     return getDefaultAssetsForClip(clipId)
   }, [editingPanel, getDefaultAssetsForClip, localStoryboards])
 
+  const imageEditBaseImage = useMemo(() => {
+    if (!editingPanel) return null
+    const storyboard = localStoryboards.find((item) => item.id === editingPanel.storyboardId)
+    if (!storyboard) return null
+    return getTextPanels(storyboard)[editingPanel.panelIndex]?.imageUrl || null
+  }, [editingPanel, getTextPanels, localStoryboards])
+
+  const imageEditAdjacentImages = useMemo<AdjacentPanelImage[]>(() => {
+    if (!editingPanel) return []
+    const storyboard = localStoryboards.find((item) => item.id === editingPanel.storyboardId)
+    if (!storyboard) return []
+    const panels = getTextPanels(storyboard)
+    const offsets: Array<{ offset: number; position: AdjacentPanelPosition }> = [
+      { offset: -2, position: 'prev2' },
+      { offset: -1, position: 'prev' },
+      { offset: 0, position: 'current' },
+      { offset: 1, position: 'next' },
+      { offset: 2, position: 'next2' },
+    ]
+    const result: AdjacentPanelImage[] = []
+    for (const { offset, position } of offsets) {
+      const url = panels[editingPanel.panelIndex + offset]?.imageUrl
+      if (url) result.push({ position, imageUrl: url })
+    }
+    return result
+  }, [editingPanel, getTextPanels, localStoryboards])
+
   const { aiDataRuntime, handleSaveAIData } = useStoryboardAiDataRuntime({
     aiDataPanel,
     localStoryboards,
@@ -121,6 +155,8 @@ export function useStoryboardModalRuntime({
     videoRatio,
     editingPanel,
     imageEditDefaults,
+    imageEditBaseImage,
+    imageEditAdjacentImages,
     handleEditSubmit,
     closeImageEditModal: () => setEditingPanel(null),
 

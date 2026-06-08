@@ -3,11 +3,17 @@
 import { useState, useCallback, type SyntheticEvent } from 'react'
 import { useTranslations } from 'next-intl'
 import { AppIcon } from '@/components/ui/icons'
+import { logInfo as _ulogInfo } from '@/lib/logging/core'
 import {
   useDeleteProjectPanelHistoryVideo,
   useSelectProjectPanelHistoryVideo,
 } from '@/lib/query/hooks'
 import type { VideoPanel } from '../types'
+
+function summarizeVideoUrl(value: string | null | undefined): string {
+  if (!value) return ''
+  return value.length > 96 ? `${value.slice(0, 48)}...${value.slice(-24)}` : value
+}
 
 export function HistoryVideoThumbnail({ videoUrl, title }: { videoUrl: string; title: string }) {
   const handleSeekToFirstFrame = useCallback((event: SyntheticEvent<HTMLVideoElement>) => {
@@ -51,19 +57,21 @@ export function HistoryVideoThumbnail({ videoUrl, title }: { videoUrl: string; t
 
 export function PanelVideoHistoryDropdown({
   projectId,
+  episodeId,
   panelId,
   currentVideoUrl,
   videoHistory,
 }: {
   projectId: string
+  episodeId?: string
   panelId: string
   currentVideoUrl: string
   videoHistory: NonNullable<VideoPanel['videoHistory']>
 }) {
   const t = useTranslations('video')
   const [open, setOpen] = useState(false)
-  const selectMutation = useSelectProjectPanelHistoryVideo(projectId)
-  const deleteMutation = useDeleteProjectPanelHistoryVideo(projectId)
+  const selectMutation = useSelectProjectPanelHistoryVideo(projectId, episodeId)
+  const deleteMutation = useDeleteProjectPanelHistoryVideo(projectId, episodeId)
   const [selectingUrl, setSelectingUrl] = useState<string | null>(null)
   const [deletingUrl, setDeletingUrl] = useState<string | null>(null)
 
@@ -75,13 +83,32 @@ export function PanelVideoHistoryDropdown({
   }, [])
 
   const handleSelect = useCallback(async (videoUrl: string) => {
+    _ulogInfo('[VideoHistoryTrace][UI panel history] click use history video', {
+      projectId,
+      episodeId,
+      panelId,
+      currentVideoUrl: summarizeVideoUrl(currentVideoUrl),
+      selectedVideoUrl: summarizeVideoUrl(videoUrl),
+      historyCount: videoHistory.length,
+    })
     setSelectingUrl(videoUrl)
     try {
-      await selectMutation.mutateAsync({ panelId, videoUrl })
+      const result = await selectMutation.mutateAsync({ panelId, videoUrl })
+      _ulogInfo('[VideoHistoryTrace][UI panel history] use history video completed', {
+        projectId,
+        episodeId,
+        panelId,
+        selectedVideoUrl: summarizeVideoUrl(videoUrl),
+        responseVideoUrl: summarizeVideoUrl(
+          result && typeof result === 'object' && typeof (result as { videoUrl?: unknown }).videoUrl === 'string'
+            ? (result as { videoUrl: string }).videoUrl
+            : '',
+        ),
+      })
     } finally {
       setSelectingUrl(null)
     }
-  }, [panelId, selectMutation])
+  }, [currentVideoUrl, episodeId, panelId, projectId, selectMutation, videoHistory.length])
 
   const handleDelete = useCallback(async (videoUrl: string) => {
     if (typeof window !== 'undefined' && !window.confirm(t('panelCard.deleteHistoryVideo'))) return

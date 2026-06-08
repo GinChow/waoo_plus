@@ -53,6 +53,35 @@ interface LocationImageRecord {
   } | null
 }
 
+function resolveStoryboardImageQuality(generationOptions: Record<string, unknown> | undefined): 'low' | 'medium' | 'high' | 'auto' {
+  const quality = typeof generationOptions?.quality === 'string' ? generationOptions.quality : ''
+  if (quality === 'low' || quality === 'medium' || quality === 'high' || quality === 'auto') {
+    return quality
+  }
+  return 'high'
+}
+
+function isSupportedStoryboardImageSize(size: string) {
+  if (size === 'auto') return true
+  const match = size.match(/^(\d+)x(\d+)$/)
+  if (!match) return false
+  const width = Number(match[1])
+  const height = Number(match[2])
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return false
+  if (width <= 0 || height <= 0) return false
+  if (Math.max(width, height) > 3840) return false
+  if (width % 16 !== 0 || height % 16 !== 0) return false
+  if (Math.max(width, height) / Math.min(width, height) > 3) return false
+  const pixels = width * height
+  return pixels >= 655360 && pixels <= 8294400
+}
+
+function resolveStoryboardImageSize(generationOptions: Record<string, unknown> | undefined): string {
+  const size = typeof generationOptions?.size === 'string' ? generationOptions.size : ''
+  if (isSupportedStoryboardImageSize(size)) return size
+  return '3840x2160'
+}
+
 export async function handleModifyAssetImageTask(job: Job<TaskJobData>) {
   const payload = (job.data.payload || {}) as AnyObj
   const type = payload.type
@@ -318,7 +347,10 @@ export async function handleModifyAssetImageTask(job: Job<TaskJobData>) {
     const projectData = await resolveNovelData(job.data.projectId)
     if (!projectData.videoRatio) throw new Error('Project videoRatio not configured')
     const aspectRatio = projectData.videoRatio
-    const requiredReference = await normalizeToBase64ForGeneration(currentUrl)
+    const ignoreBaseImage = payload.ignoreBaseImage === true
+    // 与分镜生图链路保持一致：capability 未配置时使用同一组默认请求参数。
+    const quality = resolveStoryboardImageQuality(generationOptions)
+    const size = resolveStoryboardImageSize(generationOptions)
     const extraReferenceInputs: string[] = []
 
     const selectedAssets = Array.isArray(payload.selectedAssets)
@@ -341,8 +373,12 @@ export async function handleModifyAssetImageTask(job: Job<TaskJobData>) {
     }
 
     const normalizedExtras = await normalizeReferenceImagesForGeneration(extraReferenceInputs)
-    const uniqueReferences = Array.from(new Set([requiredReference, ...normalizedExtras]))
-    const prompt = `请根据以下指令修改分镜图片，保持镜头语言和主体一致：\n${modifyPrompt}`
+    const uniqueReferences = ignoreBaseImage
+      ? Array.from(new Set(normalizedExtras))
+      : Array.from(new Set([await normalizeToBase64ForGeneration(currentUrl), ...normalizedExtras]))
+    const prompt = ignoreBaseImage
+      ? `请根据以下指令重新生成分镜图片：\n${modifyPrompt}`
+      : `请根据以下指令修改分镜图片，保持镜头语言和主体一致：\n${modifyPrompt}`
     const source = await resolveImageSourceFromGeneration(job, {
       userId: job.data.userId,
       modelId: editModel,
@@ -351,6 +387,8 @@ export async function handleModifyAssetImageTask(job: Job<TaskJobData>) {
         referenceImages: uniqueReferences,
         aspectRatio,
         ...(resolution ? { resolution } : {}),
+        quality,
+        size,
       },
     })
 
