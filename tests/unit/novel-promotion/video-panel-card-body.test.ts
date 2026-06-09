@@ -29,6 +29,10 @@ vi.mock('@/lib/query/hooks', () => ({
   useSelectProjectStoryboardGroupVideo: () => ({
     mutateAsync: vi.fn(async () => ({ videoUrl: '' })),
   }),
+  useUploadProjectPanelVideo: () => ({
+    mutateAsync: vi.fn(async () => ({ videoUrl: 'https://example.com/uploaded.mp4' })),
+    isPending: false,
+  }),
 }))
 
 function createRuntime(overrides: Partial<VideoPanelRuntime> = {}): VideoPanelRuntime {
@@ -47,6 +51,9 @@ function createRuntime(overrides: Partial<VideoPanelRuntime> = {}): VideoPanelRu
     if (key === 'panelCard.selectModel') return '选择模型'
     if (key === 'panelCard.generateVideo') return '生成视频'
     if (key === 'panelCard.deleteCurrentVideo') return '删除当前视频'
+    if (key === 'panelCard.uploadLocalVideo') return '上传本地视频'
+    if (key === 'panelCard.uploadingVideo') return '上传中'
+    if (key === 'panelCard.uploadVideoFailed') return '上传视频失败'
     if (key === 'panelCard.unknownShotType') return '未知镜头'
     if (key === 'stage.hasSynced') return '已生成'
     if (key === 'promptModal.duration') return '秒'
@@ -203,5 +210,24 @@ describe('VideoPanelCardBody', () => {
 
     expect(markup).toContain('title="删除当前视频"')
     expect(markup).not.toContain('历史视频')
+  })
+
+  it('renders local video upload action for single panel cards', () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(VideoPanelCardBody, {
+        runtime: createRuntime({
+          layout: {
+            ...createRuntime().layout,
+            isLinked: false,
+            isLastFrame: false,
+            nextPanel: null,
+            prevPanel: null,
+          },
+        }),
+      }),
+    )
+
+    expect(markup).toContain('title="上传本地视频"')
+    expect(markup).toContain('accept="video/mp4,video/quicktime,video/webm,video/x-m4v,.mp4,.mov,.webm,.m4v"')
   })
 })

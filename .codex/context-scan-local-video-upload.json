@@ -1,0 +1,48 @@
+{
+  "date": "2026-06-09",
+  "executor": "Codex",
+  "task": "为成片 video panel 增加本地视频上传能力",
+  "toolFallback": {
+    "sequentialThinking": "当前会话未暴露 sequential-thinking 工具，使用本地代码检索、计划工具和验证命令替代。",
+    "shrimpTaskManager": "当前会话未暴露 shrimp-task-manager，使用 update_plan 和本地记录替代。",
+    "codeIndex": "当前会话未暴露 code-index，使用 rg/sed 本地检索替代。"
+  },
+  "location": {
+    "ui": "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/panel-card/VideoPanelCardBody.tsx",
+    "api": "src/app/api/novel-promotion/[projectId]/panel/upload-video/route.ts",
+    "mutation": "src/lib/query/mutations/useVideoMutations.ts",
+    "state": "src/lib/novel-promotion/panel-video-state.ts"
+  },
+  "currentImplementation": {
+    "panelVideo": "单分镜当前视频使用 NovelPromotionPanel.videoUrl 保存 storage key，读取阶段转换为签名 URL，并保留 videoStorageKey 供删除当前视频使用。",
+    "history": "panel.videoHistory 使用 JSON 数组记录历史视频，现有 select/delete API 支持历史视频切换和删除。",
+    "similarPatterns": [
+      "panel/update-image 使用 FormData 上传本地图片并更新 panel 当前图。",
+      "panel/select-video-history 负责验证历史视频并切换当前视频。",
+      "useVideoMutations 中 patchEpisodePanelVideo 用于乐观更新 episode query cache。"
+    ]
+  },
+  "keyQuestions": [
+    {
+      "priority": "high",
+      "question": "上传后是否需要新数据库字段？",
+      "answer": "不需要；现有 videoUrl 和 videoHistory 足够保存当前视频与历史记录。"
+    },
+    {
+      "priority": "high",
+      "question": "上传后如何立即反映到成片面板？",
+      "answer": "新增 useUploadProjectPanelVideo mutation，在成功后 patch episodeData cache 的 videoUrl、videoStorageKey 与 videoHistory，并触发相关 query invalidation。"
+    },
+    {
+      "priority": "medium",
+      "question": "首尾帧链接卡片是否显示上传入口？",
+      "answer": "不显示；链接卡片只展示 firstlastframe 输出，上传普通视频会不可见，因此上传入口限制在普通单分镜卡片。"
+    }
+  ],
+  "sufficiencyCheck": {
+    "interfaceContract": true,
+    "technicalChoice": true,
+    "riskIdentified": true,
+    "verificationKnown": true
+  }
+}

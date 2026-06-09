@@ -1,4 +1,4 @@
-export type PanelVideoHistorySource = 'generate' | 'firstlastframe' | 'select'
+export type PanelVideoHistorySource = 'generate' | 'firstlastframe' | 'select' | 'upload'
 
 export interface PanelVideoHistoryEntry {
   videoUrl: string
@@ -27,7 +27,7 @@ function normalizeEntry(value: unknown): PanelVideoHistoryEntry | null {
   const generatedAt = readString(value.generatedAt || value.timestamp) || new Date().toISOString()
   const sourceRaw = readString(value.source)
   const source: PanelVideoHistorySource | undefined =
-    sourceRaw === 'generate' || sourceRaw === 'firstlastframe' || sourceRaw === 'select'
+    sourceRaw === 'generate' || sourceRaw === 'firstlastframe' || sourceRaw === 'select' || sourceRaw === 'upload'
       ? sourceRaw
       : undefined
   const videoPrompt = readString(value.videoPrompt) || undefined

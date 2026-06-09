@@ -56,3 +56,15 @@ Executor: Codex
 - 根因判断：播放失败、媒体 error/abort 或 ref 不存在时没有复位 `isPlaying`，导致原生视频元素保持挂载并持续显示浏览器加载转圈。
 - 实施：在 `usePanelPlayer` 中增加播放失败复位逻辑、统一退出处理和媒体错误处理；在 `VideoPanelCardHeader` 绑定 `onEnded`、`onError`、`onAbort`。
 - 测试：新增 `tests/unit/novel-promotion/use-panel-player.test.ts`，并补齐相邻 `video-panel-card-body` 测试的 query hook mock。
+
+## Task: Local Video Upload For Video Panel
+
+Date: 2026-06-09
+Executor: Codex
+
+- 工具降级：当前会话没有可调用的 `sequential-thinking`、`shrimp-task-manager`、`code-index`、`exa` MCP 工具入口，因此使用 `rg`、`sed`、`git diff`、本地测试和类型检查替代。
+- 使用 `rg` 定位成片面板、单分镜视频历史、panel 图片上传 API 和 React Query mutation，确认可复用 `videoUrl`/`videoHistory` 字段，无需数据库迁移。
+- 新增 `panel/upload-video` API：接收 FormData 本地视频，上传到 storage，设置为当前视频，并追加 source 为 `upload` 的 panel 视频历史。
+- 新增 `useUploadProjectPanelVideo` mutation：上传成功后 patch episode cache 的 `videoUrl`、`videoStorageKey` 和 `videoHistory`，并刷新项目资产、项目数据与剧集数据。
+- 在普通单分镜 `VideoPanelCardBody` 生成按钮旁增加上传本地视频入口；首尾帧链接卡片不显示上传入口，避免普通视频写入后因展示条件不可见。
+- 补充中英文文案、route catalog、组件单测和上传 API 单测。

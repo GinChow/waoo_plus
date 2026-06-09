@@ -93,7 +93,7 @@ function patchEpisodeCoarseGroupVideo(
 
 function patchEpisodePanelVideo(
   previous: unknown,
-  params: { panelId: string; videoUrl: string | null },
+  params: { panelId: string; videoUrl: string | null; videoStorageKey?: string | null; videoHistory?: unknown[] },
 ): unknown {
   if (!previous || typeof previous !== 'object' || Array.isArray(previous)) return previous
   const episode = previous as EpisodeCache
@@ -109,10 +109,25 @@ function patchEpisodePanelVideo(
         panels: panels.map((panel) => {
           if (!panel || typeof panel !== 'object') return panel
           if ((panel as { id?: unknown }).id !== params.panelId) return panel
-          return { ...panel, videoUrl: params.videoUrl }
+          return {
+            ...panel,
+            videoUrl: params.videoUrl,
+            ...(params.videoStorageKey !== undefined ? { videoStorageKey: params.videoStorageKey } : {}),
+            ...(params.videoHistory !== undefined ? { videoHistory: JSON.stringify(params.videoHistory) } : {}),
+          }
         }),
       }
     }),
+  }
+}
+
+function readUploadPanelVideoResponse(data: unknown, fallback: { videoUrl: string | null; cosKey: string | null; videoHistory: unknown[] | undefined }) {
+  if (!data || typeof data !== 'object') return fallback
+  const record = data as { videoUrl?: unknown; cosKey?: unknown; videoHistory?: unknown }
+  return {
+    videoUrl: typeof record.videoUrl === 'string' ? record.videoUrl : fallback.videoUrl,
+    cosKey: typeof record.cosKey === 'string' ? record.cosKey : fallback.cosKey,
+    videoHistory: Array.isArray(record.videoHistory) ? record.videoHistory : fallback.videoHistory,
   }
 }
 
@@ -500,6 +515,55 @@ export function useDeleteProjectPanelHistoryVideo(projectId: string, episodeId?:
         (previous: unknown) => patchEpisodePanelVideo(previous, {
           panelId: variables.panelId,
           videoUrl: null,
+        }),
+      )
+    },
+    onSettled: () => {
+      invalidateQueryTemplates(queryClient, [
+        queryKeys.projectAssets.all(projectId),
+        queryKeys.projectData(projectId),
+        ...(episodeId ? [queryKeys.episodeData(projectId, episodeId)] : []),
+      ])
+    },
+  })
+}
+
+/**
+ * 上传本地视频并设为单分镜当前视频
+ */
+export function useUploadProjectPanelVideo(projectId: string, episodeId?: string | null) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (payload: { panelId: string; file: File }) => {
+      const formData = new FormData()
+      formData.append('panelId', payload.panelId)
+      formData.append('file', payload.file)
+
+      const res = await apiFetch(`/api/novel-promotion/${projectId}/panel/upload-video`, {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}))
+        throw new Error(resolveTaskErrorMessage(error, '上传视频失败'))
+      }
+      return res.json()
+    },
+    onSuccess: (data, variables) => {
+      if (!episodeId) return
+      const uploadResult = readUploadPanelVideoResponse(data, {
+        videoUrl: null,
+        cosKey: null,
+        videoHistory: undefined,
+      })
+      queryClient.setQueryData(
+        queryKeys.episodeData(projectId, episodeId),
+        (previous: unknown) => patchEpisodePanelVideo(previous, {
+          panelId: variables.panelId,
+          videoUrl: uploadResult.videoUrl,
+          videoStorageKey: uploadResult.cosKey,
+          videoHistory: uploadResult.videoHistory,
         }),
       )
     },

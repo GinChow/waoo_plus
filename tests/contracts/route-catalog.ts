@@ -114,6 +114,7 @@ const ROUTE_FILES = [
   'src/app/api/novel-promotion/[projectId]/panel/select-history/route.ts',
   'src/app/api/novel-promotion/[projectId]/panel/select-video-history/route.ts',
   'src/app/api/novel-promotion/[projectId]/panel/update-image/route.ts',
+  'src/app/api/novel-promotion/[projectId]/panel/upload-video/route.ts',
   'src/app/api/novel-promotion/[projectId]/photography-plan/route.ts',
   'src/app/api/novel-promotion/[projectId]/reference-to-character/route.ts',
   'src/app/api/novel-promotion/[projectId]/regenerate-group/route.ts',

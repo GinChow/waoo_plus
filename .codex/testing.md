@@ -102,3 +102,21 @@ Executor: Codex
 ### Noted
 
 - `cross-env BILLING_TEST_BOOTSTRAP=0 vitest run tests/unit/novel-promotion/use-panel-player.test.ts tests/unit/novel-promotion/video-panel-card-body.test.ts` failed because direct shell invocation could not find `cross-env`; the same focused tests passed through `npx vitest` with the environment variable set directly.
+
+## Local Video Upload For Video Panel
+
+Date: 2026-06-09
+Executor: Codex
+
+### Passed
+
+- `npm run typecheck`
+  - TypeScript check passed.
+- `npx vitest run tests/unit/novel-promotion/video-panel-card-body.test.ts tests/unit/novel-promotion/panel-upload-video-route.test.ts tests/unit/guards/api-route-contract-guard.test.ts`
+  - 3 files passed, 8 tests passed.
+- `npx eslint 'src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/panel-card/VideoPanelCardBody.tsx' 'src/app/api/novel-promotion/[projectId]/panel/upload-video/route.ts' src/lib/novel-promotion/panel-video-state.ts src/lib/query/mutations/useVideoMutations.ts tests/unit/novel-promotion/video-panel-card-body.test.ts tests/unit/novel-promotion/panel-upload-video-route.test.ts`
+  - ESLint passed for touched implementation and test files.
+
+### Noted
+
+- `npm run test:unit:all -- tests/unit/novel-promotion/video-panel-card-body.test.ts tests/unit/novel-promotion/panel-upload-video-route.test.ts` ran the full `tests/unit` suite because the script always includes `tests/unit`; new upload-related tests passed, while three unrelated existing failures remained in `prompt-suffix-regression.test.ts`, `project-global-analyze-mutation.test.ts`, and `async-poll-yunwu-omni.test.ts`.

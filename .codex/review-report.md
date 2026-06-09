@@ -73,3 +73,26 @@ Overall score: 91/100
 ### Residual Risk
 
 - No browser-level reproduction was run in this turn, so the remaining risk is limited to browser-specific native video event timing. The implemented handlers cover the failure paths visible from the code and user screenshot.
+
+## Local Video Upload For Video Panel Review
+
+Date: 2026-06-09
+Reviewer: Codex
+
+Recommendation: Pass
+
+Technical score: 92/100
+Strategic score: 91/100
+Overall score: 92/100
+
+### Findings
+
+- The implementation reuses existing `videoUrl` and `videoHistory` persistence instead of adding a new storage model or migration.
+- The upload API is scoped to project-authenticated panel updates, accepts common browser video formats, uploads through the existing storage provider, and appends a normalized `upload` history entry.
+- The React Query mutation patches the episode cache immediately with signed playback URL, storage key, and history, preserving the existing delete/select video flows.
+- The UI exposes upload only on ordinary single panel cards; first-last-frame linked cards are excluded because their display path only shows `firstlastframe` outputs.
+- Focused component/API/route tests, TypeScript, and ESLint passed.
+
+### Residual Risk
+
+- No browser upload smoke test was run in this turn. Remaining risk is limited to visual spacing and large-file runtime behavior in the actual browser/network environment.

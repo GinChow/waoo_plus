@@ -9,6 +9,7 @@ import {
   useDeleteProjectPanelHistoryVideo,
   useDeleteProjectStoryboardGroupHistoryVideo,
   useSelectProjectStoryboardGroupVideo,
+  useUploadProjectPanelVideo,
 } from '@/lib/query/hooks'
 import type { VideoPanelRuntime } from './hooks/useVideoPanelActions'
 import { HistoryVideoThumbnail, PanelVideoHistoryDropdown } from './PanelVideoHistoryDropdown'
@@ -71,7 +72,9 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
   const isCoarseGroupPanel = !!panel.videoTargetGroupNumber
   const deletePanelVideoMutation = useDeleteProjectPanelHistoryVideo(projectId, episodeId)
   const deleteGroupVideoMutation = useDeleteProjectStoryboardGroupHistoryVideo(projectId, episodeId)
+  const uploadPanelVideoMutation = useUploadProjectPanelVideo(projectId, episodeId)
   const [isDeletingCurrentVideo, setIsDeletingCurrentVideo] = useState(false)
+  const uploadVideoInputRef = useRef<HTMLInputElement>(null)
 
   // 首尾帧组合分镜：结合相邻两个分镜的视频提示词，AI 合成首尾帧视频提示词
   const aiFlPromptMutation = useAiFirstLastFramePrompt(projectId)
@@ -132,6 +135,48 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
     panel.videoUrl,
     t,
   ])
+
+  const handleUploadVideoFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !panel.panelId || isCoarseGroupPanel) return
+    try {
+      await uploadPanelVideoMutation.mutateAsync({
+        panelId: panel.panelId,
+        file,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('panelCard.uploadVideoFailed')
+      if (typeof window !== 'undefined') {
+        window.alert(message)
+      }
+    }
+  }, [isCoarseGroupPanel, panel.panelId, t, uploadPanelVideoMutation])
+
+  const uploadVideoButton = !isCoarseGroupPanel && panel.panelId ? (
+    <>
+      <input
+        ref={uploadVideoInputRef}
+        type="file"
+        accept="video/mp4,video/quicktime,video/webm,video/x-m4v,.mp4,.mov,.webm,.m4v"
+        className="hidden"
+        onChange={(event) => { void handleUploadVideoFile(event) }}
+      />
+      <button
+        type="button"
+        onClick={() => uploadVideoInputRef.current?.click()}
+        disabled={taskStatus.isVideoTaskRunning || uploadPanelVideoMutation.isPending}
+        className="glass-btn-base glass-btn-secondary flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg disabled:opacity-60"
+        title={t('panelCard.uploadLocalVideo')}
+      >
+        {uploadPanelVideoMutation.isPending ? (
+          <span className="text-[10px]">{t('panelCard.uploadingVideo')}</span>
+        ) : (
+          <AppIcon name="upload" className="h-4 w-4" />
+        )}
+      </button>
+    </>
+  ) : null
 
   return (
     <div className="p-4 space-y-2">
@@ -325,6 +370,7 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
                   >
                     {panel.videoUrl ? t('stage.hasSynced') : taskStatus.isVideoTaskRunning ? taskStatus.taskRunningVideoLabel : t('panelCard.generateVideo')}
                   </button>
+                  {uploadVideoButton}
                   {panel.videoUrl && (
                     <button
                       type="button"

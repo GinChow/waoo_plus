@@ -112,3 +112,23 @@ Fixed the video render panel preview player so native video play failures and me
 
 - No browser screenshot run was executed for this UI-only playback state; local automated verification covered unit logic, type safety, and linting.
 - Direct `cross-env ... vitest` shell invocation failed because `cross-env` was not on PATH outside npm scripts; tests passed with `BILLING_TEST_BOOTSTRAP=0 npx vitest run ...`.
+
+## Local Video Upload For Video Panel
+
+Date: 2026-06-09
+Executor: Codex
+
+Implemented a local video upload path for ordinary single video panel cards. The API uploads MP4/MOV/WebM/M4V files to storage, sets the uploaded object as the current panel video, clears stale lip-sync output, and appends an `upload` source entry to panel video history.
+
+### Commands
+
+- `npm run typecheck` passed.
+- `npx vitest run tests/unit/novel-promotion/video-panel-card-body.test.ts tests/unit/novel-promotion/panel-upload-video-route.test.ts tests/unit/guards/api-route-contract-guard.test.ts` passed.
+- `npx eslint 'src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/panel-card/VideoPanelCardBody.tsx' 'src/app/api/novel-promotion/[projectId]/panel/upload-video/route.ts' src/lib/novel-promotion/panel-video-state.ts src/lib/query/mutations/useVideoMutations.ts tests/unit/novel-promotion/video-panel-card-body.test.ts tests/unit/novel-promotion/panel-upload-video-route.test.ts` passed.
+- `npm run test:unit:all -- tests/unit/novel-promotion/video-panel-card-body.test.ts tests/unit/novel-promotion/panel-upload-video-route.test.ts` ran the whole unit suite and failed only on unrelated existing tests: `prompt-suffix-regression.test.ts`, `project-global-analyze-mutation.test.ts`, and `async-poll-yunwu-omni.test.ts`.
+
+### Coverage
+
+- Component coverage confirms ordinary single panel cards render the local video upload file input and upload button.
+- API coverage confirms uploaded videos are persisted to storage, set as current panel video, and appended into video history.
+- Route contract coverage confirms the new route follows protected API conventions.

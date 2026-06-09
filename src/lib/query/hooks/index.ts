@@ -123,6 +123,7 @@ export {
     useDeleteProjectStoryboardGroupHistoryVideo,
     useSelectProjectPanelHistoryVideo,
     useDeleteProjectPanelHistoryVideo,
+    useUploadProjectPanelVideo,
     useRegenerateProjectPanelImage,
     useSelectProjectStoryboardGroupImage,
     useDeleteProjectStoryboardGroupHistoryImage,
