@@ -4,8 +4,10 @@ import { requireProjectAuthLight, isErrorResponse } from '@/lib/api-auth'
 import { apiHandler, ApiError } from '@/lib/api-errors'
 
 interface PanelData {
+    id: string
     panelIndex: number | null
     description: string | null
+    duration: number | null
     videoUrl: string | null
     lipSyncVideoUrl: string | null
 }
@@ -23,6 +25,13 @@ interface ClipData {
 interface EpisodeData {
     storyboards?: StoryboardData[]
     clips?: ClipData[]
+}
+
+function resolveVideoExtension(videoKey: string): string {
+    const path = videoKey.split(/[?#]/, 1)[0]
+    const match = path.match(/\.([a-zA-Z0-9]+)$/)
+    const extension = match?.[1]?.toLowerCase()
+    return extension && ['mp4', 'mov', 'webm', 'm4v'].includes(extension) ? extension : 'mp4'
 }
 
 /**
@@ -46,6 +55,10 @@ export const POST = apiHandler(async (
     const authResult = await requireProjectAuthLight(projectId)
     if (isErrorResponse(authResult)) return authResult
     const project = authResult.project
+    const projectConfig = await prisma.novelPromotionProject.findUnique({
+        where: { projectId },
+        select: { videoRatio: true }
+    })
 
     // 根据是否指定 episodeId 来获取数据
     let episodes: EpisodeData[] = []
@@ -102,6 +115,11 @@ export const POST = apiHandler(async (
         videoUrl: string  // 签名后的完整URL
         clipIndex: number
         panelIndex: number
+        panelId: string
+        storyboardId: string
+        description: string
+        durationSeconds: number
+        sourceType: 'original' | 'lip-sync'
     }
 
     // 从 episodes 中获取所有 storyboards 和 clips
@@ -130,11 +148,14 @@ export const POST = apiHandler(async (
 
             // 根据用户偏好选择视频类型
             let videoKey: string | null = null
+            let sourceType: 'original' | 'lip-sync' = 'original'
 
             if (preferLipSync) {
                 videoKey = panel.lipSyncVideoUrl || panel.videoUrl
+                sourceType = panel.lipSyncVideoUrl ? 'lip-sync' : 'original'
             } else {
                 videoKey = panel.videoUrl || panel.lipSyncVideoUrl
+                sourceType = panel.videoUrl ? 'original' : 'lip-sync'
             }
 
             if (videoKey) {
@@ -146,8 +167,14 @@ export const POST = apiHandler(async (
                     videoUrl: '',
                     clipIndex: clipIndex >= 0 ? clipIndex : 999,
                     panelIndex: panel.panelIndex || 0,
+                    panelId: panel.id,
+                    storyboardId: storyboard.id,
+                    description: panel.description || '镜头',
+                    durationSeconds: panel.duration && panel.duration > 0 ? panel.duration : 3,
+                    sourceType,
                     videoKey,
-                    desc: safeDesc})
+                    desc: safeDesc
+                })
             }
         }
     }
@@ -165,7 +192,8 @@ export const POST = apiHandler(async (
         const videoKey = video.videoKey
         const safeDesc = video.desc
         const index = idx + 1
-        const fileName = `${String(index).padStart(3, '0')}_${safeDesc}.mp4`
+        const extension = resolveVideoExtension(videoKey)
+        const fileName = `${String(index).padStart(3, '0')}_${safeDesc}.${extension}`
 
         // 使用代理 URL，避免 CORS 问题
         const proxyUrl = `/api/novel-promotion/${projectId}/video-proxy?key=${encodeURIComponent(videoKey)}`
@@ -173,7 +201,13 @@ export const POST = apiHandler(async (
         return {
             index,
             fileName,
-            videoUrl: proxyUrl
+            videoUrl: proxyUrl,
+            panelId: video.panelId,
+            storyboardId: video.storyboardId,
+            panelIndex: video.panelIndex,
+            description: video.description,
+            durationSeconds: video.durationSeconds,
+            sourceType: video.sourceType
         }
     })
 
@@ -183,6 +217,7 @@ export const POST = apiHandler(async (
 
     return NextResponse.json({
         projectName: project.name,
+        videoRatio: projectConfig?.videoRatio || '16:9',
         videos: result
     })
 })

@@ -68,3 +68,44 @@ Executor: Codex
 - 新增 `useUploadProjectPanelVideo` mutation：上传成功后 patch episode cache 的 `videoUrl`、`videoStorageKey` 和 `videoHistory`，并刷新项目资产、项目数据与剧集数据。
 - 在普通单分镜 `VideoPanelCardBody` 生成按钮旁增加上传本地视频入口；首尾帧链接卡片不显示上传入口，避免普通视频写入后因展示条件不可见。
 - 补充中英文文案、route catalog、组件单测和上传 API 单测。
+
+## Task: Universal Editing Project Export
+
+Date: 2026-06-09
+Executor: Codex
+
+- 工具降级：当前会话未暴露 sequential-thinking、shrimp-task-manager、code-index；使用 rg、仓库读取和 update_plan 替代。
+- 定位成片工具栏、视频下载 Hook、video-urls 接口、面板时长和项目画幅字段。
+- 采用浏览器端下载素材与 JSZip 打包，并新增纯函数生成 FCPXML、Premiere XML 和 manifest。
+
+## Task: Editing Project Export Progress
+
+Date: 2026-06-10
+Executor: Codex
+
+- 检查现有剪辑工程导出 Hook 和成片工具栏，确认长耗时阶段为逐片下载和浏览器端 JSZip 打包。
+- 新增准备、下载、打包三阶段进度状态；下载显示当前片段数，打包使用 JSZip 实时百分比。
+- 工具栏下方新增可访问进度条，并限制打包阶段仅在整数百分比变化时刷新。
+
+## Task: Vidu Q3 Pro Panel Generation 404
+
+Date: 2026-06-10
+Executor: Codex
+
+- 工具降级：当前会话未暴露 sequential-thinking、shrimp-task-manager、code-index、exa；使用 rg、仓库读取、内置计划、本地数据库查询和官方 Vidu 文档替代。
+- 定位到 Yunwu provider 的 viduq3-pro/viduq3-turbo 保存了默认 OpenAI `/videos` multipart 模板，实际自定义端点为 `/ent/v2/img2video`。
+- 通过无鉴权和空参数探测确认 `https://yunwu.ai/v1/videos` 与 `/v1/ent/v2/img2video` 为 404，根路径 `/ent/v2/img2video` 可命中 API。
+- 将两个 Vidu Q3 模型模板更新为 Vidu JSON 创建协议、`task_id/state` 响应字段和 `/ent/v2/tasks/{id}/creations` 轮询协议。
+- 修改错误归一化，优先识别正文中的上游状态码，避免外层 429 包装上游 404 时安排无效重试。
+
+## Task: Per-Panel Video Download
+
+Date: 2026-06-10
+Executor: Codex
+
+- 工具降级：当前会话未暴露 sequential-thinking、shrimp-task-manager、code-index；使用 `rg`、仓库读取、`update_plan` 和本地测试替代。
+- 定位 `VideoPanelCardHeader`、卡片 runtime、`useDownloadRemoteBlob` 和现有 `video-proxy` 下载链路。
+- 新增卡片级下载 Hook，下载当前可见版本的视频；口型同步开关切换后会下载对应预览版本。
+- 文件名采用三位分镜编号和分镜简介，清理非法字符、限制简介长度，并保留 MP4/MOV/WebM/M4V 扩展名。
+- 在视频卡片右下角增加下载按钮及下载中状态，并补充文件名和组件渲染测试。
+- 下载失败回归修复：`video-proxy` 原先把 `/m/publicId` 媒体路由直接当作 storageKey 签名，导致对象地址 404；现改为先通过 `resolveStorageKeyFromMediaValue` 还原真实 key，再调用 `getSignedObjectUrl` 流式代理。

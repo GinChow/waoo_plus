@@ -2,10 +2,19 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import VideoPanelCardBody from '@/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/panel-card/VideoPanelCardBody'
+import VideoPanelCardHeader from '@/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/panel-card/VideoPanelCardHeader'
 import type { VideoPanelRuntime } from '@/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/panel-card/hooks/useVideoPanelActions'
 
 vi.mock('@/components/task/TaskStatusInline', () => ({
   default: () => React.createElement('span', null, 'task-status'),
+}))
+
+vi.mock('@/components/task/TaskStatusOverlay', () => ({
+  default: () => React.createElement('span', null, 'task-overlay'),
+}))
+
+vi.mock('@/components/media/MediaImageWithLoading', () => ({
+  MediaImageWithLoading: () => React.createElement('img', { alt: 'preview' }),
 }))
 
 vi.mock('@/components/ui/config-modals/ModelCapabilityDropdown', () => ({
@@ -50,6 +59,7 @@ function createRuntime(overrides: Partial<VideoPanelRuntime> = {}): VideoPanelRu
     if (key === 'panelCard.clickToEditPrompt') return '点击编辑提示词...'
     if (key === 'panelCard.selectModel') return '选择模型'
     if (key === 'panelCard.generateVideo') return '生成视频'
+    if (key === 'panelCard.download') return '下载'
     if (key === 'panelCard.deleteCurrentVideo') return '删除当前视频'
     if (key === 'panelCard.uploadLocalVideo') return '上传本地视频'
     if (key === 'panelCard.uploadingVideo') return '上传中'
@@ -229,5 +239,41 @@ describe('VideoPanelCardBody', () => {
 
     expect(markup).toContain('title="上传本地视频"')
     expect(markup).toContain('accept="video/mp4,video/quicktime,video/webm,video/x-m4v,.mp4,.mov,.webm,.m4v"')
+  })
+})
+
+describe('VideoPanelCardHeader', () => {
+  it('renders a download action for the currently visible video', () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(VideoPanelCardHeader, {
+        runtime: createRuntime({
+          panel: {
+            ...createRuntime().panel,
+            videoUrl: 'https://example.com/current.mp4',
+          },
+          media: {
+            ...createRuntime().media,
+            baseVideoUrl: 'https://example.com/current.mp4',
+            currentVideoUrl: 'https://example.com/current.mp4',
+          },
+          player: {
+            ...createRuntime().player,
+            cssAspectRatio: '16/9',
+          },
+          download: {
+            isDownloading: false,
+            handleDownload: vi.fn(async () => undefined),
+          },
+          layout: {
+            ...createRuntime().layout,
+            isLinked: false,
+            isLastFrame: false,
+          },
+        }),
+      }),
+    )
+
+    expect(markup).toContain('title="下载"')
+    expect(markup).toContain('download')
   })
 })

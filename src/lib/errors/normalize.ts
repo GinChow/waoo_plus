@@ -153,7 +153,10 @@ function inferCodeFromMessage(message: string): UnifiedErrorCode | null {
     return explicitMatch[1]
   }
 
-  const statusMatch = message.match(/\bstatus\s+(\d{3})\b/i)
+  // 兼容网关可能用自身状态码包装上游错误；优先采用明确的上游状态，
+  // 避免把“外层 429、上游 404”误判为可重试限流。
+  const statusMatch = message.match(/\bupstream returned non-2xx status:\s*(\d{3})\b/i)
+    || message.match(/\bstatus\s+(\d{3})\b/i)
     || message.match(/\berror:\s*(\d{3})\b/i)
     || message.match(/\bhttp\s+(\d{3})\b/i)
   if (statusMatch) {

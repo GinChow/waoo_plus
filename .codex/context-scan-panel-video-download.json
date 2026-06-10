@@ -1,0 +1,32 @@
+{
+  "date": "2026-06-10",
+  "executor": "Codex",
+  "task": "为成片面板每个有视频的卡片增加单视频下载按钮，并按分镜编号和简介命名",
+  "locations": [
+    "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/panel-card/VideoPanelCardHeader.tsx",
+    "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/panel-card/runtime/videoPanelRuntimeCore.tsx",
+    "src/app/api/novel-promotion/[projectId]/video-proxy/route.ts"
+  ],
+  "existingPatterns": [
+    "useDownloadRemoteBlob 负责浏览器端 Blob 下载",
+    "video-proxy 提供项目鉴权后的同源视频流代理",
+    "批量下载文件名使用三位编号、分镜简介和视频扩展名"
+  ],
+  "interfaceContract": {
+    "input": "当前卡片可见视频 URL、展示分镜编号、textPanel.description",
+    "output": "浏览器下载单个视频文件",
+    "filename": "NNN_分镜简介.ext"
+  },
+  "risks": [
+    "远程视频跨域，因此必须通过现有 video-proxy 下载",
+    "简介可能包含文件系统非法字符，因此需清理并限制长度",
+    "口型同步切换后应下载当前正在预览的视频版本"
+  ],
+  "sufficiencyCheck": {
+    "interfaceDefined": true,
+    "technicalChoiceUnderstood": true,
+    "mainRisksIdentified": true,
+    "verificationKnown": true
+  },
+  "toolFallback": "sequential-thinking、shrimp-task-manager、code-index 当前未暴露，使用 rg、仓库读取、update_plan 和本地测试替代。"
+}

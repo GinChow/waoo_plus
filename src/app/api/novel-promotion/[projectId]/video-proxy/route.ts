@@ -1,8 +1,22 @@
 import { logInfo as _ulogInfo } from '@/lib/logging/core'
 import { NextRequest } from 'next/server'
-import { getSignedUrl, toFetchableUrl } from '@/lib/storage'
+import { getSignedObjectUrl, toFetchableUrl } from '@/lib/storage'
+import { resolveStorageKeyFromMediaValue } from '@/lib/media/service'
 import { requireProjectAuthLight, isErrorResponse } from '@/lib/api-auth'
 import { apiHandler, ApiError } from '@/lib/api-errors'
+
+export async function resolveVideoProxyFetchUrl(videoValue: string): Promise<string> {
+    if (videoValue.startsWith('http://') || videoValue.startsWith('https://')) {
+        return videoValue
+    }
+
+    const storageKey = await resolveStorageKeyFromMediaValue(videoValue)
+    if (storageKey) {
+        return toFetchableUrl(await getSignedObjectUrl(storageKey, 3600))
+    }
+
+    return toFetchableUrl(videoValue)
+}
 
 /**
  * 代理下载单个视频文件
@@ -14,9 +28,9 @@ export const GET = apiHandler(async (
 ) => {
     const { projectId } = await context.params
     const { searchParams } = new URL(request.url)
-    const videoKey = searchParams.get('key')
+    const videoValue = searchParams.get('key')
 
-    if (!videoKey) {
+    if (!videoValue) {
         throw new ApiError('INVALID_PARAMS')
     }
 
@@ -24,13 +38,8 @@ export const GET = apiHandler(async (
     const authResult = await requireProjectAuthLight(projectId)
     if (isErrorResponse(authResult)) return authResult
 
-    // 生成签名 URL 并下载
-    let fetchUrl: string
-    if (videoKey.startsWith('http://') || videoKey.startsWith('https://')) {
-        fetchUrl = videoKey
-    } else {
-        fetchUrl = toFetchableUrl(getSignedUrl(videoKey, 3600))
-    }
+    // 媒体路由需要先还原成真实 storageKey，避免把 /m/... 当作对象 key 签名。
+    const fetchUrl = await resolveVideoProxyFetchUrl(videoValue)
 
     _ulogInfo(`[视频代理] 下载: ${fetchUrl.substring(0, 100)}...`)
 

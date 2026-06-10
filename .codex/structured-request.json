@@ -1,0 +1,20 @@
+{
+  "date": "2026-06-09",
+  "executor": "Codex",
+  "goal": "将当前剧集所有已生成且当前选中的视频片段按分镜顺序导出到通用剪辑工程包。",
+  "deliverables": [
+    "media 目录中的独立 MP4 片段",
+    "timeline.fcpxml",
+    "timeline.xml",
+    "manifest.json",
+    "成片工具栏导出入口"
+  ],
+  "excluded": ["配音独立轨", "字幕", "BGM", "转场", "剪映私有草稿格式"],
+  "acceptance": [
+    "导出顺序与成片面板一致",
+    "遵循原视频/口型同步视频选择",
+    "时间线为 30fps 并使用面板时长",
+    "任一素材下载失败时不生成残缺工程",
+    "FCPXML 和 Premiere XML 使用相对素材路径"
+  ]
+}

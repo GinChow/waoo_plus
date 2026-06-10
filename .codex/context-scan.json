@@ -1,32 +1,36 @@
 {
-  "date": "2026-05-01",
+  "date": "2026-06-09",
   "executor": "Codex",
-  "task": "为粗镜头卡片增加粗镜头分镜图生成历史下拉预览与选择当前图功能",
-  "location": {
-    "ui": "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/storyboard/StoryboardGroup.tsx",
-    "generationWorker": "src/lib/workers/handlers/panel-image-task-handler.ts",
-    "stateField": "NovelPromotionStoryboard.coarseGroupsJson"
-  },
-  "currentImplementation": {
-    "storage": "coarseGroupsJson 原本按 groupNumber 保存单个 imageUrl/candidateImages/imagePrompt/videoPrompt",
-    "rendering": "StoryboardGroup 解析 coarseGroupsJson 并展示当前粗镜头 imageUrl",
-    "generation": "handleStoryboardGroupImageTask 每次生成后覆盖对应 group 的 imageUrl"
-  },
-  "similarPatterns": [
-    "panel/select-candidate 使用候选图选择并写回当前图片",
-    "MediaImageWithLoading 用于分镜图片预览",
-    "coarseGroupsJson 已在 media attach 阶段解析并转换可访问 URL"
+  "task": "在成片面板导出通用剪辑工程包",
+  "locations": [
+    "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/VideoToolbar.tsx",
+    "src/lib/novel-promotion/stages/video-stage-runtime/useVideoDownloadAll.ts",
+    "src/app/api/novel-promotion/[projectId]/video-urls/route.ts"
+  ],
+  "existingPattern": "成片页通过 video-urls 接口获取当前选中视频，再由浏览器下载并用 JSZip 打包。",
+  "similarCases": [
+    "成片视频批量下载",
+    "配音批量下载",
+    "分镜图片批量下载"
+  ],
+  "stack": ["Next.js", "TypeScript", "React Query", "JSZip", "Vitest"],
+  "testStrategy": "对时间线生成器做单元测试，并执行类型检查与相关单元测试。",
+  "observations": [
+    "独立视频编辑器当前被路由禁用，入口应位于现有成片工具栏。",
+    "当前视频选择偏好决定导出原始视频还是口型同步视频。",
+    "现有批量下载允许单个素材失败后继续；剪辑工程导出必须失败即终止，避免残缺时间线。",
+    "sequential-thinking、shrimp-task-manager、code-index 当前环境未提供，已降级为仓库检索和内置计划工具。"
   ],
   "questions": [
     {
       "priority": "high",
-      "question": "历史记录是否需要新增表或字段？",
-      "answer": "不需要；coarseGroupsJson 已是 LONGTEXT，适合在每个 group 内扩展 imageHistory，避免数据库迁移。"
+      "question": "导出入口应依赖禁用的独立编辑器还是当前成片状态？",
+      "answer": "依赖当前成片状态，直接读取数据库当前视频并应用原视频/口型同步选择偏好。"
     },
     {
       "priority": "high",
-      "question": "选择历史图片如何持久化？",
-      "answer": "新增 storyboard-group/select-image API，仅验证并切换指定 group 的 imageUrl。"
+      "question": "素材失败时是否允许输出部分工程？",
+      "answer": "不允许，任一素材下载失败即终止，避免时间线引用缺失文件。"
     }
   ],
   "sufficiencyCheck": {

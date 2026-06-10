@@ -120,3 +120,74 @@ Executor: Codex
 ### Noted
 
 - `npm run test:unit:all -- tests/unit/novel-promotion/video-panel-card-body.test.ts tests/unit/novel-promotion/panel-upload-video-route.test.ts` ran the full `tests/unit` suite because the script always includes `tests/unit`; new upload-related tests passed, while three unrelated existing failures remained in `prompt-suffix-regression.test.ts`, `project-global-analyze-mutation.test.ts`, and `async-poll-yunwu-omni.test.ts`.
+
+## Universal Editing Project Export
+
+Date: 2026-06-09
+Executor: Codex
+
+### Passed
+
+- `npx vitest run tests/unit/video-export/timeline-export.test.ts tests/unit/novel-promotion/video-urls-route.test.ts`
+  - 2 files passed, 5 tests passed.
+- `npm run typecheck`
+  - TypeScript check passed.
+- Focused ESLint for the export generator, hook, API route, toolbar, runtime, and tests passed.
+- `git diff --check` passed.
+
+### Noted
+
+- `npm run test:unit:all` completed with 858 passing tests and 3 unrelated existing failures in `prompt-suffix-regression.test.ts`, `project-global-analyze-mutation.test.ts`, and `async-poll-yunwu-omni.test.ts`.
+- `npm run check:file-line-count` failed on pre-existing oversized files; neither new implementation file exceeds its category budget.
+- No real Final Cut Pro, Premiere Pro, or DaVinci Resolve import smoke test was available in the local environment.
+
+## Editing Project Export Progress
+
+Date: 2026-06-10
+Executor: Codex
+
+### Passed
+
+- `npx vitest run tests/unit/video-export/export-progress.test.ts tests/unit/video-export/timeline-export.test.ts tests/unit/novel-promotion/video-urls-route.test.ts tests/unit/novel-promotion/video-toolbar-export-progress.test.ts`
+  - 4 files passed, 8 tests passed.
+- `npm run typecheck` passed.
+- Focused ESLint and `git diff --check` passed.
+
+## Vidu Q3 Pro Panel Generation 404
+
+Date: 2026-06-10
+Executor: Codex
+
+### Passed
+
+- `npx vitest run tests/unit/task/normalize-error.test.ts`
+  - 1 file passed, 12 tests passed.
+- `npm run typecheck`
+  - TypeScript check passed.
+- Authenticated empty-body route probe
+  - Rendered URL: `https://yunwu.ai/ent/v2/img2video`.
+  - Response reached Yunwu business routing with HTTP 503 instead of route 404; no generation task was created.
+
+### Not Run
+
+- A real video generation was not submitted because it would consume provider credits.
+
+## Per-Panel Video Download
+
+Date: 2026-06-10
+Executor: Codex
+
+### Passed
+
+- `npx vitest run tests/unit/novel-promotion/panel-video-download.test.ts tests/unit/novel-promotion/video-panel-card-body.test.ts`
+  - 2 files passed, 6 tests passed.
+- `npm run typecheck`
+  - TypeScript check passed.
+- Focused ESLint for the touched card runtime, header, download Hook, and tests passed.
+- `git diff --check` passed.
+
+### Noted
+
+- `npm run test:unit:all` completed with 863 passing tests and 3 unrelated existing failures in `prompt-suffix-regression.test.ts`, `project-global-analyze-mutation.test.ts`, and `async-poll-yunwu-omni.test.ts`.
+- 下载代理回归修复后执行 `npx vitest run tests/unit/novel-promotion/video-proxy-route.test.ts tests/unit/novel-promotion/panel-video-download.test.ts`：2 files passed, 4 tests passed。
+- 下载代理回归修复后 `npm run typecheck`、focused ESLint 与 `git diff --check` 均通过。

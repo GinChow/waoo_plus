@@ -96,3 +96,94 @@ Overall score: 92/100
 ### Residual Risk
 
 - No browser upload smoke test was run in this turn. Remaining risk is limited to visual spacing and large-file runtime behavior in the actual browser/network environment.
+
+## Universal Editing Project Export Review
+
+Date: 2026-06-09
+Reviewer: Codex
+
+Recommendation: Pass
+
+Technical score: 90/100
+Strategic score: 93/100
+Overall score: 91/100
+
+### Findings
+
+- The export is integrated into the active video stage instead of the currently disabled standalone editor.
+- The existing video selection contract is extended with duration, source type, panel identity, and project ratio without breaking the existing bulk-download consumer.
+- FCPXML, Premiere XML, and manifest generation are isolated as deterministic pure functions with XML escaping, frame rounding, sequential timing, and relative media paths.
+- The export aborts on any media download failure, preventing delivery of a timeline with missing source files.
+- Focused tests, TypeScript, ESLint, and diff validation passed.
+
+### Residual Risk
+
+- XML import behavior has not been exercised in installed desktop editors. FCPXML and xmeml are intentionally limited to a single video track and linked source-audio track; advanced effects and metadata are out of scope.
+- Browser-side ZIP creation keeps downloaded media in memory, so very large episodes may require a future streaming or desktop-side export path.
+
+## Editing Project Export Progress Review
+
+Date: 2026-06-10
+Reviewer: Codex
+
+Recommendation: Pass
+
+Technical score: 92/100
+Strategic score: 94/100
+Overall score: 93/100
+
+### Findings
+
+- The UI now distinguishes metadata preparation, per-clip downloading, and archive generation.
+- Download progress reserves 5-85% and reports current/total clips; JSZip metadata drives the final 85-100%.
+- Packing updates are deduplicated by integer percentage to avoid unnecessary React rendering during large exports.
+- The progress bar exposes `role=progressbar`, percentage attributes, and live status text.
+
+### Residual Risk
+
+- Export still retains media blobs in browser memory. The progress UI prevents apparent freezing but does not change the memory ceiling for extremely large projects.
+
+## Vidu Q3 Pro Panel Generation 404 Review
+
+Date: 2026-06-10
+Reviewer: Codex
+
+Recommendation: Pass
+
+Technical score: 94/100
+Strategic score: 93/100
+Overall score: 94/100
+
+### Findings
+
+- The saved model template now matches the provider's Vidu image-to-video create and polling contract without adding provider-specific runtime branching.
+- The request uses the provider's root API URL, avoiding the OpenAI-compatible `/v1` normalization that caused the 404.
+- Nested upstream 404 errors are now non-retryable even when a gateway wraps them in HTTP 429.
+- Focused unit tests and TypeScript checks passed; an authenticated no-task probe reached the intended provider route.
+
+### Residual Risk
+
+- A paid end-to-end Vidu generation was intentionally not executed, so final provider output polling remains unverified against a live successful task in this turn.
+
+## Per-Panel Video Download Review
+
+Date: 2026-06-10
+Reviewer: Codex
+
+Recommendation: Pass
+
+Technical score: 93/100
+Strategic score: 94/100
+Overall score: 93/100
+
+### Findings
+
+- The implementation reuses the existing Blob mutation and authenticated video proxy instead of introducing a second download transport.
+- The button downloads the runtime's current video URL, so original and lip-sync selection remains consistent with playback.
+- Filename generation follows the existing batch-download convention while handling invalid characters and common video extensions.
+- Focused tests, TypeScript, ESLint, and diff validation passed.
+
+### Residual Risk
+
+- No browser click smoke test was run; remaining risk is limited to browser-specific download behavior and visual spacing on unusually narrow cards.
+- 首次浏览器点击暴露媒体路由 404 后已修复；新增回归测试确认 `/m/publicId` 不会被错误签名为 storageKey。

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import TaskStatusOverlay from '@/components/task/TaskStatusOverlay'
 import { MediaImageWithLoading } from '@/components/media/MediaImageWithLoading'
 
@@ -20,6 +20,7 @@ export default function VideoPanelCardHeader({ runtime }: VideoPanelCardHeaderPr
     taskStatus,
     videoModel,
     player,
+    download,
     actions,
   } = runtime
 
@@ -133,27 +134,51 @@ export default function VideoPanelCardHeader({ runtime }: VideoPanelCardHeaderPr
         </div>
       ) : null}
 
-      {/* 重新生成按钮 */}
-      {!layout.isLinked && !layout.isLastFrame && (hasVisibleBaseVideo || taskStatus.isVideoTaskRunning) && (
-        <button
-          onClick={() =>
-            actions.onGenerateVideo(
-              panel.storyboardId,
-              panel.panelIndex,
-              videoModel.selectedModel,
-              undefined,
-              videoModel.generationOptions,
-              panel.panelId,
-            )}
-          disabled={
-            taskStatus.isVideoTaskRunning
-            || !videoModel.selectedModel
-            || videoModel.missingCapabilityFields.length > 0
-          }
-          className="absolute bottom-2 right-2 bg-[var(--glass-overlay)] hover:bg-[var(--glass-overlay-strong)] text-white p-2 rounded-full transition-all z-20 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <AppIcon name="refresh" className="w-4 h-4" />
-        </button>
+      {/* 视频操作按钮 */}
+      {(media.currentVideoUrl || (!layout.isLinked && !layout.isLastFrame && taskStatus.isVideoTaskRunning)) && (
+        <div className="absolute bottom-2 right-2 flex items-center gap-2 z-20">
+          {media.currentVideoUrl && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                void download.handleDownload()
+              }}
+              disabled={download.isDownloading}
+              className="bg-[var(--glass-overlay)] hover:bg-[var(--glass-overlay-strong)] text-white p-2 rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              title={t('panelCard.download')}
+              aria-label={t('panelCard.download')}
+            >
+              <AppIcon
+                name={download.isDownloading ? 'loader' : 'download'}
+                className={`w-4 h-4 ${download.isDownloading ? 'animate-spin' : ''}`}
+              />
+            </button>
+          )}
+
+          {!layout.isLinked && !layout.isLastFrame && (hasVisibleBaseVideo || taskStatus.isVideoTaskRunning) && (
+            <button
+              type="button"
+              onClick={() =>
+                actions.onGenerateVideo(
+                  panel.storyboardId,
+                  panel.panelIndex,
+                  videoModel.selectedModel,
+                  undefined,
+                  videoModel.generationOptions,
+                  panel.panelId,
+                )}
+              disabled={
+                taskStatus.isVideoTaskRunning
+                || !videoModel.selectedModel
+                || videoModel.missingCapabilityFields.length > 0
+              }
+              className="bg-[var(--glass-overlay)] hover:bg-[var(--glass-overlay-strong)] text-white p-2 rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <AppIcon name="refresh" className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       )}
 
       {/* 任务进度遮罩 */}

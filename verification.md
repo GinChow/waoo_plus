@@ -132,3 +132,77 @@ Implemented a local video upload path for ordinary single video panel cards. The
 - Component coverage confirms ordinary single panel cards render the local video upload file input and upload button.
 - API coverage confirms uploaded videos are persisted to storage, set as current panel video, and appended into video history.
 - Route contract coverage confirms the new route follows protected API conventions.
+
+## Universal Editing Project Export
+
+Date: 2026-06-09
+Executor: Codex
+
+Implemented an editing-project ZIP export from the active video stage. The package contains all currently selected generated videos under `media/`, plus `timeline.fcpxml`, Premiere-compatible `timeline.xml`, and `manifest.json`.
+
+### Commands
+
+- `npx vitest run tests/unit/video-export/timeline-export.test.ts tests/unit/novel-promotion/video-urls-route.test.ts` passed: 2 files, 5 tests.
+- `npm run typecheck` passed.
+- Focused ESLint passed for all touched implementation and test files.
+- `git diff --check` passed.
+- `npm run test:unit:all` had 858 passing tests and 3 unrelated existing failures.
+
+### Coverage
+
+- Generator tests cover XML escaping, relative media URLs, sequential frame timing, source-audio linkage, manifest metadata, and aspect-ratio dimensions.
+- API tests cover clip ordering, lip-sync preference, default duration, safe filenames, source type, and project ratio.
+- No installed-editor import smoke test was available; this remains the principal compatibility risk.
+
+## Editing Project Export Progress
+
+Date: 2026-06-10
+Executor: Codex
+
+Added visible progress feedback for editing-project exports: preparation status, downloaded clip count, archive percentage, and an accessible progress bar below the video toolbar.
+
+### Commands
+
+- Focused Vitest run passed: 4 files, 8 tests.
+- `npm run typecheck` passed.
+- Focused ESLint passed.
+- `git diff --check` passed.
+
+## Vidu Q3 Pro Panel Generation 404
+
+Date: 2026-06-10
+Executor: Codex
+
+Corrected the local Yunwu `viduq3-pro` and `viduq3-turbo` media templates to use Vidu's JSON image-to-video endpoint and task polling response fields. Also corrected error normalization so a gateway wrapper status 429 cannot hide a non-retryable upstream 404.
+
+### Commands
+
+- `npx vitest run tests/unit/task/normalize-error.test.ts` passed: 1 file, 12 tests.
+- `npm run typecheck` passed.
+- Authenticated empty-body probe reached `https://yunwu.ai/ent/v2/img2video` and returned a business-layer 503 rather than route 404; no task was created.
+
+### Remaining Validation
+
+- No paid video generation was submitted. The next user-triggered panel generation will exercise live task creation and polling.
+
+## Per-Panel Video Download
+
+Date: 2026-06-10
+Executor: Codex
+
+Added a download action to every video card that currently exposes a playable video. The action downloads through the existing project video proxy and names the file with the displayed panel number plus the panel description.
+
+### Commands
+
+- Focused Vitest passed: 2 files, 6 tests.
+- `npm run typecheck` passed.
+- Focused ESLint passed.
+- `git diff --check` passed.
+- Full unit suite: 863 passed, 3 unrelated existing failures.
+
+### Coverage
+
+- Filename tests cover panel numbering, invalid filename characters, URL extension detection, and MIME fallback.
+- Component coverage confirms a visible video renders the download action.
+- Runtime behavior uses the currently selected original or lip-sync video URL.
+- 回归验证覆盖 `/m/m_...` 媒体路由：代理会先解析真实 storageKey，再获取最终签名地址，不再将媒体路由本身作为对象 key。

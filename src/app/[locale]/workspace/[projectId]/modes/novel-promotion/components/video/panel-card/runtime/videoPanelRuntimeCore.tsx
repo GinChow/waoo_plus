@@ -9,6 +9,7 @@ import { usePanelPlayer } from './hooks/usePanelPlayer'
 import { usePanelPromptEditor } from './hooks/usePanelPromptEditor'
 import { usePanelVoiceManager } from './hooks/usePanelVoiceManager'
 import { usePanelLipSync } from './hooks/usePanelLipSync'
+import { usePanelVideoDownload } from './hooks/usePanelVideoDownload'
 
 export function useVideoPanelActions({
   panel,
@@ -103,6 +104,15 @@ export function useVideoPanelActions({
     onLipSync,
   })
 
+  const displayedPanelNumber = panel.videoTargetGroupNumber ?? panel.textPanel?.panel_number ?? panelIndex + 1
+  const download = usePanelVideoDownload({
+    projectId,
+    panel,
+    panelNumber: displayedPanelNumber,
+    videoUrl: player.currentVideoUrl,
+    downloadFailedMessage: t('stage.downloadFailed'),
+  })
+
   const showLipSyncSection = voiceManager.hasMatchedVoiceLines
   const canLipSync = hasVisibleBaseVideo && voiceManager.hasMatchedAudio && !taskStatus.isLipSyncTaskRunning
 
@@ -131,6 +141,7 @@ export function useVideoPanelActions({
     },
     voiceManager,
     lipSync,
+    download,
     layout: {
       isLinked,
       isLastFrame,

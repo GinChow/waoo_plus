@@ -1,0 +1,24 @@
+{
+  "date": "2026-06-10",
+  "executor": "Codex",
+  "task": "修复成片面板调用 viduq3-pro 生成视频时的 404 与错误重试",
+  "locations": [
+    "src/lib/model-gateway/openai-compat/template-video.ts",
+    "src/lib/openai-compat-template-runtime.ts",
+    "src/lib/errors/normalize.ts",
+    "tests/unit/task/normalize-error.test.ts"
+  ],
+  "existingPattern": "OpenAI 兼容媒体模型通过用户配置中的 compatMediaTemplate 渲染创建和轮询请求。",
+  "observations": [
+    "目标模型保存了 Vidu customEndpoint，但 compatMediaTemplate 仍是默认 OpenAI /videos multipart 模板。",
+    "Provider baseUrl 会规范化为 /v1，而 Yunwu Vidu 路由位于站点根路径 /ent/v2。",
+    "网关用 429 包装上游 404，现有错误归一化优先读取外层状态，导致无效重试。",
+    "sequential-thinking、shrimp-task-manager、code-index 当前环境未提供，已使用仓库检索、内置计划与本地验证降级。"
+  ],
+  "sufficiencyCheck": {
+    "interfaceContract": true,
+    "technicalChoice": true,
+    "riskIdentified": true,
+    "verificationKnown": true
+  }
+}

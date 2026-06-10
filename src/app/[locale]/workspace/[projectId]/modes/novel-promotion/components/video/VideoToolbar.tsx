@@ -3,6 +3,7 @@ import { useTranslations } from 'next-intl'
 import TaskStatusInline from '@/components/task/TaskStatusInline'
 import { resolveTaskPresentationState } from '@/lib/task/presentation'
 import { AppIcon } from '@/components/ui/icons'
+import type { TimelineExportProgress } from '@/lib/video-export/export-progress'
 
 interface VideoToolbarProps {
   totalCoarseShots: number
@@ -13,8 +14,11 @@ interface VideoToolbarProps {
   failedCount: number
   isAnyTaskRunning: boolean
   isDownloading: boolean
+  isExportingTimeline: boolean
+  timelineExportProgress: TimelineExportProgress | null
   onGenerateAll: () => void
   onDownloadAll: () => void
+  onExportTimeline: () => void
   onBack: () => void
   onEnterEditor?: () => void  // 进入剪辑器
   videosReady?: boolean  // 是否有视频可以剪辑
@@ -29,8 +33,11 @@ export default function VideoToolbar({
   failedCount,
   isAnyTaskRunning,
   isDownloading,
+  isExportingTimeline,
+  timelineExportProgress,
   onGenerateAll,
   onDownloadAll,
+  onExportTimeline,
   onBack,
   onEnterEditor,
   videosReady = false
@@ -52,6 +59,16 @@ export default function VideoToolbar({
       hasOutput: videosWithUrl > 0,
     })
     : null
+  const timelineProgressText = timelineExportProgress?.phase === 'preparing'
+    ? t('toolbar.exportPreparing')
+    : timelineExportProgress?.phase === 'downloading'
+      ? t('toolbar.exportDownloading', {
+        current: timelineExportProgress.current,
+        total: timelineExportProgress.total,
+      })
+      : timelineExportProgress?.phase === 'packing'
+        ? t('toolbar.exportPacking', { percent: timelineExportProgress.percent })
+        : ''
   return (
     <div className="glass-surface p-4">
       <div className="flex items-center justify-between">
@@ -103,6 +120,15 @@ export default function VideoToolbar({
               </>
             )}
           </button>
+          <button
+            onClick={onExportTimeline}
+            disabled={videosWithUrl === 0 || isExportingTimeline}
+            className="glass-btn-base glass-btn-secondary flex items-center gap-2 px-4 py-2 text-sm font-medium border border-[var(--glass-stroke-base)] disabled:opacity-50 disabled:cursor-not-allowed"
+            title={videosWithUrl === 0 ? t('toolbar.noVideos') : t('toolbar.exportTimelineTitle')}
+          >
+            <AppIcon name="clapperboard" className="w-4 h-4" />
+            <span>{isExportingTimeline ? t('toolbar.exportingTimeline') : t('toolbar.exportTimeline')}</span>
+          </button>
           {onEnterEditor && (
             <button
               onClick={onEnterEditor}
@@ -123,6 +149,27 @@ export default function VideoToolbar({
           </button>
         </div>
       </div>
+      {timelineExportProgress && (
+        <div className="mt-3" role="status" aria-live="polite">
+          <div className="mb-1.5 flex items-center justify-between gap-3 text-xs text-[var(--glass-text-secondary)]">
+            <span>{timelineProgressText}</span>
+            <span className="tabular-nums">{timelineExportProgress.percent}%</span>
+          </div>
+          <div
+            className="h-2 overflow-hidden rounded-full bg-[var(--glass-bg-muted)]"
+            role="progressbar"
+            aria-label={timelineProgressText}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={timelineExportProgress.percent}
+          >
+            <div
+              className="h-full rounded-full bg-[var(--glass-accent-from)] transition-[width] duration-300 ease-out"
+              style={{ width: `${timelineExportProgress.percent}%` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

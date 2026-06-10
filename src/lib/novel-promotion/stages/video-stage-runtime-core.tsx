@@ -34,6 +34,7 @@ import { useVideoPanelsProjection } from './video-stage-runtime/useVideoPanelsPr
 import { useVideoPanelLinking } from './video-stage-runtime/useVideoPanelLinking'
 import { useVideoVoiceLines } from './video-stage-runtime/useVideoVoiceLines'
 import { useVideoDownloadAll } from './video-stage-runtime/useVideoDownloadAll'
+import { useVideoTimelineExport } from './video-stage-runtime/useVideoTimelineExport'
 import { useVideoStageUiState } from './video-stage-runtime/useVideoStageUiState'
 import { useVideoPanelViewport } from './video-stage-runtime/useVideoPanelViewport'
 import { useVideoFirstLastFrameFlow } from './video-stage-runtime/useVideoFirstLastFrameFlow'
@@ -133,6 +134,18 @@ export function useVideoStageRuntime({
     videosWithUrl,
     handleDownloadAllVideos,
   } = useVideoDownloadAll({
+    episodeId,
+    t: (key) => t(key as never),
+    allPanels,
+    panelVideoPreference,
+    listEpisodeVideoUrlsMutation,
+    downloadRemoteBlobMutation,
+  })
+  const {
+    isExportingTimeline,
+    timelineExportProgress,
+    handleExportTimeline,
+  } = useVideoTimelineExport({
     episodeId,
     t: (key) => t(key as never),
     allPanels,
@@ -522,8 +535,11 @@ export function useVideoStageRuntime({
         failedCount={failedCount}
         isAnyTaskRunning={isAnyTaskRunning}
         isDownloading={isDownloading}
+        isExportingTimeline={isExportingTimeline}
+        timelineExportProgress={timelineExportProgress}
         onGenerateAll={handleOpenBatchGenerateModal}
         onDownloadAll={handleDownloadAllVideos}
+        onExportTimeline={handleExportTimeline}
         onBack={onBack}
         onEnterEditor={onEnterEditor}
         videosReady={videosWithUrl > 0}

@@ -75,6 +75,14 @@ describe('normalizeAnyError provider-specific mapping', () => {
     expect(normalized.retryable).toBe(false)
   })
 
+  it('prioritizes nested upstream 404 over wrapper status 429', () => {
+    const normalized = normalizeAnyError(
+      new Error('Template request failed with status 429: upstream returned non-2xx status: 404, body:'),
+    )
+    expect(normalized.code).toBe('VIDEO_API_FORMAT_UNSUPPORTED')
+    expect(normalized.retryable).toBe(false)
+  })
+
   it('maps invalid_request unmarshal message to INVALID_PARAMS even when status is 429', () => {
     const normalized = normalizeAnyError({
       status: 429,

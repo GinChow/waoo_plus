@@ -30,8 +30,19 @@ export interface VideoModelOption {
 }
 
 export interface EpisodeVideoUrlsResponse {
-  videos?: Array<{ index: number; fileName: string; videoUrl: string }>
+  videos?: Array<{
+    index: number
+    fileName: string
+    videoUrl: string
+    panelId: string
+    storyboardId: string
+    panelIndex: number
+    description: string
+    durationSeconds: number
+    sourceType: 'original' | 'lip-sync'
+  }>
   projectName?: string
+  videoRatio?: string
 }
 
 export interface VideoStageShellProps {

@@ -103,6 +103,12 @@
     "downloadCount": "下载 {count} 个视频",
     "packing": "打包中...",
     "downloadAll": "下载全部",
+    "exportTimeline": "导出剪辑工程",
+    "exportingTimeline": "导出中...",
+    "exportTimelineTitle": "导出 FCPXML、Premiere XML 和全部视频素材",
+    "exportPreparing": "正在准备剪辑工程...",
+    "exportDownloading": "正在下载视频片段 {current}/{total}",
+    "exportPacking": "正在生成工程压缩包 {percent}%",
     "enterEditor": "进入视频剪辑器",
     "enterEdit": "进入剪辑",
     "back": "返回"
@@ -126,6 +132,7 @@
       "fetchVideosFailed": "获取视频列表失败"
     },
     "downloadFailed": "下载失败",
+    "exportFailed": "导出剪辑工程失败",
     "unknownError": "未知错误"
   },
   "render": {

@@ -103,6 +103,12 @@
     "downloadCount": "Download {count} videos",
     "packing": "Packing...",
     "downloadAll": "Download All",
+    "exportTimeline": "Export Editing Project",
+    "exportingTimeline": "Exporting...",
+    "exportTimelineTitle": "Export FCPXML, Premiere XML, and all video media",
+    "exportPreparing": "Preparing editing project...",
+    "exportDownloading": "Downloading video clips {current}/{total}",
+    "exportPacking": "Building project archive {percent}%",
     "enterEditor": "Enter Video Editor",
     "enterEdit": "Enter Editor",
     "back": "Back"
@@ -126,6 +132,7 @@
       "fetchVideosFailed": "Failed to fetch video list"
     },
     "downloadFailed": "Download failed",
+    "exportFailed": "Failed to export editing project",
     "unknownError": "Unknown error"
   },
   "render": {
