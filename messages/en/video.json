@@ -67,6 +67,24 @@
     "batchModeEnabled": "Batch mode enabled",
     "batchModeDisabled": "Batch mode disabled"
   },
+  "frameCapture": {
+    "buttonTitle": "Pick a video frame as the panel image",
+    "title": "Capture Video Frame",
+    "hint": "Drag the slider or use the arrow buttons to scrub frame by frame, then save the current frame locally or use it for an adjacent panel.",
+    "prevFrame": "Previous frame",
+    "nextFrame": "Next frame",
+    "saveLocal": "Save locally",
+    "setAsPreviousPanel": "Set as previous panel (#{number})",
+    "setAsCurrentPanel": "Set as current panel (#{number})",
+    "setAsNextPanel": "Set as next panel (#{number})",
+    "applying": "Applying...",
+    "captureFailed": "Failed to capture video frame",
+    "applyFailed": "Failed to update the panel image",
+    "overwriteTitle": "Replace the existing panel image?",
+    "overwriteMessage": "Panel #{number} already has an image. Continuing will replace it with the current video frame.",
+    "overwriteConfirm": "Replace image",
+    "loadFailed": "Failed to load video"
+  },
   "promptModal": {
     "title": "Edit Shot #{number} Video Prompt",
     "shotType": "Shot Type:",

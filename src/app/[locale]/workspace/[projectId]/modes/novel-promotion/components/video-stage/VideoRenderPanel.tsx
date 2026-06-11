@@ -5,10 +5,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import { useTranslations } from 'next-intl'
 import type { CapabilitySelections, CapabilityValue } from '@/lib/model-config-contract'
-import { VideoPanelCard, type VideoPanel, type VideoModelOption, type MatchedVoiceLine, type FirstLastFrameParams, type VideoGenerationOptions } from '../video'
+import { VideoPanelCard, type VideoPanel, type VideoModelOption, type MatchedVoiceLine, type FirstLastFrameParams, type VideoGenerationOptions, type PanelGroupRuntime } from '../video'
 import { useUpdateProjectPanelVideoPrompt } from '@/lib/query/hooks'
 import { AppIcon } from '@/components/ui/icons'
 import VideoGroupPanelCard from './VideoGroupPanelCard'
+import PanelGroupCollapseButton from '../storyboard/PanelGroupCollapseButton'
 
 interface VideoPanelGroup {
   groupKey: string
@@ -17,6 +18,7 @@ interface VideoPanelGroup {
 
 interface VideoRenderPanelProps {
   allPanels: VideoPanel[]
+  panelGroupsByAnchor: Map<string, PanelGroupRuntime>
   linkedPanels: Map<string, boolean>
   highlightedPanelKey: string | null
   panelRefs: MutableRefObject<Map<string, HTMLDivElement>>
@@ -74,6 +76,7 @@ interface VideoRenderPanelProps {
 
 export default function VideoRenderPanel({
   allPanels,
+  panelGroupsByAnchor,
   linkedPanels,
   highlightedPanelKey,
   panelRefs,
@@ -195,20 +198,17 @@ export default function VideoRenderPanel({
         } ${inGroup ? 'ring-2 ring-[var(--glass-accent-from)] rounded-2xl' : ''}`}
       >
         {inGroup && groupContext?.isGroupStart && (
-          <div className="absolute -top-2 left-2 right-2 z-20 flex items-center gap-2 pointer-events-none">
+          <div className="absolute top-2 left-2 right-2 z-50 flex items-start gap-2 pointer-events-none">
             <div className="flex items-center gap-1.5 rounded-full bg-[var(--glass-accent-from)] px-2 py-0.5 text-[10px] font-semibold text-white shadow-[var(--glass-shadow-sm)] pointer-events-auto">
               <AppIcon name="unplug" className="h-2.5 w-2.5" />
               <span>{t('panelGroup.badge')}</span>
             </div>
             {groupContext.onCollapse && (
-              <button
-                type="button"
+              <PanelGroupCollapseButton
                 onClick={groupContext.onCollapse}
-                className="ml-auto pointer-events-auto rounded-full bg-[var(--glass-bg-surface)] border border-[var(--glass-accent-from)] px-2 py-0.5 text-[10px] text-[var(--glass-accent-from)] hover:bg-[var(--glass-tone-info-bg)]"
                 title={t('panelGroup.collapseTitle')}
-              >
-                {t('panelGroup.collapse')}
-              </button>
+                label={t('panelGroup.collapse')}
+              />
             )}
           </div>
         )}
@@ -294,12 +294,15 @@ export default function VideoRenderPanel({
           const firstPanel = allPanels[firstPanelIndex]
           const groupStartGlobalNumber = firstPanel.panelIndex + 1
           const groupPanels = group.panelIndices.map((index) => allPanels[index])
+          const groupAnchorPanelId = groupPanels[0]?.panelId
+          const panelGroup = groupAnchorPanelId ? panelGroupsByAnchor.get(groupAnchorPanelId) : undefined
           return [(
             <div key={group.groupKey} className="relative h-full">
               <VideoGroupPanelCard
                 projectId={projectId}
                 episodeId={episodeId}
                 groupPanels={groupPanels}
+                group={panelGroup}
                 groupStartGlobalNumber={groupStartGlobalNumber}
                 videoRatio={videoRatio}
                 onExpand={() => toggleExpand(group.groupKey)}

@@ -5,6 +5,7 @@ import { queryKeys } from '../keys'
 import { checkApiResponse } from '@/lib/error-handler'
 import { resolveTaskErrorMessage } from '@/lib/task/error-message'
 import { clearTaskTargetOverlay, upsertTaskTargetOverlay } from '../task-target-overlay'
+import { TASK_TYPE } from '@/lib/task/types'
 import type { MediaRef } from '@/types/project'
 import { apiFetch } from '@/lib/api-fetch'
 
@@ -222,6 +223,7 @@ export function useGenerateVideo(projectId: string | null, episodeId: string | n
                 projectId,
                 targetType: 'NovelPromotionPanel',
                 targetId: panelId,
+                runningTaskType: TASK_TYPE.VIDEO_PANEL,
                 intent: 'generate',
             })
         },
@@ -370,6 +372,7 @@ export function useLipSync(projectId: string | null, episodeId: string | null) {
                 projectId,
                 targetType: 'NovelPromotionPanel',
                 targetId: panelId,
+                runningTaskType: TASK_TYPE.LIP_SYNC,
                 intent: 'generate',
             })
         },

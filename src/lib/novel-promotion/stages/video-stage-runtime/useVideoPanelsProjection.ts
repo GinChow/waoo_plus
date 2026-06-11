@@ -3,10 +3,22 @@
 import { useMemo } from 'react'
 import type {
   Clip,
+  PanelGroupRuntime,
   Storyboard,
   VideoPanel,
 } from '@/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video'
 import { parsePanelVideoHistory } from '@/lib/novel-promotion/panel-video-state'
+
+function parseJsonStringArray(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((item): item is string => typeof item === 'string' && item.length > 0)
+  } catch {
+    return []
+  }
+}
 import { logInfo as _ulogInfo, logWarn as _ulogWarn } from '@/lib/logging/core'
 
 interface TaskStateLike {
@@ -214,19 +226,8 @@ export function useVideoPanelsProjection({
         const panelVideoState = panelId ? panelVideoStates.getTaskState(`panel-video:${panelId}`) : null
         const panelLipState = panelId ? panelLipStates.getTaskState(`panel-lip:${panelId}`) : null
         const coarseGroupState = parentGroupNumber ? coarseGroupStates.get(parentGroupNumber) : null
-        const projectedVideoUrl = panel.videoUrl || coarseGroupState?.videoUrl || undefined
-        if (parentGroupNumber && (coarseGroupState?.videoUrl || coarseGroupState?.videoHistory.length)) {
-          _ulogInfo('[VideoHistoryTrace][projection] project panel video url', {
-            storyboardId: storyboard.id,
-            panelId,
-            panelIndex: actualPanelIndex,
-            panelNumber,
-            parentGroupNumber,
-            coarseGroupVideoUrl: summarizeVideoUrl(coarseGroupState?.videoUrl),
-            panelVideoUrl: summarizeVideoUrl(panel.videoUrl || null),
-            projectedVideoUrl: summarizeVideoUrl(projectedVideoUrl || null),
-          })
-        }
+        // 原子分镜彻底独立：视频只用自身 videoUrl，不再回退到粗分组的组视频
+        const projectedVideoUrl = panel.videoUrl || undefined
 
         const videoHistory = parsePanelVideoHistory(panel.videoHistory || null)
         panels.push({
@@ -234,11 +235,13 @@ export function useVideoPanelsProjection({
           storyboardId: storyboard.id,
           panelIndex: actualPanelIndex,
           parentGroupNumber,
-          videoTargetGroupNumber: parentGroupNumber,
+          // 视频维度不再把粗分组状态投到原子分镜（解耦，原子分镜独立）。
+          // 粗分组图片(coarseGroupImageUrl)属设计阶段产物，保留。
+          videoTargetGroupNumber: undefined,
           coarseGroupImageUrl: coarseGroupState?.imageUrl || null,
-          coarseGroupVideoPrompt: coarseGroupState?.videoPrompt || null,
-          coarseGroupDuration: coarseGroupState?.duration || null,
-          coarseGroupVideoHistory: coarseGroupState?.videoHistory || [],
+          coarseGroupVideoPrompt: null,
+          coarseGroupDuration: null,
+          coarseGroupVideoHistory: [],
           videoHistory: videoHistory.map((entry) => ({
             videoUrl: entry.videoUrl,
             generatedAt: entry.generatedAt,
@@ -286,9 +289,6 @@ export function useVideoPanelsProjection({
                 (entry) => canonicalMediaRef(entry.videoUrl) === canonicalMediaRef(projectedVideoUrl),
               )
               const sourceCount = currentEntry?.sourceImageUrls?.length || 1
-              if (parentGroupNumber && coarseGroupState?.imageUrl && sourceCount === 1) {
-                return [coarseGroupState.imageUrl]
-              }
               return storyboardPanels
                 .slice(index, index + sourceCount)
                 .map((item) => item.imageUrl)
@@ -312,8 +312,58 @@ export function useVideoPanelsProjection({
     return panels
   }, [panelLipStates, panelVideoStates, sortedStoryboards])
 
+  // 组合分镜（linkedToNextPanel）的 omni 合成视频：按 anchorPanelId（组内首个成员）建索引，供组卡读取。
+  const panelGroupsByAnchor = useMemo<Map<string, PanelGroupRuntime>>(() => {
+    const imageUrlByPanelId = new Map<string, string | undefined>()
+    allPanels.forEach((panel) => {
+      if (panel.panelId) imageUrlByPanelId.set(panel.panelId, panel.imageUrl)
+    })
+    const result = new Map<string, PanelGroupRuntime>()
+    sortedStoryboards.forEach((storyboard) => {
+      const groups = storyboard.panelGroups || []
+      groups.forEach((group) => {
+        const memberPanelIds = parseJsonStringArray(group.memberPanelIdsJson)
+        const anchorPanelId = group.anchorPanelId || memberPanelIds[0]
+        if (!anchorPanelId) return
+        const videoHistory = parsePanelVideoHistory(group.videoHistory || null).map((entry) => ({
+          videoUrl: entry.videoUrl,
+          generatedAt: entry.generatedAt,
+          videoPrompt: entry.videoPrompt,
+          videoModel: entry.videoModel,
+          generationMode: entry.generationMode,
+          source: entry.source,
+          taskId: entry.taskId,
+          sourceImageUrls: entry.sourceImageUrls,
+        }))
+        const videoUrl = group.videoUrl || undefined
+        const isVideoStale = isCurrentVideoStale({
+          currentVideoUrl: videoUrl,
+          currentImageUrls: memberPanelIds.map((id) => imageUrlByPanelId.get(id)),
+          videoHistory: parsePanelVideoHistory(group.videoHistory || null),
+        })
+        result.set(anchorPanelId, {
+          id: group.id,
+          storyboardId: storyboard.id,
+          anchorPanelId,
+          memberPanelIds,
+          videoUrl,
+          videoHistory,
+          videoModel: group.videoModel || undefined,
+          videoGenerationMode: group.videoGenerationMode || undefined,
+          videoPrompt: group.videoPrompt || undefined,
+          firstLastFramePrompt: group.firstLastFramePrompt || undefined,
+          firstLastFrameEnabled: group.firstLastFrameEnabled ?? true,
+          duration: group.duration ?? null,
+          isVideoStale,
+        })
+      })
+    })
+    return result
+  }, [allPanels, sortedStoryboards])
+
   return {
     sortedStoryboards,
     allPanels,
+    panelGroupsByAnchor,
   }
 }

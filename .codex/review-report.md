@@ -213,3 +213,33 @@ Overall score: 93/100
 - 本次未进行浏览器截图级视觉验收，剩余风险主要是极窄屏下的卡片密度和间距。
 - 历史遗留且没有 `sourceImageUrls` 的视频无法可靠判断来源，系统保留视频但不做猜测性过期提示。
 - 生产构建未完成，因为当前开发服务正在使用同一 `.next` 目录；类型检查和相关测试均已通过。
+
+## Video Frame Capture Targets Review
+
+Date: 2026-06-11 17:30:06 +0800
+Reviewer: Codex
+
+Recommendation: Pass
+
+Technical score: 93/100
+Strategic score: 94/100
+Overall score: 93/100
+
+### Findings
+
+- The modal encodes the selected video frame once per action and supports local download plus previous/current/next panel image updates.
+- Adjacent targets are derived from the existing global `allPanels` order, so navigation works across storyboard boundaries without a second ordering model.
+- Image writes reuse the existing authenticated `panel/update-image` route, storage path, history preservation, local state patch, and query refresh flow.
+- Existing target images trigger the shared warning confirmation dialog before replacement.
+- Seek completion disables capture actions, preventing the optimistic slider time from being saved before the video element reaches that frame.
+- Upload HTTP failures are no longer swallowed for frame capture, so the modal remains open and reports the error instead of signaling false success.
+
+### Verification
+
+- Focused tests passed: 3 files, 9 tests.
+- TypeScript, focused ESLint, and `git diff --check` passed.
+- Full unit suite completed with 875 passing tests and 4 unrelated existing failures.
+
+### Residual Risk
+
+- Browser-specific canvas encoding, native download behavior, and visual wrapping on very narrow viewports were not interactively exercised in this turn.

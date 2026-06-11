@@ -12,6 +12,7 @@ interface ConfirmDialogProps {
   onConfirm: () => void
   onCancel: () => void
   type?: 'danger' | 'warning' | 'info'
+  layerClassName?: string
 }
 
 export default function ConfirmDialog({
@@ -22,7 +23,8 @@ export default function ConfirmDialog({
   cancelText,
   onConfirm,
   onCancel,
-  type = 'danger'
+  type = 'danger',
+  layerClassName = 'z-50',
 }: ConfirmDialogProps) {
   const t = useTranslations('common')
 
@@ -60,12 +62,12 @@ export default function ConfirmDialog({
     <>
       {/* 背景遮罩 */}
       <div
-        className="fixed inset-0 z-50 glass-overlay animate-fade-in"
+        className={`fixed inset-0 glass-overlay animate-fade-in ${layerClassName}`}
         onClick={onCancel}
       />
 
       {/* 对话框 */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className={`fixed inset-0 flex items-center justify-center p-4 pointer-events-none ${layerClassName}`}>
         <div
           className="glass-surface-modal max-w-md w-full p-6 pointer-events-auto animate-scale-in"
           onClick={(e) => e.stopPropagation()}

@@ -176,6 +176,35 @@ async function attachMediaFieldsToPanel<T extends Record<string, unknown>>(panel
   }
 }
 
+async function attachMediaFieldsToPanelGroup<T extends Record<string, unknown>>(group: T) {
+  const videoMedia = await resolveMediaRefFromLegacyValue(group.videoUrl)
+  let resolvedVideoHistoryJson: unknown = group.videoHistory
+  if (typeof group.videoHistory === 'string' && group.videoHistory.trim()) {
+    try {
+      const parsed = JSON.parse(group.videoHistory)
+      if (Array.isArray(parsed)) {
+        const resolved = await Promise.all(parsed.map(async (entry) => {
+          if (!entry || typeof entry !== 'object') return entry
+          const record = entry as Record<string, unknown>
+          const videoUrl = typeof record.videoUrl === 'string' ? record.videoUrl : ''
+          if (!videoUrl || videoUrl.startsWith('PENDING:')) return record
+          const media = await resolveMediaRefFromLegacyValue(videoUrl)
+          return { ...record, videoUrl: media?.url || videoUrl }
+        }))
+        resolvedVideoHistoryJson = JSON.stringify(resolved)
+      }
+    } catch {
+      // keep original on parse failure
+    }
+  }
+  return {
+    ...group,
+    videoMedia,
+    videoUrl: videoMedia?.url || group.videoUrl || null,
+    videoHistory: resolvedVideoHistoryJson,
+  }
+}
+
 async function attachMediaFieldsToStoryboard<T extends Record<string, unknown>>(storyboard: T) {
   const storyboardImageMedia = await resolveMediaRefFromLegacyValue(storyboard.storyboardImageUrl)
   let coarseGroupsJson = storyboard.coarseGroupsJson
@@ -236,6 +265,9 @@ async function attachMediaFieldsToStoryboard<T extends Record<string, unknown>>(
   const panels = await Promise.all(
     ((storyboard.panels as Array<Record<string, unknown>>) || []).map(attachMediaFieldsToPanel),
   )
+  const panelGroups = await Promise.all(
+    ((storyboard.panelGroups as Array<Record<string, unknown>>) || []).map(attachMediaFieldsToPanelGroup),
+  )
 
   return {
     ...storyboard,
@@ -244,6 +276,7 @@ async function attachMediaFieldsToStoryboard<T extends Record<string, unknown>>(
     storyboardImageUrl: storyboardImageMedia?.url || storyboard.storyboardImageUrl || null,
     coarseGroupsJson,
     panels,
+    panelGroups,
   }
 }
 

@@ -12,6 +12,7 @@ import {
     requestJsonWithError,
     requestTaskResponseWithError,
 } from './mutation-shared'
+import { TASK_TYPE } from '@/lib/task/types'
 
 export function useRegenerateProjectPanelImage(projectId: string) {
     const queryClient = useQueryClient()
@@ -41,6 +42,7 @@ export function useRegenerateProjectPanelImage(projectId: string) {
                 projectId,
                 targetType: 'panelId' in payload ? 'NovelPromotionPanel' : 'NovelPromotionStoryboard',
                 targetId: 'panelId' in payload ? payload.panelId : payload.storyboardId,
+                runningTaskType: TASK_TYPE.IMAGE_PANEL,
                 intent: 'regenerate',
                 ...('groupNumber' in payload ? { groupNumber: payload.groupNumber } : {}),
             })

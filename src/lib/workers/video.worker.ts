@@ -18,24 +18,21 @@ import { normalizeToBase64ForGeneration } from '@/lib/media/outbound-image'
 import { resolveBuiltinCapabilitiesByModelKey } from '@/lib/model-capabilities/lookup'
 import { parseModelKeyStrict } from '@/lib/model-config-contract'
 import { getProviderConfig } from '@/lib/api-config'
-import { upsertCoarseGroupVideoState } from '@/lib/novel-promotion/coarse-group-image-state'
 import {
   appendPanelVideoHistoryEntry,
   parsePanelVideoHistory,
   serializePanelVideoHistory,
 } from '@/lib/novel-promotion/panel-video-state'
+import {
+  resolveGroupMemberPanelIds,
+  upsertPanelGroupVideo,
+} from '@/lib/novel-promotion/panel-group-state'
 
 type AnyObj = Record<string, unknown>
 type VideoOptionValue = string | number | boolean
 type VideoOptionMap = Record<string, VideoOptionValue>
 type VideoGenerationMode = 'normal' | 'firstlastframe'
 type PanelRecord = NonNullable<Awaited<ReturnType<typeof prisma.novelPromotionPanel.findUnique>>>
-
-interface CoarseGroupVideoSource {
-  imageUrl: string
-  prompt: string
-  duration?: number
-}
 
 function toDurationMs(value: number | null | undefined): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return undefined
@@ -56,11 +53,6 @@ function extractGenerationOptions(payload: AnyObj): VideoOptionMap {
     }
   }
   return next
-}
-
-function readPositiveGroupNumber(value: unknown): number | null {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null
-  return Math.trunc(value)
 }
 
 function isRecord(value: unknown): value is AnyObj {
@@ -250,119 +242,6 @@ async function generateOmniGroupVideo(
   }
 }
 
-function parseParentGroupByPanelNumber(raw: string | null | undefined): Map<number, number> {
-  if (!raw) return new Map()
-  try {
-    const parsed = JSON.parse(raw)
-    const mapping = new Map<number, number>()
-    if (!Array.isArray(parsed)) return mapping
-    for (const item of parsed) {
-      if (
-        item
-        && typeof item === 'object'
-        && !Array.isArray(item)
-        && typeof (item as { panel_number?: unknown }).panel_number === 'number'
-        && typeof (item as { parent_group_number?: unknown }).parent_group_number === 'number'
-      ) {
-        mapping.set(
-          (item as { panel_number: number }).panel_number,
-          (item as { parent_group_number: number }).parent_group_number,
-        )
-      }
-      if (Array.isArray(item) && typeof item[0] === 'number' && typeof item[1] === 'number') {
-        mapping.set(item[0], item[1])
-      }
-    }
-    return mapping
-  } catch {
-    return new Map()
-  }
-}
-
-function parseCoarseGroupVideoState(raw: string | null | undefined, groupNumber: number): {
-  imageUrl: string | null
-  videoPrompt: string | null
-  duration: number | null
-} | null {
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return null
-    for (const item of parsed) {
-      if (!item || typeof item !== 'object' || Array.isArray(item)) continue
-      if ((item as { groupNumber?: unknown }).groupNumber !== groupNumber) continue
-      return {
-        imageUrl: typeof (item as { imageUrl?: unknown }).imageUrl === 'string'
-          ? (item as { imageUrl: string }).imageUrl
-          : null,
-        videoPrompt: typeof (item as { videoPrompt?: unknown }).videoPrompt === 'string'
-          ? (item as { videoPrompt: string }).videoPrompt
-          : null,
-        duration: typeof (item as { duration?: unknown }).duration === 'number'
-          && Number.isFinite((item as { duration: number }).duration)
-          && (item as { duration: number }).duration > 0
-          ? (item as { duration: number }).duration
-          : null,
-      }
-    }
-    return null
-  } catch {
-    return null
-  }
-}
-
-async function resolveCoarseGroupVideoSource(panel: PanelRecord, groupNumber: number): Promise<CoarseGroupVideoSource | null> {
-  const storyboard = await prisma.novelPromotionStoryboard.findUnique({
-    where: { id: panel.storyboardId },
-    select: {
-      storyboardTextJson: true,
-      coarseGroupsJson: true,
-      panels: {
-        orderBy: { panelIndex: 'asc' },
-        select: {
-          panelIndex: true,
-          panelNumber: true,
-          description: true,
-          videoPrompt: true,
-          imageUrl: true,
-          duration: true,
-        },
-      },
-    },
-  })
-  if (!storyboard) return null
-
-  const parentGroupMap = parseParentGroupByPanelNumber(storyboard.storyboardTextJson)
-  const groupPanels = storyboard.panels.filter((item) => {
-    const panelNumber = item.panelNumber ?? item.panelIndex + 1
-    return (parentGroupMap.get(panelNumber) || 1) === groupNumber
-  })
-  const representative = groupPanels[0] || null
-  const state = parseCoarseGroupVideoState(storyboard.coarseGroupsJson, groupNumber)
-  const imageUrl = state?.imageUrl || representative?.imageUrl || panel.imageUrl
-  if (!imageUrl) return null
-
-  const prompt = state?.videoPrompt
-    || groupPanels.map((item, index) => {
-      const text = item.videoPrompt || item.description || ''
-      return text ? `[${index + 1}] ${text}` : ''
-    }).filter(Boolean).join('\n')
-    || panel.videoPrompt
-    || panel.description
-  if (!prompt) return null
-
-  const calculatedDuration = groupPanels.reduce((sum, item) => {
-    return sum + (typeof item.duration === 'number' && Number.isFinite(item.duration) && item.duration > 0 ? item.duration : 0)
-  }, 0)
-  const duration = state?.duration && state.duration > 0 ? state.duration : calculatedDuration
-
-  return {
-    imageUrl,
-    prompt,
-    ...(duration > 0 ? { duration } : {}),
-  }
-}
-
 async function fetchPanelByStoryboardIndex(storyboardId: string, panelIndex: number) {
   return await prisma.novelPromotionPanel.findFirst({
     where: {
@@ -406,13 +285,11 @@ async function generateVideoForPanel(
   generationMode: VideoGenerationMode
   prompt: string
   model: string
-  groupNumber: number | null
   sourceImageUrls: string[]
   actualVideoTokens?: number
 }> {
-  const groupNumber = readPositiveGroupNumber(payload.groupNumber)
-  const coarseGroupSource = groupNumber ? await resolveCoarseGroupVideoSource(panel, groupNumber) : null
-  const sourceImageValue = coarseGroupSource?.imageUrl || panel.imageUrl
+  // 原子分镜独立：单镜视频只用分镜自身的图片/提示词/时长，不再读取粗分组合成状态。
+  const sourceImageValue = panel.imageUrl
   if (!sourceImageValue) {
     throw new Error(`Panel ${panel.id} has no imageUrl`)
   }
@@ -424,7 +301,7 @@ async function generateVideoForPanel(
   const firstLastCustomPrompt = typeof firstLastFramePayload?.customPrompt === 'string' ? firstLastFramePayload.customPrompt : null
   const persistedFirstLastPrompt = firstLastFramePayload ? panel.firstLastFramePrompt : null
   const customPrompt = typeof payload.customPrompt === 'string' ? payload.customPrompt : null
-  const prompt = firstLastCustomPrompt || persistedFirstLastPrompt || customPrompt || coarseGroupSource?.prompt || panel.videoPrompt || panel.description
+  const prompt = firstLastCustomPrompt || persistedFirstLastPrompt || customPrompt || panel.videoPrompt || panel.description
   if (!prompt) {
     throw new Error(`Panel ${panel.id} has no video prompt`)
   }
@@ -471,9 +348,7 @@ async function generateVideoForPanel(
     }
   }
 
-  const panelDuration = typeof coarseGroupSource?.duration === 'number'
-    ? coarseGroupSource.duration
-    : typeof panel.duration === 'number' && Number.isFinite(panel.duration) && panel.duration > 0
+  const panelDuration = typeof panel.duration === 'number' && Number.isFinite(panel.duration) && panel.duration > 0
     ? panel.duration
     : undefined
 
@@ -513,7 +388,6 @@ async function generateVideoForPanel(
     generationMode,
     prompt,
     model,
-    groupNumber,
     sourceImageUrls: [sourceImageValue, lastFrameSourceImageUrl].filter((value): value is string => !!value),
     ...(typeof generatedVideo.actualVideoTokens === 'number'
       ? { actualVideoTokens: generatedVideo.actualVideoTokens }
@@ -551,27 +425,35 @@ async function handleVideoPanelTask(job: Job<TaskJobData>) {
       groupVideoOptions,
     )
     await assertTaskActive(job, 'persist_group_video')
-    const nowGroup = new Date()
-    const groupNextHistory = appendPanelVideoHistoryEntry(parsePanelVideoHistory(panel.videoHistory), {
+    // 组合视频与原子分镜解耦：写入独立的 NovelPromotionPanelGroup 表，不再污染首个 panel。
+    const groupPanelIndices = Array.isArray(groupVideoOptions.groupPanelIndices)
+      ? groupVideoOptions.groupPanelIndices.filter(
+          (value): value is number => typeof value === 'number' && Number.isFinite(value),
+        )
+      : []
+    const resolvedMemberPanelIds = await resolveGroupMemberPanelIds(panel.storyboardId, groupPanelIndices)
+    const memberPanelIds = resolvedMemberPanelIds.length > 0 ? resolvedMemberPanelIds : [panel.id]
+    const groupFirstLastFrameEnabled = typeof groupVideoOptions.firstLastFrame === 'boolean'
+      ? groupVideoOptions.firstLastFrame
+      : undefined
+    const groupFirstLastFramePrompt = typeof groupVideoOptions.firstLastFramePrompt === 'string'
+      ? groupVideoOptions.firstLastFramePrompt
+      : undefined
+    const panelGroupId = await upsertPanelGroupVideo({
+      storyboardId: panel.storyboardId,
+      memberPanelIds,
       videoUrl: cosKey,
-      generatedAt: nowGroup.toISOString(),
-      source: 'generate',
-      videoPrompt: typeof panel.videoPrompt === 'string' ? panel.videoPrompt : undefined,
       videoModel: modelId,
-      generationMode: 'normal',
+      videoGenerationMode: 'normal',
+      videoPrompt: typeof panel.videoPrompt === 'string' ? panel.videoPrompt : null,
+      firstLastFramePrompt: groupFirstLastFramePrompt,
+      firstLastFrameEnabled: groupFirstLastFrameEnabled,
       taskId: job.data.taskId,
       sourceImageUrls,
     })
-    await prisma.novelPromotionPanel.update({
-      where: { id: panel.id },
-      data: {
-        videoUrl: cosKey,
-        videoGenerationMode: 'normal',
-        videoHistory: serializePanelVideoHistory(groupNextHistory),
-      },
-    })
     return {
       panelId: panel.id,
+      panelGroupId,
       videoUrl: cosKey,
       ...(typeof actualVideoTokens === 'number' ? { actualVideoTokens } : {}),
     }
@@ -584,7 +466,7 @@ async function handleVideoPanelTask(job: Job<TaskJobData>) {
     panelId: panel.id,
   })
 
-  const { cosKey, generationMode, prompt, model, groupNumber, sourceImageUrls, actualVideoTokens } = await generateVideoForPanel(
+  const { cosKey, generationMode, prompt, model, sourceImageUrls, actualVideoTokens } = await generateVideoForPanel(
     job,
     panel,
     payload,
@@ -613,30 +495,6 @@ async function handleVideoPanelTask(job: Job<TaskJobData>) {
       videoHistory: serializePanelVideoHistory(panelNextHistory),
     },
   })
-
-  if (groupNumber) {
-    const storyboard = await prisma.novelPromotionStoryboard.findUnique({
-      where: { id: panel.storyboardId },
-      select: { coarseGroupsJson: true },
-    })
-    if (storyboard) {
-      const coarseGroupsJson = upsertCoarseGroupVideoState({
-        raw: storyboard.coarseGroupsJson,
-        groupNumber,
-        videoUrl: cosKey,
-        videoPrompt: prompt,
-        videoModel: model,
-        generationMode,
-        generatedAt: now.toISOString(),
-      })
-      if (coarseGroupsJson) {
-        await prisma.novelPromotionStoryboard.update({
-          where: { id: panel.storyboardId },
-          data: { coarseGroupsJson },
-        })
-      }
-    }
-  }
 
   return {
     panelId: panel.id,

@@ -412,6 +412,62 @@ export function useDeleteProjectStoryboardGroupHistoryVideo(projectId: string, e
 }
 
 /**
+ * 选择组合分镜（linkedToNextPanel 组）历史视频为当前组合视频
+ */
+export function useSelectProjectPanelGroupVideo(projectId: string, episodeId?: string | null) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: { panelGroupId: string; videoUrl: string }) => {
+      const res = await apiFetch(`/api/novel-promotion/${projectId}/panel-group/select-video-history`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}))
+        throw new Error(resolveTaskErrorMessage(error, '选择组合视频失败'))
+      }
+      return res.json()
+    },
+    onSettled: () => {
+      invalidateQueryTemplates(queryClient, [
+        queryKeys.projectAssets.all(projectId),
+        queryKeys.projectData(projectId),
+        ...(episodeId ? [queryKeys.episodeData(projectId, episodeId)] : []),
+      ])
+    },
+  })
+}
+
+/**
+ * 删除组合分镜历史视频
+ */
+export function useDeleteProjectPanelGroupHistoryVideo(projectId: string, episodeId?: string | null) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: { panelGroupId: string; videoUrl: string; clearCurrent?: boolean }) => {
+      const params = new URLSearchParams({ panelGroupId: payload.panelGroupId, videoUrl: payload.videoUrl })
+      if (payload.clearCurrent) params.set('clearCurrent', 'true')
+      const res = await apiFetch(`/api/novel-promotion/${projectId}/panel-group/select-video-history?${params.toString()}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}))
+        throw new Error(resolveTaskErrorMessage(error, '删除组合视频失败'))
+      }
+      return res.json()
+    },
+    onSettled: () => {
+      invalidateQueryTemplates(queryClient, [
+        queryKeys.projectAssets.all(projectId),
+        queryKeys.projectData(projectId),
+        ...(episodeId ? [queryKeys.episodeData(projectId, episodeId)] : []),
+      ])
+    },
+  })
+}
+
+/**
  * 切换单分镜历史视频为当前视频
  */
 export function useSelectProjectPanelHistoryVideo(projectId: string, episodeId?: string | null) {

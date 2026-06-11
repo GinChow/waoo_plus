@@ -122,3 +122,17 @@ Executor: Codex
 - 视频生成和本地上传时记录 `sourceImageUrls`；当前图片发生变化时保留旧视频并展示“可能已过期”。
 - 为满足 Next.js route export 约束，将下载代理辅助函数移动到 `src/lib/video-proxy.ts`，路由和测试统一引用该模块。
 - 首次生产构建发现上述 route export 既有阻塞并已修复；再次构建因用户正在运行的 Next.js 开发服务占用同一 `.next` 目录而停止，仅终止本次构建进程，未中断开发服务。
+
+## Task: Video Frame Capture Targets
+
+Date: 2026-06-11
+Executor: Codex
+
+- 工具降级：当前会话未暴露 `sequential-thinking`、`shrimp-task-manager`、`code-index`；使用 `rg`、仓库读取、`update_plan` 和本地验证替代。
+- 检查工作区发现已有未提交的抽帧弹窗和当前分镜上传接线，后续修改基于现有内容增量完成，不回退其他改动。
+- 确认 `StoryboardVideoRuntime.allPanels` 提供跨 storyboard 的全局顺序，相邻分镜应从该数组定位；图片写回复用 `handleUploadPanelImage` 和 `panel/update-image`。
+- 充分性检查：接口契约、技术方案、主要风险与验证方式均已明确。
+- 实施：抽帧弹窗新增本地 JPEG 下载、上一/当前/下一分镜目标、已有图片覆盖确认和 seek 完成保护；相邻目标从全局 `allPanels` 顺序计算。
+- 上传链路：继续复用 `panel/update-image`，并为抽帧调用传播 HTTP/响应错误，失败时保留弹窗。
+- 验证：聚焦 3 个测试文件共 9 项通过；TypeScript、focused ESLint、`git diff --check` 通过。
+- 全量单测：875/879 通过；4 个失败位于既有的 worker、提示词、全局分析和 Yunwu 轮询测试，与本功能无关。

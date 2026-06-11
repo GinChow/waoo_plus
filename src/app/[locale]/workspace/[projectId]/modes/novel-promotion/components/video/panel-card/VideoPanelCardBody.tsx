@@ -3,21 +3,13 @@ import TaskStatusInline from '@/components/task/TaskStatusInline'
 import { resolveTaskPresentationState } from '@/lib/task/presentation'
 import { ModelCapabilityDropdown } from '@/components/ui/config-modals/ModelCapabilityDropdown'
 import { AppIcon } from '@/components/ui/icons'
-import { logInfo as _ulogInfo } from '@/lib/logging/core'
 import {
   useAiFirstLastFramePrompt,
   useDeleteProjectPanelHistoryVideo,
-  useDeleteProjectStoryboardGroupHistoryVideo,
-  useSelectProjectStoryboardGroupVideo,
   useUploadProjectPanelVideo,
 } from '@/lib/query/hooks'
 import type { VideoPanelRuntime } from './hooks/useVideoPanelActions'
-import { HistoryVideoThumbnail, PanelVideoHistoryDropdown } from './PanelVideoHistoryDropdown'
-
-function summarizeVideoUrl(value: string | null | undefined): string {
-  if (!value) return ''
-  return value.length > 96 ? `${value.slice(0, 48)}...${value.slice(-24)}` : value
-}
+import { PanelVideoHistoryDropdown } from './PanelVideoHistoryDropdown'
 
 interface VideoPanelCardBodyProps {
   runtime: VideoPanelRuntime
@@ -67,11 +59,8 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
   const showsOutgoingLinkBadge = layout.isLinked && !!layout.nextPanel
   const showsPromptEditor = !layout.isLastFrame || layout.isLinked
   const showsFirstLastFrameActions = layout.isLinked && !!layout.nextPanel
-  const videoHistory = panel.coarseGroupVideoHistory || []
   const panelVideoHistory = panel.videoHistory || []
-  const isCoarseGroupPanel = !!panel.videoTargetGroupNumber
   const deletePanelVideoMutation = useDeleteProjectPanelHistoryVideo(projectId, episodeId)
-  const deleteGroupVideoMutation = useDeleteProjectStoryboardGroupHistoryVideo(projectId, episodeId)
   const uploadPanelVideoMutation = useUploadProjectPanelVideo(projectId, episodeId)
   const [isDeletingCurrentVideo, setIsDeletingCurrentVideo] = useState(false)
   const uploadVideoInputRef = useRef<HTMLInputElement>(null)
@@ -105,16 +94,6 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
     const deleteTargetVideoUrl = panel.videoStorageKey || panel.videoUrl
     setIsDeletingCurrentVideo(true)
     try {
-      if (isCoarseGroupPanel) {
-        if (!panel.videoTargetGroupNumber) return
-        await deleteGroupVideoMutation.mutateAsync({
-          storyboardId: panel.storyboardId,
-          groupNumber: panel.videoTargetGroupNumber,
-          videoUrl: deleteTargetVideoUrl,
-          clearCurrent: true,
-        })
-        return
-      }
       if (!panel.panelId) return
       await deletePanelVideoMutation.mutateAsync({
         panelId: panel.panelId,
@@ -125,13 +104,9 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
       setIsDeletingCurrentVideo(false)
     }
   }, [
-    deleteGroupVideoMutation,
     deletePanelVideoMutation,
-    isCoarseGroupPanel,
     panel.panelId,
-    panel.storyboardId,
     panel.videoStorageKey,
-    panel.videoTargetGroupNumber,
     panel.videoUrl,
     t,
   ])
@@ -139,7 +114,7 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
   const handleUploadVideoFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
-    if (!file || !panel.panelId || isCoarseGroupPanel) return
+    if (!file || !panel.panelId) return
     try {
       await uploadPanelVideoMutation.mutateAsync({
         panelId: panel.panelId,
@@ -151,9 +126,9 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
         window.alert(message)
       }
     }
-  }, [isCoarseGroupPanel, panel.panelId, t, uploadPanelVideoMutation])
+  }, [panel.panelId, t, uploadPanelVideoMutation])
 
-  const uploadVideoButton = !isCoarseGroupPanel && panel.panelId ? (
+  const uploadVideoButton = panel.panelId ? (
     <>
       <input
         ref={uploadVideoInputRef}
@@ -185,7 +160,7 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
         <DurationEditor
           duration={panel.textPanel?.duration ?? null}
           unit={t('promptModal.duration')}
-          onChange={onUpdateDuration ? (val) => onUpdateDuration(panel.storyboardId, panel.panelIndex, val, panel.videoTargetGroupNumber) : undefined}
+          onChange={onUpdateDuration ? (val) => onUpdateDuration(panel.storyboardId, panel.panelIndex, val) : undefined}
         />
       </div>
 
@@ -357,7 +332,7 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
                         undefined,
                         videoModel.generationOptions,
                         panel.panelId,
-                        panel.videoTargetGroupNumber,
+                        undefined,
                         promptEditor.localPrompt,
                       )}
                     disabled={
@@ -407,19 +382,7 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
                   </div>
                 </div>
 
-                {isCoarseGroupPanel && videoHistory.length > 0 && (
-                  <CoarseGroupVideoHistoryDropdown
-                    projectId={projectId}
-                    episodeId={episodeId}
-                    storyboardId={panel.storyboardId}
-                    groupNumber={panel.videoTargetGroupNumber}
-                    currentVideoUrl={panel.videoUrl || ''}
-                    videoHistory={videoHistory}
-                    t={t}
-                  />
-                )}
-
-                {!isCoarseGroupPanel && panelVideoHistory.length > 0 && panel.panelId && (
+                {panelVideoHistory.length > 0 && panel.panelId && (
                   <PanelVideoHistoryDropdown
                     projectId={projectId}
                     episodeId={episodeId}
@@ -511,161 +474,6 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
           </>
         )}
       </div>
-    </div>
-  )
-}
-
-function CoarseGroupVideoHistoryDropdown({
-  projectId,
-  episodeId,
-  storyboardId,
-  groupNumber,
-  currentVideoUrl,
-  videoHistory,
-  t,
-}: {
-  projectId: string
-  episodeId?: string
-  storyboardId: string
-  groupNumber?: number
-  currentVideoUrl: string
-  videoHistory: NonNullable<VideoPanelRuntime['panel']['coarseGroupVideoHistory']>
-  t: (key: string, values?: Record<string, number>) => string
-}) {
-  const [openVideoHistory, setOpenVideoHistory] = useState(false)
-  const selectHistoryVideoMutation = useSelectProjectStoryboardGroupVideo(projectId, episodeId)
-  const deleteHistoryVideoMutation = useDeleteProjectStoryboardGroupHistoryVideo(projectId, episodeId)
-  const [selectingHistoryVideoUrl, setSelectingHistoryVideoUrl] = useState<string | null>(null)
-  const [deletingHistoryVideoUrl, setDeletingHistoryVideoUrl] = useState<string | null>(null)
-
-  const formatHistoryTime = useCallback((value: string) => {
-    if (!value) return ''
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return ''
-    return date.toLocaleString()
-  }, [])
-
-  const handleSelectHistoryVideo = useCallback(async (videoUrl: string) => {
-    if (!groupNumber) return
-    _ulogInfo('[VideoHistoryTrace][UI group history] click use history video', {
-      projectId,
-      episodeId,
-      storyboardId,
-      groupNumber,
-      currentVideoUrl: summarizeVideoUrl(currentVideoUrl),
-      selectedVideoUrl: summarizeVideoUrl(videoUrl),
-      historyCount: videoHistory.length,
-    })
-    setSelectingHistoryVideoUrl(videoUrl)
-    try {
-      const result = await selectHistoryVideoMutation.mutateAsync({
-        storyboardId,
-        groupNumber,
-        videoUrl,
-      })
-      _ulogInfo('[VideoHistoryTrace][UI group history] use history video completed', {
-        projectId,
-        episodeId,
-        storyboardId,
-        groupNumber,
-        selectedVideoUrl: summarizeVideoUrl(videoUrl),
-        responseVideoUrl: summarizeVideoUrl(
-          result && typeof result === 'object' && typeof (result as { videoUrl?: unknown }).videoUrl === 'string'
-            ? (result as { videoUrl: string }).videoUrl
-            : '',
-        ),
-      })
-    } finally {
-      setSelectingHistoryVideoUrl(null)
-    }
-  }, [currentVideoUrl, episodeId, groupNumber, projectId, selectHistoryVideoMutation, storyboardId, videoHistory.length])
-
-  const handleDeleteHistoryVideo = useCallback(async (videoUrl: string) => {
-    if (!groupNumber) return
-    setDeletingHistoryVideoUrl(videoUrl)
-    try {
-      await deleteHistoryVideoMutation.mutateAsync({
-        storyboardId,
-        groupNumber,
-        videoUrl,
-      })
-    } finally {
-      setDeletingHistoryVideoUrl(null)
-    }
-  }, [deleteHistoryVideoMutation, groupNumber, storyboardId])
-
-  return (
-    <div className="relative mt-2">
-      <button
-        type="button"
-        className="flex h-8 w-full items-center justify-between rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)] px-2 text-xs text-[var(--glass-text-secondary)] hover:bg-[var(--glass-bg-surface-hover)]"
-        onClick={() => setOpenVideoHistory((current) => !current)}
-      >
-        <span>{t('panelCard.videoHistoryCount', { count: videoHistory.length })}</span>
-        <AppIcon
-          name="chevronDown"
-          className={`h-3.5 w-3.5 transition-transform ${openVideoHistory ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {openVideoHistory && (
-        <div className="absolute left-0 right-0 top-9 z-20 max-h-80 overflow-y-auto rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-surface)] p-2 shadow-xl">
-          <div className="grid gap-2">
-            {[...videoHistory].reverse().map((entry, historyIndex) => {
-              const isCurrent = entry.videoUrl === currentVideoUrl
-              const isSelecting = selectingHistoryVideoUrl === entry.videoUrl
-              const isDeleting = deletingHistoryVideoUrl === entry.videoUrl
-              return (
-                <div
-                  key={`${entry.videoUrl}-${historyIndex}`}
-                  className={`grid grid-cols-[112px_1fr_auto_auto] items-center gap-2 rounded-md border p-1.5 ${
-                    isCurrent
-                      ? 'border-[var(--glass-accent-from)] bg-[var(--glass-bg-muted)]'
-                      : 'border-[var(--glass-stroke-base)] bg-[var(--glass-bg-muted)]/60'
-                  }`}
-                >
-                  <HistoryVideoThumbnail
-                    videoUrl={entry.videoUrl}
-                    title={isCurrent ? t('panelCard.currentVideo') : t('panelCard.historyVideo', { number: videoHistory.length - historyIndex })}
-                  />
-                  <div className="min-w-0">
-                    <div className="truncate text-xs text-[var(--glass-text-primary)]">
-                      {isCurrent ? t('panelCard.currentVideo') : t('panelCard.historyVideo', { number: videoHistory.length - historyIndex })}
-                    </div>
-                    <div className="truncate text-[11px] text-[var(--glass-text-tertiary)]">
-                      {formatHistoryTime(entry.generatedAt)}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="glass-btn-base glass-btn-soft rounded-md px-2 py-1 text-xs disabled:opacity-60"
-                    disabled={isCurrent || isSelecting || isDeleting}
-                    onClick={() => handleSelectHistoryVideo(entry.videoUrl)}
-                  >
-                    {isCurrent ? (
-                      <AppIcon name="check" className="h-3.5 w-3.5" />
-                    ) : (
-                      <span>{isSelecting ? t('panelCard.saving') : t('panelCard.useHistoryVideo')}</span>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className="glass-btn-base glass-btn-danger rounded-md px-2 py-1 text-xs disabled:opacity-60"
-                    disabled={isSelecting || isDeleting}
-                    onClick={() => handleDeleteHistoryVideo(entry.videoUrl)}
-                    title={t('panelCard.deleteHistoryVideo')}
-                  >
-                    {isDeleting ? (
-                      <span>{t('panelCard.deleting')}</span>
-                    ) : (
-                      <AppIcon name="trashAlt" className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

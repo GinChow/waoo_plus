@@ -4,6 +4,7 @@ import { MediaImageWithLoading } from '@/components/media/MediaImageWithLoading'
 
 import type { VideoPanelRuntime } from './hooks/useVideoPanelActions'
 import { AppIcon } from '@/components/ui/icons'
+import VideoFrameCaptureModal from './VideoFrameCaptureModal'
 
 interface VideoPanelCardHeaderProps {
   runtime: VideoPanelRuntime
@@ -12,6 +13,7 @@ interface VideoPanelCardHeaderProps {
 export default function VideoPanelCardHeader({ runtime }: VideoPanelCardHeaderProps) {
   const {
     t,
+    projectId,
     panel,
     panelIndex,
     panelKey,
@@ -26,6 +28,11 @@ export default function VideoPanelCardHeader({ runtime }: VideoPanelCardHeaderPr
 
   const [errorDismissed, setErrorDismissed] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
+  const [showFrameCapture, setShowFrameCapture] = useState(false)
+
+  const canCaptureFrame = !!media.currentVideoUrl
+    && !!actions.onCaptureFrameAsImage
+    && layout.frameCaptureTargets.length > 0
 
   useEffect(() => {
     setErrorDismissed(false)
@@ -147,6 +154,20 @@ export default function VideoPanelCardHeader({ runtime }: VideoPanelCardHeaderPr
       {/* 视频操作按钮 */}
       {(media.currentVideoUrl || (!layout.isLinked && !layout.isLastFrame && taskStatus.isVideoTaskRunning)) && (
         <div className="absolute bottom-2 right-2 flex items-center gap-2 z-20">
+          {canCaptureFrame && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                setShowFrameCapture(true)
+              }}
+              className="bg-[var(--glass-overlay)] hover:bg-[var(--glass-overlay-strong)] text-white p-2 rounded-full transition-all"
+              title={t('frameCapture.buttonTitle')}
+              aria-label={t('frameCapture.buttonTitle')}
+            >
+              <AppIcon name="film" className="w-4 h-4" />
+            </button>
+          )}
           {media.currentVideoUrl && (
             <button
               type="button"
@@ -207,6 +228,17 @@ export default function VideoPanelCardHeader({ runtime }: VideoPanelCardHeaderPr
           </button>
           <span className="text-white text-xs text-center break-all">{taskStatus.panelErrorDisplay.message}</span>
         </div>
+      )}
+
+      {showFrameCapture && media.currentVideoUrl && actions.onCaptureFrameAsImage && (
+        <VideoFrameCaptureModal
+          projectId={projectId}
+          videoUrl={media.currentVideoUrl}
+          aspectRatio={player.cssAspectRatio}
+          targets={layout.frameCaptureTargets}
+          onApply={actions.onCaptureFrameAsImage}
+          onClose={() => setShowFrameCapture(false)}
+        />
       )}
     </div>
   )

@@ -67,6 +67,24 @@
     "batchModeEnabled": "已开启批量模式",
     "batchModeDisabled": "批量模式已关闭"
   },
+  "frameCapture": {
+    "buttonTitle": "从视频选取一帧作为分镜图",
+    "title": "选取视频帧",
+    "hint": "拖动滑块或使用左右按钮逐帧预览，可将当前帧保存到本地或设为相邻分镜图。",
+    "prevFrame": "上一帧",
+    "nextFrame": "下一帧",
+    "saveLocal": "保存到本地",
+    "setAsPreviousPanel": "设为上一分镜图（#{number}）",
+    "setAsCurrentPanel": "设为当前分镜图（#{number}）",
+    "setAsNextPanel": "设为下一分镜图（#{number}）",
+    "applying": "应用中...",
+    "captureFailed": "抓取视频帧失败",
+    "applyFailed": "设置分镜图片失败",
+    "overwriteTitle": "覆盖现有分镜图片？",
+    "overwriteMessage": "分镜 #{number} 已有分镜图片，继续后将使用当前视频帧替换。",
+    "overwriteConfirm": "确认覆盖",
+    "loadFailed": "视频加载失败"
+  },
   "promptModal": {
     "title": "编辑镜头 #{number} 视频提示词",
     "shotType": "景别：",

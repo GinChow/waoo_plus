@@ -245,8 +245,36 @@ export function addSignedUrlsToStoryboard(storyboard: StoryboardLike) {
     storyboardImageUrl: keyToSignedUrl(storyboard.storyboardImageUrl),
     coarseGroupsJson: signStoryboardCoarseGroups(storyboard.coarseGroupsJson),
     panels,
+    panelGroups: signPanelGroups(storyboard.panelGroups),
     historyCount,
   }
+}
+
+function signPanelGroups(raw: unknown) {
+  if (!Array.isArray(raw)) return raw
+  return raw.map((group) => {
+    if (!group || typeof group !== 'object') return group
+    const record = group as UnknownRecord
+    const videoHistory = Array.isArray(record.videoHistory)
+      ? record.videoHistory.map((entry) => {
+        if (!entry || typeof entry !== 'object') return entry
+        const historyRecord = entry as UnknownRecord
+        return {
+          ...historyRecord,
+          videoUrl: typeof historyRecord.videoUrl === 'string' && !historyRecord.videoUrl.startsWith('http')
+            ? getSignedUrl(historyRecord.videoUrl, 7200) || historyRecord.videoUrl
+            : historyRecord.videoUrl,
+        }
+      })
+      : record.videoHistory
+    return {
+      ...record,
+      videoUrl: typeof record.videoUrl === 'string' && !record.videoUrl.startsWith('http')
+        ? getSignedUrl(record.videoUrl, 7200) || record.videoUrl
+        : record.videoUrl,
+      videoHistory,
+    }
+  })
 }
 
 function signStoryboardCoarseGroups(raw: string | null | undefined) {

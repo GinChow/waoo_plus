@@ -51,6 +51,8 @@ export function useVideoPanelActions({
   onResetFlPrompt,
   onGenerateFirstLastFrame,
   onPreviewImage,
+  frameCaptureTargets,
+  onCaptureFrameAsImage,
 }: VideoPanelCardShellProps) {
   const t = useTranslations('video')
   const tCommon = useTranslations('common')
@@ -158,6 +160,7 @@ export function useVideoPanelActions({
       flCustomPrompt,
       defaultFlPrompt,
       videoRatio,
+      frameCaptureTargets: frameCaptureTargets || [],
     },
     actions: {
       onGenerateVideo,
@@ -168,6 +171,7 @@ export function useVideoPanelActions({
       onFlCustomPromptChange,
       onResetFlPrompt,
       onGenerateFirstLastFrame,
+      onCaptureFrameAsImage,
     },
     computed: {
       showLipSyncSection,

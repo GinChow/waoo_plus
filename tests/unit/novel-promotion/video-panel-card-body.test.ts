@@ -160,6 +160,7 @@ function createRuntime(overrides: Partial<VideoPanelRuntime> = {}): VideoPanelRu
       flCustomPrompt: '',
       defaultFlPrompt: '',
       videoRatio: '9:16',
+      frameCaptureTargets: [],
     },
     actions: {
       onGenerateVideo: () => undefined,
@@ -275,5 +276,43 @@ describe('VideoPanelCardHeader', () => {
 
     expect(markup).toContain('title="下载"')
     expect(markup).toContain('download')
+  })
+
+  it('renders the frame capture action when panel image targets are available', () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(VideoPanelCardHeader, {
+        runtime: createRuntime({
+          media: {
+            ...createRuntime().media,
+            baseVideoUrl: 'https://example.com/current.mp4',
+            currentVideoUrl: 'https://example.com/current.mp4',
+          },
+          player: {
+            ...createRuntime().player,
+            cssAspectRatio: '16/9',
+          },
+          download: {
+            isDownloading: false,
+            handleDownload: vi.fn(async () => undefined),
+          },
+          layout: {
+            ...createRuntime().layout,
+            frameCaptureTargets: [{
+              panelId: 'panel-2',
+              panelNumber: 2,
+              position: 'current',
+              hasImage: true,
+            }],
+          },
+          actions: {
+            ...createRuntime().actions,
+            onCaptureFrameAsImage: vi.fn(async () => undefined),
+          },
+        }),
+      }),
+    )
+
+    expect(markup).toContain('title="frameCapture.buttonTitle"')
+    expect(markup).toContain('film')
   })
 })

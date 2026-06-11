@@ -1,6 +1,15 @@
 import type { VideoPanel, MatchedVoiceLine, VideoModelOption, FirstLastFrameParams, VideoGenerationOptions } from '../types'
 import type { CapabilitySelections, CapabilityValue } from '@/lib/model-config-contract'
 
+export type VideoFrameCaptureTargetPosition = 'previous' | 'current' | 'next'
+
+export interface VideoFrameCaptureTarget {
+  panelId: string
+  panelNumber: number
+  position: VideoFrameCaptureTargetPosition
+  hasImage: boolean
+}
+
 export interface VideoPanelCardShellProps {
   embedded?: boolean
   panel: VideoPanel
@@ -64,4 +73,7 @@ export interface VideoPanelCardShellProps {
     firstPanelId?: string,
   ) => void
   onPreviewImage?: (imageUrl: string) => void
+  frameCaptureTargets?: VideoFrameCaptureTarget[]
+  // 把视频某一帧写入指定分镜（复用分镜图上传管线）
+  onCaptureFrameAsImage?: (panelId: string, file: File) => Promise<void> | void
 }

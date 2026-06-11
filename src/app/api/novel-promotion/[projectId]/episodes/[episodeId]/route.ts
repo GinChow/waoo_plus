@@ -141,7 +141,8 @@ export const GET = apiHandler(async (
       storyboards: {
         include: {
           clip: true,
-          panels: { orderBy: { panelIndex: 'asc' } }
+          panels: { orderBy: { panelIndex: 'asc' } },
+          panelGroups: true
         },
         orderBy: { createdAt: 'asc' }
       },

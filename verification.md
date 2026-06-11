@@ -232,3 +232,28 @@ Executor: Codex
 
 - No browser visual regression was executed.
 - Historical videos without `sourceImageUrls` are preserved but are not guessed to be stale.
+# Video Frame Capture Targets
+
+Date: 2026-06-11 17:30:06 +0800
+Executor: Codex
+
+## Result
+
+- Focused functional and render tests: 9 passed.
+- TypeScript: passed.
+- Focused ESLint: passed.
+- Diff whitespace validation: passed.
+- Full unit suite: 875 passed, 4 unrelated existing failures.
+
+## Verified Behavior
+
+- The selected frame can be downloaded locally as JPEG without closing the modal.
+- Writable previous, current, and next panels are derived from the global panel order, including storyboard boundaries.
+- Missing neighbors and panels without `panelId` are omitted.
+- Targets with an existing image require confirmation before upload.
+- Upload errors propagate back to the modal, keep it open, and show failure feedback.
+
+## Residual Risk
+
+- No interactive browser click-through was available in this turn; static render and pure behavior tests cover the UI contract and target logic.
+- The full suite remains red due to four failures outside this feature's changed surface.

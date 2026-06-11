@@ -258,7 +258,11 @@ export default function StoryboardStage({
     refreshStoryboards()
   }, [deletePanelHistoryImageMutation, onRefresh, refreshEpisodeData, refreshStoryboards, patchPanelInEpisodeCache, setLocalStoryboards])
 
-  const handleUploadPanelImage = useCallback(async (panelId: string, file: File) => {
+  const handleUploadPanelImage = useCallback(async (
+    panelId: string,
+    file: File,
+    throwOnError = false,
+  ) => {
     setUploadingPanelIds((prev) => new Set(prev).add(panelId))
     try {
       const formData = new FormData()
@@ -268,8 +272,12 @@ export default function StoryboardStage({
         method: 'POST',
         body: formData,
       })
-      const result = await response.json().catch(() => null) as { imageUrl?: string } | null
+      const result = await response.json().catch(() => null) as { imageUrl?: string; error?: string } | null
+      if (!response.ok) {
+        throw new Error(result?.error || `Failed to update panel image: ${response.status}`)
+      }
       const nextImageUrl = result?.imageUrl
+      if (!nextImageUrl) throw new Error('Panel image response is missing imageUrl')
       if (nextImageUrl) {
         setLocalStoryboards((previous) => previous.map((storyboard) => {
           const panels = storyboard.panels || []
@@ -286,8 +294,8 @@ export default function StoryboardStage({
       onRefresh()
       refreshEpisodeData()
       refreshStoryboards()
-    } catch {
-      // ignore
+    } catch (error) {
+      if (throwOnError) throw error
     } finally {
       setUploadingPanelIds((prev) => {
         const next = new Set(prev)
@@ -296,6 +304,11 @@ export default function StoryboardStage({
       })
     }
   }, [projectId, onRefresh, refreshEpisodeData, refreshStoryboards, patchPanelInEpisodeCache, setLocalStoryboards])
+
+  const handleCaptureFrameAsImage = useCallback(
+    (panelId: string, file: File) => handleUploadPanelImage(panelId, file, true),
+    [handleUploadPanelImage],
+  )
 
   return (
     <StoryboardVideoRuntimeProvider
@@ -315,6 +328,7 @@ export default function StoryboardStage({
       onGenerateVideo={onGenerateVideo}
       onGenerateAllVideos={onGenerateAllVideos}
       onUpdatePanelVideoModel={onUpdatePanelVideoModel}
+      onUploadPanelImage={handleCaptureFrameAsImage}
     >
       <StoryboardStageShell>
         <StoryboardToolbar

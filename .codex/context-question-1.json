@@ -1,13 +1,13 @@
 {
-  "date": "2026-06-10",
+  "date": "2026-06-11",
   "executor": "Codex",
-  "question": "如何在图片重新生成后保留旧视频，并可靠提示视频可能已过期？",
-  "answer": "视频生成或上传时将实际使用的 sourceImageUrls 写入 videoHistory；投影当前视频时忽略签名 URL 的 query/hash，对来源图片序列与当前图片序列进行比较。图片更新流程不修改 videoUrl，因此旧视频继续保留。",
-  "boundary": "缺少 sourceImageUrls 的历史遗留视频无法可靠回溯来源，保持展示但不做猜测性标记；后续生成和上传的视频具备完整判断能力。",
-  "sufficiency": {
-    "interfaceContractKnown": true,
-    "technicalChoiceReasonKnown": true,
-    "mainRisksIdentified": true,
-    "verificationKnown": true
-  }
+  "question": "如何可靠定位可写入的上一、当前、下一分镜并判断是否需要覆盖确认？",
+  "priority": "high",
+  "evidence": [
+    "StoryboardVideoRuntime.allPanels 是跨 storyboard 的全局有序 VideoPanel 数组",
+    "panelIndexByKey 可定位当前 panel 在 allPanels 中的位置",
+    "VideoPanel.imageUrl 表示目标是否已有分镜图片",
+    "VideoPanel.panelId 是 panel/update-image 所需写入标识"
+  ],
+  "resolution": "基于 allPanelsIndex 取相邻元素，仅为带 panelId 的元素构造目标；目标的 hasImage 由 imageUrl 判定。"
 }

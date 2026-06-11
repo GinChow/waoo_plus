@@ -219,3 +219,31 @@ Executor: Codex
 
 - Initial `npm run build` exposed an existing invalid helper export from the `video-proxy` route; the helper was moved to `src/lib/video-proxy.ts` and type checking passed afterward.
 - The follow-up build was stopped because an active user-owned `next dev --turbopack` process was using the same `.next` directory. The development server was not terminated.
+
+## Video Frame Capture Targets
+
+Date: 2026-06-11 17:30:06 +0800
+Executor: Codex
+
+### Passed
+
+- `npx vitest run tests/unit/novel-promotion/video-frame-capture-modal.test.ts tests/unit/novel-promotion/video-frame-capture-targets.test.ts tests/unit/novel-promotion/video-panel-card-body.test.ts`
+  - 3 files passed, 9 tests passed.
+  - Covers local-save UI, previous/current/next target rendering, global target ordering, boundary filtering, overwrite-confirmation rule, and card entry rendering.
+- `npm run typecheck`
+  - TypeScript check passed.
+- Focused ESLint for all touched implementation and test files passed.
+- `git diff --check`
+  - Passed.
+
+### Full Unit Suite
+
+- `npm run test:unit:all`
+  - 236 files passed, 4 files failed; 875 of 879 tests passed.
+  - New and related frame-capture tests passed.
+  - Unrelated existing failures remain in `video-worker.test.ts`, `prompt-suffix-regression.test.ts`, `project-global-analyze-mutation.test.ts`, and `async-poll-yunwu-omni.test.ts`.
+
+### Guards
+
+- `node scripts/guards/file-line-count-guard.mjs` reported existing oversized files across the repository.
+- The new `VideoFrameCaptureModal.tsx` is 381 lines and remains below the component budget of 500 lines.

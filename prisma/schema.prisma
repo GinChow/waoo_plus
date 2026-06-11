@@ -243,6 +243,33 @@ model NovelPromotionPanel {
   @@map("novel_promotion_panels")
 }
 
+// 组合分镜（用户手动连接 linkedToNextPanel 的相邻原子分镜）的 omni 合成视频产物。
+// 与原子分镜解耦：成员为 linkedToNextPanel 推导的快照，合成视频/历史只存这里，不污染首个 panel。
+model NovelPromotionPanelGroup {
+  id                    String                   @id @default(uuid())
+  storyboardId          String
+  anchorPanelId         String // 组内首个成员 panelId，作为查找锚点
+  memberPanelIdsJson    String                   @db.Text // 有序成员 panelId 列表（JSON）快照
+  videoUrl              String?                  @db.Text
+  videoMediaId          String?
+  videoMedia            MediaObject?             @relation("NovelPromotionPanelGroupVideoMedia", fields: [videoMediaId], references: [id], onDelete: SetNull)
+  videoHistory          String?                  @db.Text
+  videoModel            String?                  @db.Text
+  videoGenerationMode   String?                  @db.Text // normal | firstlastframe
+  videoPrompt           String?                  @db.Text
+  firstLastFramePrompt  String?                  @db.Text
+  duration              Float?
+  firstLastFrameEnabled Boolean                  @default(true)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @default(now()) @updatedAt
+  storyboard            NovelPromotionStoryboard @relation(fields: [storyboardId], references: [id], onDelete: Cascade)
+
+  @@unique([storyboardId, anchorPanelId])
+  @@index([storyboardId])
+  @@index([videoMediaId])
+  @@map("novel_promotion_panel_groups")
+}
+
 model NovelPromotionProject {
   id              String                    @id @default(uuid())
   projectId       String                    @unique
@@ -323,6 +350,7 @@ model NovelPromotionStoryboard {
   lastError           String?
   photographyPlan     String?               @db.Text
   panels              NovelPromotionPanel[]
+  panelGroups         NovelPromotionPanelGroup[]
   clip                NovelPromotionClip    @relation(fields: [clipId], references: [id], onDelete: Cascade)
   episode             NovelPromotionEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
   supplementaryPanels SupplementaryPanel[]
@@ -970,6 +998,7 @@ model MediaObject {
   novelPromotionEpisodeAudios           NovelPromotionEpisode[]     @relation("NovelPromotionEpisodeAudioMedia")
   novelPromotionPanelImages             NovelPromotionPanel[]       @relation("NovelPromotionPanelImageMedia")
   novelPromotionPanelVideos             NovelPromotionPanel[]       @relation("NovelPromotionPanelVideoMedia")
+  novelPromotionPanelGroupVideos        NovelPromotionPanelGroup[]  @relation("NovelPromotionPanelGroupVideoMedia")
   novelPromotionPanelLipSyncVideos      NovelPromotionPanel[]       @relation("NovelPromotionPanelLipSyncVideoMedia")
   novelPromotionPanelSketchImages       NovelPromotionPanel[]       @relation("NovelPromotionPanelSketchMedia")
   novelPromotionPanelPreviousImages     NovelPromotionPanel[]       @relation("NovelPromotionPanelPreviousImageMedia")

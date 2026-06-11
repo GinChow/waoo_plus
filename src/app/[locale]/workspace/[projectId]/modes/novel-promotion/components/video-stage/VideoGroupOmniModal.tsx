@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslations } from 'next-intl'
 import { AppIcon } from '@/components/ui/icons'
 import { MediaImageWithLoading } from '@/components/media/MediaImageWithLoading'
@@ -156,13 +157,15 @@ export default function VideoGroupOmniModal({
     await onConfirm(multiPrompt, totalDuration)
   }
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--glass-overlay)]"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-[var(--glass-overlay)]"
       onClick={submitting ? undefined : onClose}
     >
       <div
-        className="bg-[var(--glass-bg-surface)] rounded-lg max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col"
+        className="relative z-10 bg-[var(--glass-bg-surface)] rounded-lg max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(event) => event.stopPropagation()}
       >
         {/* 标题栏 */}
@@ -348,6 +351,7 @@ export default function VideoGroupOmniModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

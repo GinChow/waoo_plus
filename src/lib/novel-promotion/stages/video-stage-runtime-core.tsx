@@ -107,7 +107,7 @@ export function useVideoStageRuntime({
     projectId,
     storyboards,
   })
-  const { allPanels } = useVideoPanelsProjection({
+  const { allPanels, panelGroupsByAnchor } = useVideoPanelsProjection({
     storyboards,
     clips,
     panelVideoStates,
@@ -558,6 +558,7 @@ export function useVideoStageRuntime({
 
       <VideoRenderPanel
         allPanels={projectedPanels}
+        panelGroupsByAnchor={panelGroupsByAnchor}
         linkedPanels={linkedPanels}
         highlightedPanelKey={highlightedPanelKey}
         panelRefs={panelRefs}

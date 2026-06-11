@@ -29,6 +29,7 @@ import type {
   Clip,
   BatchVideoGenerationParams,
   FirstLastFrameParams,
+  PanelGroupRuntime,
   Storyboard,
   VideoGenerationOptions,
   VideoModelOption,
@@ -36,6 +37,7 @@ import type {
 } from '../video'
 import { VideoPanelCard } from '../video'
 import VideoGroupPanelCard from '../video-stage/VideoGroupPanelCard'
+import { buildVideoFrameCaptureTargets } from '../video/panel-card/frame-capture-targets'
 
 interface StoryboardVideoRuntimeProviderProps {
   children: ReactNode
@@ -59,6 +61,7 @@ interface StoryboardVideoRuntimeProviderProps {
   ) => Promise<void>
   onGenerateAllVideos: (options?: BatchVideoGenerationParams) => Promise<void>
   onUpdatePanelVideoModel: (storyboardId: string, panelIndex: number, model: string) => Promise<void>
+  onUploadPanelImage?: (panelId: string, file: File) => Promise<void> | void
 }
 
 interface StoryboardVideoRuntimeValue {
@@ -71,6 +74,7 @@ interface StoryboardVideoRuntimeValue {
   // 未过滤的全部已启用视频模型（组合视频需要匹配 kling-v3-omni 等非常规模型）
   userVideoModels: VideoModelOption[]
   allPanels: VideoPanel[]
+  panelGroupsByAnchor: Map<string, PanelGroupRuntime>
   panelIndexByKey: Map<string, number>
   linkedPanels: Map<string, boolean>
   panelVideoPreference: Map<string, boolean>
@@ -81,6 +85,7 @@ interface StoryboardVideoRuntimeValue {
   onGenerateAllVideos: () => Promise<void>
   onUpdatePanelVideoModel: StoryboardVideoRuntimeProviderProps['onUpdatePanelVideoModel']
   onLipSync: (storyboardId: string, panelIndex: number, voiceLineId: string, panelId?: string) => Promise<void>
+  onUploadPanelImage?: (panelId: string, file: File) => Promise<void> | void
   flModel: string
   flModelOptions: VideoModelOption[]
   flGenerationOptions: VideoGenerationOptions
@@ -118,10 +123,11 @@ export function StoryboardVideoRuntimeProvider({
   onGenerateVideo,
   onGenerateAllVideos,
   onUpdatePanelVideoModel,
+  onUploadPanelImage,
 }: StoryboardVideoRuntimeProviderProps) {
   const tVideo = useTranslations('video')
   const { panelVideoStates, panelLipStates } = useVideoTaskStates({ projectId, storyboards })
-  const { allPanels } = useVideoPanelsProjection({
+  const { allPanels, panelGroupsByAnchor } = useVideoPanelsProjection({
     storyboards,
     clips,
     panelVideoStates,
@@ -200,6 +206,7 @@ export function StoryboardVideoRuntimeProvider({
     videoModelOptions,
     userVideoModels: userVideoModels || [],
     allPanels,
+    panelGroupsByAnchor,
     panelIndexByKey,
     linkedPanels,
     panelVideoPreference,
@@ -210,6 +217,7 @@ export function StoryboardVideoRuntimeProvider({
     onGenerateAllVideos: () => onGenerateAllVideos({ videoModel: defaultVideoModel }),
     onUpdatePanelVideoModel,
     onLipSync: handleLipSync,
+    onUploadPanelImage,
     flModel: firstLastFrame.flModel,
     flModelOptions: firstLastFrame.flModelOptions,
     flGenerationOptions: firstLastFrame.flGenerationOptions,
@@ -241,6 +249,8 @@ export function StoryboardVideoRuntimeProvider({
     onGenerateAllVideos,
     onGenerateVideo,
     onUpdatePanelVideoModel,
+    onUploadPanelImage,
+    panelGroupsByAnchor,
     panelIndexByKey,
     panelVideoPreference,
     panelVoiceLines,
@@ -308,6 +318,7 @@ export function StoryboardVideoPane({
   const isLastFrame = isFirstLastFramePair && !!previousPanel
     && runtime.linkedPanels.get(`${previousPanel.storyboardId}-${previousPanel.panelIndex}`) === true
   const localPrompt = promptOverrides.get(key) ?? panel.textPanel?.video_prompt ?? ''
+  const frameCaptureTargets = buildVideoFrameCaptureTargets(runtime.allPanels, allPanelsIndex)
 
   return (
     <VideoPanelCard
@@ -355,6 +366,8 @@ export function StoryboardVideoPane({
       onResetFlPrompt={runtime.resetFlCustomPrompt}
       onGenerateFirstLastFrame={runtime.handleGenerateFirstLastFrame}
       onPreviewImage={onPreviewImage}
+      frameCaptureTargets={frameCaptureTargets}
+      onCaptureFrameAsImage={runtime.onUploadPanelImage}
     />
   )
 }
@@ -387,12 +400,16 @@ export function StoryboardGroupVideoPane({
     .filter((panel): panel is VideoPanel => !!panel)
   if (groupPanels.length === 0) return null
 
+  const anchorPanelId = groupPanels[0]?.panelId
+  const group = anchorPanelId ? runtime.panelGroupsByAnchor.get(anchorPanelId) : undefined
+
   return (
     <VideoGroupPanelCard
       embedded
       projectId={runtime.projectId}
       episodeId={runtime.episodeId}
       groupPanels={groupPanels}
+      group={group}
       groupStartGlobalNumber={groupStartGlobalNumber}
       videoRatio={runtime.videoRatio}
       onExpand={onExpand}

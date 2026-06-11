@@ -141,6 +141,19 @@ export async function hasPanelVideoOutput(panelId: string | null | undefined) {
   return isNonEmptyString(panel.videoUrl) || !!panel.videoMediaId
 }
 
+export async function hasPanelGroupVideoOutput(params: {
+  storyboardId: string | null | undefined
+  anchorPanelId: string | null | undefined
+}) {
+  if (!isNonEmptyString(params.storyboardId) || !isNonEmptyString(params.anchorPanelId)) return false
+  const group = await prisma.novelPromotionPanelGroup.findUnique({
+    where: { storyboardId_anchorPanelId: { storyboardId: params.storyboardId, anchorPanelId: params.anchorPanelId } },
+    select: { videoUrl: true, videoMediaId: true },
+  })
+  if (!group) return false
+  return isNonEmptyString(group.videoUrl) || !!group.videoMediaId
+}
+
 export async function hasPanelLipSyncOutput(panelId: string | null | undefined) {
   if (!isNonEmptyString(panelId)) return false
   const panel = await prisma.novelPromotionPanel.findUnique({

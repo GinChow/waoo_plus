@@ -121,6 +121,8 @@ export {
     useUpdateProjectPanelDuration,
     useSelectProjectStoryboardGroupVideo,
     useDeleteProjectStoryboardGroupHistoryVideo,
+    useSelectProjectPanelGroupVideo,
+    useDeleteProjectPanelGroupHistoryVideo,
     useSelectProjectPanelHistoryVideo,
     useDeleteProjectPanelHistoryVideo,
     useUploadProjectPanelVideo,

@@ -64,17 +64,60 @@ export interface Panel {
   lipSyncErrorCode?: string | null
 }
 
+// 组合分镜（用户连接的相邻原子分镜）的 omni 合成视频记录（来自 NovelPromotionPanelGroup 表）
+export interface PanelGroupRecord {
+  id: string
+  storyboardId: string
+  anchorPanelId: string
+  memberPanelIdsJson?: string | null
+  videoUrl?: string | null
+  videoHistory?: string | null
+  videoModel?: string | null
+  videoGenerationMode?: string | null
+  videoPrompt?: string | null
+  firstLastFramePrompt?: string | null
+  firstLastFrameEnabled?: boolean | null
+  duration?: number | null
+}
+
 export interface Storyboard {
   id: string
   clipId?: string | null
   storyboardTextJson?: string | null
   coarseGroupsJson?: string | null
   panels?: Panel[]
+  panelGroups?: PanelGroupRecord[]
   clip?: {
     start: number
     end: number
     summary: string
   }
+}
+
+// 投影后的组合分镜运行态（供 VideoGroupPanelCard 使用）
+export interface PanelGroupRuntime {
+  id: string
+  storyboardId: string
+  anchorPanelId: string
+  memberPanelIds: string[]
+  videoUrl?: string
+  videoHistory: Array<{
+    videoUrl: string
+    generatedAt: string
+    videoPrompt?: string
+    videoModel?: string
+    generationMode?: string
+    source?: string
+    taskId?: string
+    sourceImageUrls?: string[]
+  }>
+  videoModel?: string
+  videoGenerationMode?: string
+  videoPrompt?: string
+  firstLastFramePrompt?: string
+  firstLastFrameEnabled: boolean
+  duration?: number | null
+  isVideoStale?: boolean
 }
 
 export interface Clip {

@@ -11,6 +11,7 @@ import GroupPanelCard, { GroupLinkToNextButton } from './GroupPanelCard'
 import { AppIcon } from '@/components/ui/icons'
 import type { PanelSaveState } from './hooks/usePanelCrudActions'
 import { StoryboardGroupVideoPane, StoryboardVideoPane } from './StoryboardVideoRuntime'
+import PanelGroupCollapseButton from './PanelGroupCollapseButton'
 
 interface PanelGroup {
   groupKey: string
@@ -206,20 +207,17 @@ export default function StoryboardPanelList({
         style={{ zIndex: textPanels.length - index }}
       >
         {inGroup && groupContext?.isGroupStart && (
-          <div className="absolute -top-2 left-2 right-2 z-20 flex items-center gap-2 pointer-events-none">
+          <div className="absolute top-2 left-2 right-2 z-50 flex items-start gap-2 pointer-events-none">
             <div className="flex items-center gap-1.5 rounded-full bg-[var(--glass-accent-from)] px-2 py-0.5 text-[10px] font-semibold text-white shadow-[var(--glass-shadow-sm)] pointer-events-auto">
               <AppIcon name="unplug" className="h-2.5 w-2.5" />
               <span>{t('panelGroup.badge')}</span>
             </div>
             {groupContext.onCollapse && (
-              <button
-                type="button"
+              <PanelGroupCollapseButton
                 onClick={groupContext.onCollapse}
-                className="ml-auto pointer-events-auto rounded-full bg-[var(--glass-bg-surface)] border border-[var(--glass-accent-from)] px-2 py-0.5 text-[10px] text-[var(--glass-accent-from)] hover:bg-[var(--glass-tone-info-bg)]"
                 title={t('panelGroup.collapseTitle')}
-              >
-                {t('panelGroup.collapse')}
-              </button>
+                label={t('panelGroup.collapse')}
+              />
             )}
           </div>
         )}

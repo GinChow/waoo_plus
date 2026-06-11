@@ -12,10 +12,19 @@ interface PanelData {
     lipSyncVideoUrl: string | null
 }
 
+interface PanelGroupData {
+    id: string
+    anchorPanelId: string
+    memberPanelIdsJson: string | null
+    videoUrl: string | null
+    duration: number | null
+}
+
 interface StoryboardData {
     id: string
     clipId: string
     panels?: PanelData[]
+    panelGroups?: PanelGroupData[]
 }
 
 interface ClipData {
@@ -70,7 +79,8 @@ export const POST = apiHandler(async (
             include: {
                 storyboards: {
                     include: {
-                        panels: { orderBy: { panelIndex: 'asc' } }
+                        panels: { orderBy: { panelIndex: 'asc' } },
+                        panelGroups: true
                     },
                     orderBy: { createdAt: 'asc' }
                 },
@@ -91,7 +101,8 @@ export const POST = apiHandler(async (
                     include: {
                         storyboards: {
                             include: {
-                                panels: { orderBy: { panelIndex: 'asc' } }
+                                panels: { orderBy: { panelIndex: 'asc' } },
+                                panelGroups: true
                             },
                             orderBy: { createdAt: 'asc' }
                         },
@@ -140,8 +151,46 @@ export const POST = apiHandler(async (
     for (const storyboard of allStoryboards) {
         const clipIndex = allClips.findIndex((clip) => clip.id === storyboard.clipId)
 
+        // 组合分镜（linkedToNextPanel 组）的合成视频：在锚点位置输出一次，跳过组内其余成员的个体视频。
+        const groups = storyboard.panelGroups || []
+        const groupVideoByAnchor = new Map<string, PanelGroupData>()
+        const groupedMemberPanelIds = new Set<string>()
+        for (const group of groups) {
+            let memberIds: string[] = []
+            try {
+                const parsed = group.memberPanelIdsJson ? JSON.parse(group.memberPanelIdsJson) : []
+                if (Array.isArray(parsed)) memberIds = parsed.filter((id): id is string => typeof id === 'string')
+            } catch {
+                memberIds = []
+            }
+            if (group.videoUrl) groupVideoByAnchor.set(group.anchorPanelId, group)
+            // 非锚点成员在下方循环中跳过（其个体视频不计入，由组合视频覆盖）
+            memberIds.filter((id) => id !== group.anchorPanelId).forEach((id) => groupedMemberPanelIds.add(id))
+        }
+
         const panels = storyboard.panels || []
         for (const panel of panels) {
+            // 组合视频：锚点 panel 输出组合视频；其余成员跳过
+            const anchorGroup = groupVideoByAnchor.get(panel.id)
+            if (anchorGroup?.videoUrl) {
+                const safeDesc = (panel.description || '镜头').slice(0, 50).replace(/[\\/:*?"<>|]/g, '_')
+                videoCandidates.push({
+                    fileName: '',
+                    videoUrl: '',
+                    clipIndex: clipIndex >= 0 ? clipIndex : 999,
+                    panelIndex: panel.panelIndex || 0,
+                    panelId: panel.id,
+                    storyboardId: storyboard.id,
+                    description: panel.description || '镜头',
+                    durationSeconds: anchorGroup.duration && anchorGroup.duration > 0 ? anchorGroup.duration : 3,
+                    sourceType: 'original',
+                    videoKey: anchorGroup.videoUrl,
+                    desc: safeDesc,
+                })
+                continue
+            }
+            if (groupedMemberPanelIds.has(panel.id)) continue
+
             // 构建 panelKey 用于查找偏好
             const panelKey = `${storyboard.id}-${panel.panelIndex || 0}`
             const preferLipSync = panelPreferences?.[panelKey] ?? true

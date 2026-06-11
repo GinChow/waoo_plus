@@ -11,12 +11,13 @@ import type {
   FirstLastFrameParams,
   GroupVideoGenerationOptions,
   MultiPromptShot,
+  PanelGroupRuntime,
   VideoGenerationOptions,
   VideoModelOption,
   VideoPanel,
 } from '../video'
 import VideoGroupOmniModal from './VideoGroupOmniModal'
-import { PanelVideoHistoryDropdown } from '../video/panel-card/PanelVideoHistoryDropdown'
+import { PanelGroupVideoHistoryDropdown } from './PanelGroupVideoHistoryDropdown'
 import { ModelCapabilityDropdown } from '@/components/ui/config-modals/ModelCapabilityDropdown'
 
 // kling-omni-video multi_prompt 最多支持 6 个分镜
@@ -33,6 +34,8 @@ interface VideoGroupPanelCardProps {
   projectId: string
   episodeId: string
   groupPanels: VideoPanel[]
+  // 组合分镜 omni 合成视频状态（来自 NovelPromotionPanelGroup 表，与原子分镜解耦）
+  group?: PanelGroupRuntime
   groupStartGlobalNumber: number
   videoRatio: string
   onExpand: () => void
@@ -56,6 +59,7 @@ export default function VideoGroupPanelCard({
   projectId,
   episodeId,
   groupPanels,
+  group,
   groupStartGlobalNumber,
   videoRatio,
   onExpand,
@@ -73,30 +77,21 @@ export default function VideoGroupPanelCard({
   )
   const startNumber = groupStartGlobalNumber
   const endNumber = groupStartGlobalNumber + groupPanels.length - 1
-  const generatedVideoCount = groupPanels.filter((panel) => panel.videoUrl).length
-
   const [modalOpen, setModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [omniModelValue, setOmniModelValue] = useState('')
   const [groupVideoPlaying, setGroupVideoPlaying] = useState(false)
   const groupVideoRef = useRef<HTMLVideoElement>(null)
   const firstPanel = groupPanels[0]
-  // 组合（omni）合成视频写入组内首个面板的 videoUrl
-  const groupVideoUrl = firstPanel?.videoUrl
+  // 组合（omni）合成视频存于独立的组表，与原子分镜解耦
+  const groupVideoUrl = group?.videoUrl
+  const groupVideoHistory = group?.videoHistory ?? []
+  const generatedVideoCount = groupVideoUrl ? groupPanels.length : 0
 
   useEffect(() => {
-    _ulogInfo('[VideoHistoryTrace][group card] group video url changed', {
-      projectId,
-      episodeId,
-      storyboardId: firstPanel?.storyboardId,
-      panelId: firstPanel?.panelId,
-      panelIndex: firstPanel?.panelIndex,
-      groupVideoUrl: groupVideoUrl || '',
-      historyCount: firstPanel?.videoHistory?.length ?? 0,
-    })
     setGroupVideoPlaying(false)
     groupVideoRef.current?.load()
-  }, [episodeId, firstPanel?.panelId, firstPanel?.panelIndex, firstPanel?.storyboardId, firstPanel?.videoHistory?.length, groupVideoUrl, projectId])
+  }, [episodeId, group?.id, groupVideoHistory.length, groupVideoUrl, projectId])
 
   // 仅两张图组合支持「首尾帧 / 多镜头」模式切换（与分镜面板共享同一持久化标记）
   const isTwoPanelGroup = groupPanels.length === 2
@@ -207,7 +202,7 @@ export default function VideoGroupPanelCard({
               {t('panelGroup.title', { start: startNumber, end: endNumber })}
             </span>
           </div>
-          {firstPanel?.isVideoStale && groupVideoUrl && (
+          {group?.isVideoStale && groupVideoUrl && (
             <span
               className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800"
               title={t('production.possiblyStaleHint')}
@@ -403,13 +398,13 @@ export default function VideoGroupPanelCard({
               </button>
             )}
           </div>
-          {firstPanel?.panelId && (firstPanel?.videoHistory?.length ?? 0) > 0 && (
-            <PanelVideoHistoryDropdown
+          {group?.id && groupVideoHistory.length > 0 && (
+            <PanelGroupVideoHistoryDropdown
               projectId={projectId}
               episodeId={episodeId}
-              panelId={firstPanel.panelId}
+              panelGroupId={group.id}
               currentVideoUrl={groupVideoUrl}
-              videoHistory={firstPanel.videoHistory ?? []}
+              videoHistory={groupVideoHistory}
             />
           )}
         </div>
