@@ -164,44 +164,47 @@ export default function ImageSection({
 
   return (
     <div
-      className={`relative overflow-hidden group rounded-t-2xl transition-all bg-[var(--glass-bg-muted)] ${isTaskPulseAnimating ? 'animate-brightness-boost' : ''}`}
+      className={`relative group transition-all ${isTaskPulseAnimating ? 'animate-brightness-boost' : ''}`}
       style={{ aspectRatio: cssAspectRatio }}
     >
-      {isDeleting ? (
-        renderLoadingState('process', imageUrl)
-      ) : isModifying ? (
-        renderLoadingState('modify', imageUrl)
-      ) : isSubmittingPanelImageTask ? (
-        renderLoadingState('regenerate', imageUrl)
-      ) : candidateData ? (
-        hasValidCandidates ? (
-          <ImageSectionCandidateMode
-            panelId={panelId}
-            imageUrl={imageUrl}
-            candidateData={candidateData}
-            onSelectCandidateIndex={onSelectCandidateIndex}
-            onConfirmCandidate={onConfirmCandidate}
-            onCancelCandidate={onCancelCandidate}
-            onPreviewImage={onPreviewImage}
+      {/* 图片显示层单独裁切圆角；外层不再 overflow-hidden，避免工具栏/历史弹层在窄面板下被裁掉 */}
+      <div className="absolute inset-0 overflow-hidden rounded-t-2xl bg-[var(--glass-bg-muted)]">
+        {isDeleting ? (
+          renderLoadingState('process', imageUrl)
+        ) : isModifying ? (
+          renderLoadingState('modify', imageUrl)
+        ) : isSubmittingPanelImageTask ? (
+          renderLoadingState('regenerate', imageUrl)
+        ) : candidateData ? (
+          hasValidCandidates ? (
+            <ImageSectionCandidateMode
+              panelId={panelId}
+              imageUrl={imageUrl}
+              candidateData={candidateData}
+              onSelectCandidateIndex={onSelectCandidateIndex}
+              onConfirmCandidate={onConfirmCandidate}
+              onCancelCandidate={onCancelCandidate}
+              onPreviewImage={onPreviewImage}
+            />
+          ) : (
+            renderLoadingState(imageUrl ? 'regenerate' : 'generate', imageUrl)
+          )
+        ) : failedError ? (
+          renderFailedState()
+        ) : imageUrl ? (
+          <MediaImageWithLoading
+            src={imageUrl}
+            alt={t('variant.shotNum', { number: globalPanelNumber })}
+            containerClassName="h-full w-full"
+            className={`w-full h-full object-cover ${onPreviewImage ? 'cursor-zoom-in' : ''}`}
+            onClick={onPreviewImage ? () => onPreviewImage(imageUrl) : undefined}
+            title={onPreviewImage ? t('image.clickToPreview') : undefined}
+            sizes="(max-width: 768px) 100vw, 33vw"
           />
         ) : (
-          renderLoadingState(imageUrl ? 'regenerate' : 'generate', imageUrl)
-        )
-      ) : failedError ? (
-        renderFailedState()
-      ) : imageUrl ? (
-        <MediaImageWithLoading
-          src={imageUrl}
-          alt={t('variant.shotNum', { number: globalPanelNumber })}
-          containerClassName="h-full w-full"
-          className={`w-full h-full object-cover ${onPreviewImage ? 'cursor-zoom-in' : ''}`}
-          onClick={onPreviewImage ? () => onPreviewImage(imageUrl) : undefined}
-          title={onPreviewImage ? t('image.clickToPreview') : undefined}
-          sizes="(max-width: 768px) 100vw, 33vw"
-        />
-      ) : (
-        renderEmptyState()
-      )}
+          renderEmptyState()
+        )}
+      </div>
 
       <div className="absolute top-2 left-2">
         <span className="glass-chip glass-chip-neutral px-2 py-0.5 text-xs font-medium">{globalPanelNumber}</span>

@@ -14,7 +14,7 @@ export default function VoiceStageRoute() {
     <VoiceStage
       projectId={projectId}
       episodeId={episodeId}
-      onBack={() => runtime.onStageChange('videos')}
+      onBack={() => runtime.onStageChange('storyboard')}
       onOpenAssetLibraryForCharacter={(characterId) =>
         characterId
           ? runtime.onOpenAssetLibraryForCharacter(characterId, false)

@@ -28,7 +28,7 @@ describe('resolveVideoProxyFetchUrl', () => {
   it('resolves a media route before signing the storage object', async () => {
     resolveStorageKeyFromMediaValueMock.mockResolvedValue('videos/panel-1.mp4')
     getSignedObjectUrlMock.mockResolvedValue('https://storage.example/signed-video')
-    const { resolveVideoProxyFetchUrl } = await import('@/app/api/novel-promotion/[projectId]/video-proxy/route')
+    const { resolveVideoProxyFetchUrl } = await import('@/lib/video-proxy')
 
     await expect(resolveVideoProxyFetchUrl('/m/m_0605ceb5b9931cf2e1c1d791da2a4c9965f874d1'))
       .resolves.toBe('fetchable:https://storage.example/signed-video')
@@ -37,7 +37,7 @@ describe('resolveVideoProxyFetchUrl', () => {
   })
 
   it('keeps external video urls unchanged', async () => {
-    const { resolveVideoProxyFetchUrl } = await import('@/app/api/novel-promotion/[projectId]/video-proxy/route')
+    const { resolveVideoProxyFetchUrl } = await import('@/lib/video-proxy')
 
     await expect(resolveVideoProxyFetchUrl('https://provider.example/video.mp4'))
       .resolves.toBe('https://provider.example/video.mp4')

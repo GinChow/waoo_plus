@@ -24,6 +24,14 @@ import {
   removePanelImageHistoryEntry,
   serializePanelImageHistory,
 } from '@/lib/novel-promotion/panel-image-state'
+import type { CapabilitySelections } from '@/lib/model-config-contract'
+import type {
+  FirstLastFrameParams,
+  BatchVideoGenerationParams,
+  VideoGenerationOptions,
+  VideoModelOption,
+} from '../video'
+import { StoryboardVideoRuntimeProvider } from './StoryboardVideoRuntime'
 
 interface StoryboardStageProps {
   projectId: string
@@ -31,8 +39,22 @@ interface StoryboardStageProps {
   storyboards: NovelPromotionStoryboard[]
   clips: NovelPromotionClip[]
   videoRatio: string
+  defaultVideoModel: string
+  capabilityOverrides: CapabilitySelections
+  userVideoModels?: VideoModelOption[]
+  onGenerateVideo: (
+    storyboardId: string,
+    panelIndex: number,
+    videoModel?: string,
+    firstLastFrame?: FirstLastFrameParams,
+    generationOptions?: VideoGenerationOptions,
+    panelId?: string,
+    groupNumber?: number,
+    customPrompt?: string,
+  ) => Promise<void>
+  onGenerateAllVideos: (options?: BatchVideoGenerationParams) => Promise<void>
+  onUpdatePanelVideoModel: (storyboardId: string, panelIndex: number, model: string) => Promise<void>
   onBack: () => void
-  onNext: () => void
   isTransitioning?: boolean
 }
 
@@ -42,8 +64,13 @@ export default function StoryboardStage({
   storyboards: initialStoryboards,
   clips,
   videoRatio,
+  defaultVideoModel,
+  capabilityOverrides,
+  userVideoModels,
+  onGenerateVideo,
+  onGenerateAllVideos,
+  onUpdatePanelVideoModel,
   onBack,
-  onNext,
   isTransitioning = false,
 }: StoryboardStageProps) {
   const controller = useStoryboardStageController({
@@ -129,7 +156,6 @@ export default function StoryboardStage({
     updatePanelActingNotesMutation,
 
     addingStoryboardGroupState,
-    transitioningState,
     runningCount,
     pendingPanelCount,
     handleGenerateAllPanels,
@@ -272,12 +298,25 @@ export default function StoryboardStage({
   }, [projectId, onRefresh, refreshEpisodeData, refreshStoryboards, patchPanelInEpisodeCache, setLocalStoryboards])
 
   return (
-      <StoryboardStageShell
-        isTransitioning={isTransitioning}
-        isNextDisabled={isTransitioning || localStoryboards.length === 0}
-        transitioningState={transitioningState}
-        onNext={onNext}
-      >
+    <StoryboardVideoRuntimeProvider
+      projectId={projectId}
+      episodeId={episodeId}
+      storyboards={localStoryboards}
+      clips={clips.map((clip) => ({
+        id: clip.id,
+        start: clip.start ?? 0,
+        end: clip.end ?? 0,
+        summary: clip.summary,
+      }))}
+      defaultVideoModel={defaultVideoModel}
+      capabilityOverrides={capabilityOverrides}
+      videoRatio={videoRatio}
+      userVideoModels={userVideoModels}
+      onGenerateVideo={onGenerateVideo}
+      onGenerateAllVideos={onGenerateAllVideos}
+      onUpdatePanelVideoModel={onUpdatePanelVideoModel}
+    >
+      <StoryboardStageShell>
         <StoryboardToolbar
           totalSegments={sortedStoryboards.length}
           totalPanels={totalPanels}
@@ -416,5 +455,6 @@ export default function StoryboardStage({
           />
         )}
       </StoryboardStageShell>
+    </StoryboardVideoRuntimeProvider>
   )
 }

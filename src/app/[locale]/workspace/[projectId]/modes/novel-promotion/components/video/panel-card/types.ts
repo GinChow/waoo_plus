@@ -2,6 +2,7 @@ import type { VideoPanel, MatchedVoiceLine, VideoModelOption, FirstLastFramePara
 import type { CapabilitySelections, CapabilityValue } from '@/lib/model-config-contract'
 
 export interface VideoPanelCardShellProps {
+  embedded?: boolean
   panel: VideoPanel
   panelIndex: number
   defaultVideoModel: string

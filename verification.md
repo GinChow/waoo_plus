@@ -206,3 +206,29 @@ Added a download action to every video card that currently exposes a playable vi
 - Component coverage confirms a visible video renders the download action.
 - Runtime behavior uses the currently selected original or lip-sync video URL.
 - 回归验证覆盖 `/m/m_...` 媒体路由：代理会先解析真实 storageKey，再获取最终签名地址，不再将媒体路由本身作为对象 key。
+
+## Unified Storyboard Production
+
+Date: 2026-06-10
+Executor: Codex
+
+分镜与成片已合并为“分镜制作”。同一分镜卡片同时包含图片与视频制作区域，视频模型和时长设置保留在视频区域内。图片重新生成不会删除旧视频；带来源图片记录的视频在图片变化后显示“可能已过期”。
+
+### Commands
+
+- Focused Vitest passed: 5 files, 19 tests.
+- `npm run typecheck` passed.
+- Focused ESLint passed.
+- `npm run lint:all` passed with 0 errors and 47 existing warnings.
+- `git diff --check` passed.
+- Full unit suite: 872/875 passed; 3 unrelated existing failures remain.
+
+### Build Note
+
+- The initial production build exposed an existing invalid helper export from a Next.js route; the helper was moved to `src/lib/video-proxy.ts`.
+- The follow-up build was stopped because the active user-owned Next.js development server was using the same `.next` directory. The development server was not terminated.
+
+### Residual Risk
+
+- No browser visual regression was executed.
+- Historical videos without `sourceImageUrls` are preserved but are not guessed to be stale.

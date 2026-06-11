@@ -73,4 +73,54 @@ describe('video panels projection error code', () => {
     expect(result.allPanels).toHaveLength(1)
     expect(result.allPanels[0]?.videoUrl).toBe('video/selected-panel-history.mp4')
   })
+
+  it('marks a video stale when the current image differs from its recorded source image', () => {
+    const result = useVideoPanelsProjection({
+      clips: [{ id: 'clip-1', start: 0, end: 5, summary: 'clip' }],
+      storyboards: [{
+        id: 'sb-1',
+        clipId: 'clip-1',
+        panels: [{
+          id: 'panel-1',
+          panelIndex: 0,
+          imageUrl: 'images/current.png?signature=current',
+          videoUrl: 'videos/output.mp4?signature=video',
+          videoHistory: JSON.stringify([{
+            videoUrl: 'videos/output.mp4',
+            generatedAt: '2026-06-10T00:00:00.000Z',
+            sourceImageUrls: ['images/source.png'],
+          }]),
+        }],
+      }],
+      panelVideoStates: { getTaskState: () => null },
+      panelLipStates: { getTaskState: () => null },
+    })
+
+    expect(result.allPanels[0]?.isVideoStale).toBe(true)
+  })
+
+  it('keeps a video current when signed URLs resolve to the recorded source image', () => {
+    const result = useVideoPanelsProjection({
+      clips: [{ id: 'clip-1', start: 0, end: 5, summary: 'clip' }],
+      storyboards: [{
+        id: 'sb-1',
+        clipId: 'clip-1',
+        panels: [{
+          id: 'panel-1',
+          panelIndex: 0,
+          imageUrl: 'images/source.png?signature=new',
+          videoUrl: 'videos/output.mp4?signature=new',
+          videoHistory: JSON.stringify([{
+            videoUrl: 'videos/output.mp4?signature=old',
+            generatedAt: '2026-06-10T00:00:00.000Z',
+            sourceImageUrls: ['images/source.png?signature=old'],
+          }]),
+        }],
+      }],
+      panelVideoStates: { getTaskState: () => null },
+      panelLipStates: { getTaskState: () => null },
+    })
+
+    expect(result.allPanels[0]?.isVideoStale).toBe(false)
+  })
 })

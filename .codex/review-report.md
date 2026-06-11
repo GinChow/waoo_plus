@@ -187,3 +187,29 @@ Overall score: 93/100
 
 - No browser click smoke test was run; remaining risk is limited to browser-specific download behavior and visual spacing on unusually narrow cards.
 - 首次浏览器点击暴露媒体路由 404 后已修复；新增回归测试确认 `/m/publicId` 不会被错误签名为 storageKey。
+
+## Unified Storyboard Production Review
+
+Date: 2026-06-10
+Reviewer: Codex
+
+Recommendation: Pass
+
+Technical score: 92/100
+Strategic score: 94/100
+Overall score: 93/100
+
+### Findings
+
+- 导航和路由统一为“分镜制作”，同时保留旧 stage URL 的兼容进入路径。
+- 统一卡片复用现有 `PanelCard`、`VideoPanelCard` 和视频 runtime hooks，没有复制模型能力、首尾帧或口型同步业务逻辑。
+- 视频卡片继续显示模型和时长设置，并保留生成、历史、上传、下载等原有能力。
+- 图片重新生成不会清除当前视频；新生成和上传的视频保存来源图片序列，签名 URL 变化不会造成误判。
+- 普通单图、首尾帧和多图组合视频均记录实际来源图片，相关状态解析和投影测试已覆盖。
+- 相关单测、TypeScript、ESLint 和差异检查通过。
+
+### Residual Risk
+
+- 本次未进行浏览器截图级视觉验收，剩余风险主要是极窄屏下的卡片密度和间距。
+- 历史遗留且没有 `sourceImageUrls` 的视频无法可靠判断来源，系统保留视频但不做猜测性过期提示。
+- 生产构建未完成，因为当前开发服务正在使用同一 `.next` 目录；类型检查和相关测试均已通过。

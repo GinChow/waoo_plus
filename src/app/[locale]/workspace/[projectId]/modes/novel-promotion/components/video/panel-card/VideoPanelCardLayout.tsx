@@ -18,7 +18,7 @@ function VideoPanelCardLayout(props: VideoPanelCardShellProps) {
   }, [updateDurationMutation])
 
   return (
-    <div className="glass-surface-elevated overflow-visible">
+    <div className={props.embedded ? 'h-full overflow-visible' : 'glass-surface-elevated overflow-visible'}>
       <VideoPanelCardHeader runtime={runtime} />
       <VideoPanelCardBody runtime={runtime} onUpdateDuration={handleUpdateDuration} />
       <VideoPanelCardFooter runtime={runtime} />

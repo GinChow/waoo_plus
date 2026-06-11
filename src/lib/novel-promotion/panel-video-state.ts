@@ -8,6 +8,7 @@ export interface PanelVideoHistoryEntry {
   videoModel?: string
   generationMode?: string
   taskId?: string
+  sourceImageUrls?: string[]
 }
 
 export const PANEL_VIDEO_HISTORY_MAX = 50
@@ -34,7 +35,10 @@ function normalizeEntry(value: unknown): PanelVideoHistoryEntry | null {
   const videoModel = readString(value.videoModel) || undefined
   const generationMode = readString(value.generationMode) || undefined
   const taskId = readString(value.taskId) || undefined
-  return { videoUrl, generatedAt, source, videoPrompt, videoModel, generationMode, taskId }
+  const sourceImageUrls = Array.isArray(value.sourceImageUrls)
+    ? value.sourceImageUrls.filter((item): item is string => typeof item === 'string' && item.length > 0)
+    : undefined
+  return { videoUrl, generatedAt, source, videoPrompt, videoModel, generationMode, taskId, sourceImageUrls }
 }
 
 export function parsePanelVideoHistory(raw: string | null | undefined): PanelVideoHistoryEntry[] {
@@ -79,6 +83,7 @@ export function appendPanelVideoHistoryEntry(
     videoModel: entry.videoModel ?? (existingIndex >= 0 ? next[existingIndex].videoModel : undefined),
     generationMode: entry.generationMode ?? (existingIndex >= 0 ? next[existingIndex].generationMode : undefined),
     taskId: entry.taskId ?? (existingIndex >= 0 ? next[existingIndex].taskId : undefined),
+    sourceImageUrls: entry.sourceImageUrls ?? (existingIndex >= 0 ? next[existingIndex].sourceImageUrls : undefined),
   }
   if (existingIndex >= 0) {
     next.splice(existingIndex, 1)

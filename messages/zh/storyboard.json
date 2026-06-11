@@ -1,4 +1,16 @@
 {
+    "production": {
+        "image": "分镜图片",
+        "video": "分镜视频",
+        "possiblyStale": "可能已过期",
+        "possiblyStaleHint": "当前分镜图片已不同于生成此视频时使用的图片，视频仍可继续使用。",
+        "generateMissingVideos": "生成缺失视频",
+        "generatingVideos": "生成中 {count}",
+        "downloadVideos": "下载视频 {count}",
+        "downloadingVideos": "下载中",
+        "exportTimeline": "导出时间线",
+        "exportingTimeline": "导出中"
+    },
     "phases": {
         "planning": "规划分镜",
         "cinematography": "设计摄影",

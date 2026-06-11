@@ -65,6 +65,7 @@ export const POST = apiHandler(async (
       id: true,
       videoHistory: true,
       videoPrompt: true,
+      imageUrl: true,
     },
   })
 
@@ -85,6 +86,7 @@ export const POST = apiHandler(async (
       source: 'upload',
       videoPrompt: panel.videoPrompt || undefined,
       generationMode: 'upload',
+      sourceImageUrls: panel.imageUrl ? [panel.imageUrl] : undefined,
     },
   )
 

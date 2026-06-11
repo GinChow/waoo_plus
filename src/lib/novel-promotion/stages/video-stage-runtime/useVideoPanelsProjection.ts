@@ -44,6 +44,32 @@ function summarizeVideoUrl(value: string | null | undefined): string {
   return value.length > 96 ? `${value.slice(0, 48)}...${value.slice(-24)}` : value
 }
 
+function canonicalMediaRef(value: string | null | undefined): string {
+  if (!value) return ''
+  return value.split(/[?#]/, 1)[0]
+}
+
+function isCurrentVideoStale(params: {
+  currentVideoUrl: string | undefined
+  currentImageUrls: Array<string | null | undefined>
+  videoHistory: ReturnType<typeof parsePanelVideoHistory>
+}): boolean {
+  if (!params.currentVideoUrl) return false
+  const currentVideoRef = canonicalMediaRef(params.currentVideoUrl)
+  const currentEntry = [...params.videoHistory].reverse().find(
+    (entry) => canonicalMediaRef(entry.videoUrl) === currentVideoRef,
+  )
+  const sourceImageUrls = currentEntry?.sourceImageUrls
+  if (!sourceImageUrls?.length) return false
+  const currentImageUrls = params.currentImageUrls
+    .map(canonicalMediaRef)
+    .filter(Boolean)
+  if (sourceImageUrls.length !== currentImageUrls.length) return true
+  return sourceImageUrls.some(
+    (sourceImageUrl, index) => canonicalMediaRef(sourceImageUrl) !== currentImageUrls[index],
+  )
+}
+
 function parseCoarseGroupStates(raw: string | null | undefined): Map<number, CoarseGroupState> {
   if (!raw) return new Map()
   try {
@@ -202,6 +228,7 @@ export function useVideoPanelsProjection({
           })
         }
 
+        const videoHistory = parsePanelVideoHistory(panel.videoHistory || null)
         panels.push({
           panelId,
           storyboardId: storyboard.id,
@@ -212,7 +239,7 @@ export function useVideoPanelsProjection({
           coarseGroupVideoPrompt: coarseGroupState?.videoPrompt || null,
           coarseGroupDuration: coarseGroupState?.duration || null,
           coarseGroupVideoHistory: coarseGroupState?.videoHistory || [],
-          videoHistory: parsePanelVideoHistory(panel.videoHistory || null).map((entry) => ({
+          videoHistory: videoHistory.map((entry) => ({
             videoUrl: entry.videoUrl,
             generatedAt: entry.generatedAt,
             videoPrompt: entry.videoPrompt,
@@ -220,6 +247,7 @@ export function useVideoPanelsProjection({
             generationMode: entry.generationMode,
             source: entry.source,
             taskId: entry.taskId,
+            sourceImageUrls: entry.sourceImageUrls,
           })),
           textPanel: {
             panel_number: panelNumber,
@@ -251,6 +279,22 @@ export function useVideoPanelsProjection({
               ? panelVideoState.lastError?.message || panel.videoErrorMessage || undefined
               : panel.videoErrorMessage || undefined,
           videoModel: panel.videoModel || undefined,
+          isVideoStale: isCurrentVideoStale({
+            currentVideoUrl: projectedVideoUrl,
+            currentImageUrls: (() => {
+              const currentEntry = [...videoHistory].reverse().find(
+                (entry) => canonicalMediaRef(entry.videoUrl) === canonicalMediaRef(projectedVideoUrl),
+              )
+              const sourceCount = currentEntry?.sourceImageUrls?.length || 1
+              if (parentGroupNumber && coarseGroupState?.imageUrl && sourceCount === 1) {
+                return [coarseGroupState.imageUrl]
+              }
+              return storyboardPanels
+                .slice(index, index + sourceCount)
+                .map((item) => item.imageUrl)
+            })(),
+            videoHistory,
+          }),
           linkedToNextPanel: panel.linkedToNextPanel || false,
           lipSyncVideoUrl: panel.lipSyncVideoUrl || undefined,
           lipSyncTaskRunning: panelLipState?.phase === 'queued' || panelLipState?.phase === 'processing',

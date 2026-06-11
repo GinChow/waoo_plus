@@ -37,13 +37,14 @@ export function StageNavigation({
 }: StageNavigationProps) {
   const t = useTranslations('stages')
   // 如果 currentStage 是旧的 'text-storyboard'，自动重定向到 'storyboard'
-  const effectiveStage = currentStage === 'text-storyboard' ? 'storyboard' : currentStage
+  const effectiveStage = currentStage === 'text-storyboard' || currentStage === 'videos'
+    ? 'storyboard'
+    : currentStage
 
   const stages = [
     { id: 'config', label: t('config'), enabled: true },
     { id: 'assets', label: t('assets'), enabled: hasAudio || hasAssets },
-    { id: 'storyboard', label: t('storyboard'), enabled: hasTextStoryboards || hasStoryboards },
-    { id: 'videos', label: t('videos'), enabled: hasStoryboards || hasVideos },
+    { id: 'storyboard', label: t('storyboard'), enabled: hasTextStoryboards || hasStoryboards || hasVideos },
     // 配音阶段只要有文本输入就可以启用，不受其他条件限制
     { id: 'voice', label: t('voice'), enabled: hasNovelText || hasVoiceLines }
   ]

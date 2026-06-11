@@ -10,6 +10,8 @@
     "cancel": "Cancel",
     "generating": "Generating...",
     "failed": "Failed",
+    "possiblyStale": "Possibly outdated",
+    "possiblyStaleHint": "The current storyboard image differs from the image used to generate this video. The video remains available.",
     "lipSync": "Lip Sync",
     "lipSyncVideo": "Lip Sync Video",
     "lipSyncLabel": "Lip Sync",

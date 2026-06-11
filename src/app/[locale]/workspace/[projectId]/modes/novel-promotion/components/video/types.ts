@@ -108,6 +108,7 @@ export interface VideoPanel {
     generationMode?: string
     source?: string
     taskId?: string
+    sourceImageUrls?: string[]
   }>
   textPanel?: TextPanel
   firstLastFramePrompt?: string
@@ -120,6 +121,7 @@ export interface VideoPanel {
   videoErrorMessage?: string  // 视频生成错误消息
   videoErrorCode?: string
   videoModel?: string
+  isVideoStale?: boolean
   linkedToNextPanel?: boolean
   // 口型同步相关
   lipSyncVideoUrl?: string

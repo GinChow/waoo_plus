@@ -57,9 +57,10 @@ export default function ImageSectionActionButtons({
 
   return (
     <>
-      <div className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 z-20 transition-opacity ${isSubmittingPanelImageTask ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-        <div className="relative glass-surface-modal border border-[var(--glass-stroke-base)] rounded-lg p-0.5">
-          <div className="flex items-center gap-0.5">
+      {/* 限宽在图片范围内并允许换行，窄面板下工具栏不会被裁切 */}
+      <div className={`absolute bottom-1.5 inset-x-1.5 z-20 flex justify-center transition-opacity ${isSubmittingPanelImageTask ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+        <div className="relative max-w-full glass-surface-modal border border-[var(--glass-stroke-base)] rounded-lg p-0.5">
+          <div className="flex flex-wrap items-center justify-center gap-0.5">
             <ImageGenerationInlineCountButton
               prefix={
                 <>

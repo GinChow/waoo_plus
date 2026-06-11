@@ -1,22 +1,8 @@
 import { logInfo as _ulogInfo } from '@/lib/logging/core'
 import { NextRequest } from 'next/server'
-import { getSignedObjectUrl, toFetchableUrl } from '@/lib/storage'
-import { resolveStorageKeyFromMediaValue } from '@/lib/media/service'
 import { requireProjectAuthLight, isErrorResponse } from '@/lib/api-auth'
 import { apiHandler, ApiError } from '@/lib/api-errors'
-
-export async function resolveVideoProxyFetchUrl(videoValue: string): Promise<string> {
-    if (videoValue.startsWith('http://') || videoValue.startsWith('https://')) {
-        return videoValue
-    }
-
-    const storageKey = await resolveStorageKeyFromMediaValue(videoValue)
-    if (storageKey) {
-        return toFetchableUrl(await getSignedObjectUrl(storageKey, 3600))
-    }
-
-    return toFetchableUrl(videoValue)
-}
+import { resolveVideoProxyFetchUrl } from '@/lib/video-proxy'
 
 /**
  * 代理下载单个视频文件

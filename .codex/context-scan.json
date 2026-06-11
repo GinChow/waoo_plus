@@ -1,38 +1,29 @@
 {
-  "date": "2026-06-09",
+  "date": "2026-06-10",
   "executor": "Codex",
-  "task": "在成片面板导出通用剪辑工程包",
+  "task": "合并分镜和成片为分镜制作阶段",
   "locations": [
-    "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video/VideoToolbar.tsx",
-    "src/lib/novel-promotion/stages/video-stage-runtime/useVideoDownloadAll.ts",
-    "src/app/api/novel-promotion/[projectId]/video-urls/route.ts"
+    "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/hooks/useWorkspaceStageNavigation.ts",
+    "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/storyboard",
+    "src/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/video",
+    "src/lib/novel-promotion/stages/video-stage-runtime",
+    "src/lib/workers/video.worker.ts"
   ],
-  "existingPattern": "成片页通过 video-urls 接口获取当前选中视频，再由浏览器下载并用 JSZip 打包。",
+  "existingPattern": "分镜阶段负责图片卡片，成片阶段通过 VideoPanelCard 和既有 runtime 负责模型、时长、首尾帧、口型同步、下载和剪辑工程导出。",
   "similarCases": [
-    "成片视频批量下载",
-    "配音批量下载",
-    "分镜图片批量下载"
+    "PanelCard 的分镜图片编辑与历史选择",
+    "VideoPanelCard 的单分镜视频制作",
+    "VideoGroupPanelCard 的组合分镜视频展示"
   ],
-  "stack": ["Next.js", "TypeScript", "React Query", "JSZip", "Vitest"],
-  "testStrategy": "对时间线生成器做单元测试，并执行类型检查与相关单元测试。",
-  "observations": [
-    "独立视频编辑器当前被路由禁用，入口应位于现有成片工具栏。",
-    "当前视频选择偏好决定导出原始视频还是口型同步视频。",
-    "现有批量下载允许单个素材失败后继续；剪辑工程导出必须失败即终止，避免残缺时间线。",
-    "sequential-thinking、shrimp-task-manager、code-index 当前环境未提供，已降级为仓库检索和内置计划工具。"
+  "technicalChoice": "复用现有 VideoPanelCard 和视频阶段 hooks，通过 StoryboardVideoRuntimeProvider 投影到分镜卡片，避免复制视频生成逻辑。",
+  "risks": [
+    "旧路由参数需要兼容，否则已有链接会失效",
+    "带签名参数的媒体 URL 不能直接字符串比较",
+    "首尾帧或组合视频可能对应多张来源图片",
+    "运行中的开发服务与生产构建共用 .next 目录"
   ],
-  "questions": [
-    {
-      "priority": "high",
-      "question": "导出入口应依赖禁用的独立编辑器还是当前成片状态？",
-      "answer": "依赖当前成片状态，直接读取数据库当前视频并应用原视频/口型同步选择偏好。"
-    },
-    {
-      "priority": "high",
-      "question": "素材失败时是否允许输出部分工程？",
-      "answer": "不允许，任一素材下载失败即终止，避免时间线引用缺失文件。"
-    }
-  ],
+  "testStrategy": "执行来源状态与视频投影单测、视频 worker 和卡片回归测试、TypeScript、ESLint、完整单元测试及差异检查。",
+  "toolFallback": "当前环境未暴露 sequential-thinking、shrimp-task-manager、code-index；使用 rg、仓库读取、update_plan 和本地验证替代。",
   "sufficiencyCheck": {
     "interfaceContract": true,
     "technicalChoice": true,

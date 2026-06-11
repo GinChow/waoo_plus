@@ -191,3 +191,31 @@ Executor: Codex
 - `npm run test:unit:all` completed with 863 passing tests and 3 unrelated existing failures in `prompt-suffix-regression.test.ts`, `project-global-analyze-mutation.test.ts`, and `async-poll-yunwu-omni.test.ts`.
 - 下载代理回归修复后执行 `npx vitest run tests/unit/novel-promotion/video-proxy-route.test.ts tests/unit/novel-promotion/panel-video-download.test.ts`：2 files passed, 4 tests passed。
 - 下载代理回归修复后 `npm run typecheck`、focused ESLint 与 `git diff --check` 均通过。
+
+## Unified Storyboard Production
+
+Date: 2026-06-10
+Executor: Codex
+
+### Passed
+
+- `npx vitest run tests/unit/novel-promotion/video-proxy-route.test.ts tests/unit/worker/video-worker.test.ts tests/unit/novel-promotion/video-panel-card-body.test.ts tests/unit/novel-promotion/video-panels-projection-error-code.test.ts tests/unit/novel-promotion/panel-video-state.test.ts`
+  - 5 files passed, 19 tests passed.
+- `npm run typecheck`
+  - TypeScript check passed.
+- Focused ESLint for all touched TypeScript implementation and test files passed.
+- `npm run lint:all`
+  - 0 errors; 47 existing warnings.
+- `git diff --check`
+  - Passed.
+
+### Full Unit Suite
+
+- `npm run test:unit:all`
+  - 236 files passed, 3 files failed; 872 of 875 tests passed.
+  - Existing unrelated failures: `prompt-suffix-regression.test.ts`, `project-global-analyze-mutation.test.ts`, `async-poll-yunwu-omni.test.ts`.
+
+### Build
+
+- Initial `npm run build` exposed an existing invalid helper export from the `video-proxy` route; the helper was moved to `src/lib/video-proxy.ts` and type checking passed afterward.
+- The follow-up build was stopped because an active user-owned `next dev --turbopack` process was using the same `.next` directory. The development server was not terminated.

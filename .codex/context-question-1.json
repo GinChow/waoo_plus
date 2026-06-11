@@ -1,8 +1,9 @@
 {
-  "date": "2026-04-24",
+  "date": "2026-06-10",
   "executor": "Codex",
-  "question": "How to parallelize without changing storyboard ordering and progress metadata?",
-  "answer": "Reuse mapWithConcurrency because it writes results by input index; stepAttempt and progress titles still use groupIndex + 1.",
+  "question": "如何在图片重新生成后保留旧视频，并可靠提示视频可能已过期？",
+  "answer": "视频生成或上传时将实际使用的 sourceImageUrls 写入 videoHistory；投影当前视频时忽略签名 URL 的 query/hash，对来源图片序列与当前图片序列进行比较。图片更新流程不修改 videoUrl，因此旧视频继续保留。",
+  "boundary": "缺少 sourceImageUrls 的历史遗留视频无法可靠回溯来源，保持展示但不做猜测性标记；后续生成和上传的视频具备完整判断能力。",
   "sufficiency": {
     "interfaceContractKnown": true,
     "technicalChoiceReasonKnown": true,

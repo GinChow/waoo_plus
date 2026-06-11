@@ -1,10 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslations } from 'next-intl'
 import { AppIcon } from '@/components/ui/icons'
 import { MediaImageWithLoading } from '@/components/media/MediaImageWithLoading'
 import { parsePanelImageHistory, type PanelImageHistoryEntry } from '@/lib/novel-promotion/panel-image-state'
+
+const PANEL_WIDTH = 320
+const PANEL_MAX_HEIGHT = 320
+const VIEWPORT_EDGE_GAP = 12
 
 interface PanelImageHistoryPopoverProps {
   panelId: string
@@ -33,16 +38,67 @@ export default function PanelImageHistoryPopover({
   const t = useTranslations('storyboard')
   const [open, setOpen] = useState(false)
   const [busyKey, setBusyKey] = useState<string | null>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({})
 
   const history: PanelImageHistoryEntry[] = parsePanelImageHistory(imageHistoryRaw)
 
+  // 弹层通过 portal 渲染到 body 并以 fixed 定位锚定触发按钮，
+  // 避免被分镜卡片的 overflow / zIndex 层级裁切或压盖
+  const updatePlacement = useCallback(() => {
+    const trigger = triggerRef.current
+    if (!trigger) return
+    const rect = trigger.getBoundingClientRect()
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight
+    const panelWidth = Math.min(PANEL_WIDTH, viewportWidth - VIEWPORT_EDGE_GAP * 2)
+    const idealLeft = rect.left + rect.width / 2 - panelWidth / 2
+    const left = Math.max(VIEWPORT_EDGE_GAP, Math.min(idealLeft, viewportWidth - panelWidth - VIEWPORT_EDGE_GAP))
+    const spaceAbove = rect.top - VIEWPORT_EDGE_GAP
+    const spaceBelow = viewportHeight - rect.bottom - VIEWPORT_EDGE_GAP
+    const openUpward = spaceAbove >= spaceBelow
+    const maxHeight = Math.max(160, Math.min(PANEL_MAX_HEIGHT, openUpward ? spaceAbove : spaceBelow))
+    setPanelStyle({
+      position: 'fixed',
+      left,
+      width: panelWidth,
+      maxHeight,
+      ...(openUpward
+        ? { bottom: viewportHeight - rect.top + 8 }
+        : { top: rect.bottom + 8 }),
+    })
+  }, [])
+
   useEffect(() => {
     if (!open) return
-    const handler = (event: KeyboardEvent) => {
+    updatePlacement()
+    const handleReposition = () => updatePlacement()
+    window.addEventListener('resize', handleReposition)
+    window.addEventListener('scroll', handleReposition, true)
+    return () => {
+      window.removeEventListener('resize', handleReposition)
+      window.removeEventListener('scroll', handleReposition, true)
+    }
+  }, [open, updatePlacement])
+
+  useEffect(() => {
+    if (!open) return
+    const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(false)
     }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (triggerRef.current?.contains(target)) return
+      if (panelRef.current?.contains(target)) return
+      setOpen(false)
+    }
+    document.addEventListener('keydown', handleKey)
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('keydown', handleKey)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
   }, [open])
 
   if (history.length === 0) return null
@@ -70,6 +126,7 @@ export default function PanelImageHistoryPopover({
   return (
     <div className="relative inline-flex" onClick={(event) => event.stopPropagation()}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((current) => !current)}
         className={`glass-btn-base glass-btn-secondary flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] transition-all active:scale-95`}
@@ -78,8 +135,13 @@ export default function PanelImageHistoryPopover({
         <AppIcon name="clock" className="w-2.5 h-2.5" />
         <span>{t('panel.imageHistoryCount', { count: history.length })}</span>
       </button>
-      {open && (
-        <div className="absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 w-[320px] max-h-80 overflow-y-auto rounded-lg border border-[var(--glass-stroke-base)] bg-[var(--glass-bg-surface)] p-2 shadow-xl">
+      {open && createPortal(
+        <div
+          ref={panelRef}
+          className="glass-surface-modal z-[9999] overflow-y-auto rounded-lg border border-[var(--glass-stroke-base)] p-2 shadow-xl"
+          style={panelStyle}
+          onClick={(event) => event.stopPropagation()}
+        >
           <div className="grid gap-2">
             {[...history].reverse().map((entry, historyIndex) => {
               const isCurrent = entry.url === currentImageUrl
@@ -143,7 +205,8 @@ export default function PanelImageHistoryPopover({
               )
             })}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

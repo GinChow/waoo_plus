@@ -3,7 +3,6 @@
 import ConfigStage from './ConfigStage'
 import ScriptStage from './ScriptStage'
 import StoryboardStage from './StoryboardStage'
-import VideoStageRoute from './VideoStageRoute'
 import VoiceStageRoute from './VoiceStageRoute'
 
 interface WorkspaceStageContentProps {
@@ -20,8 +19,6 @@ export default function WorkspaceStageContent({
       {(currentStage === 'script' || currentStage === 'assets') && <ScriptStage />}
 
       {currentStage === 'storyboard' && <StoryboardStage />}
-
-      {currentStage === 'videos' && <VideoStageRoute />}
 
       {currentStage === 'voice' && <VoiceStageRoute />}
     </div>

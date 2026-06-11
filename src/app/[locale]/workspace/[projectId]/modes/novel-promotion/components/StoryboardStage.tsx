@@ -19,8 +19,13 @@ export default function StoryboardStage() {
       storyboards={storyboards}
       clips={clips}
       videoRatio={runtime.videoRatio || '9:16'}
+      defaultVideoModel={runtime.videoModel || ''}
+      capabilityOverrides={runtime.capabilityOverrides}
+      userVideoModels={runtime.userVideoModels}
+      onGenerateVideo={runtime.onGenerateVideo}
+      onGenerateAllVideos={runtime.onGenerateAllVideos}
+      onUpdatePanelVideoModel={runtime.onUpdatePanelVideoModel}
       onBack={() => runtime.onStageChange('script')}
-      onNext={async () => runtime.onStageChange('videos')}
       isTransitioning={runtime.isTransitioning}
     />
   )

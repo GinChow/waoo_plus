@@ -32,7 +32,8 @@ export default function VideoPanelCardHeader({ runtime }: VideoPanelCardHeaderPr
   }, [taskStatus.panelErrorDisplay?.message])
 
   const hasVisibleBaseVideo = !!media.baseVideoUrl
-  const showFirstLastFrameSwitch = layout.hasNext
+  // 统一分镜卡片（embedded）下，链接/断开操作由分镜卡片之间的 PanelActionButtons 提供，这里不再重复渲染
+  const showFirstLastFrameSwitch = layout.hasNext && !layout.embedded
 
   return (
     <div className="bg-[var(--glass-bg-muted)] flex items-center justify-center relative" style={{ aspectRatio: player.cssAspectRatio }}>
@@ -81,6 +82,15 @@ export default function VideoPanelCardHeader({ runtime }: VideoPanelCardHeaderPr
       <div className="absolute top-2 left-2 bg-[var(--glass-overlay)] text-white px-2 py-0.5 rounded text-xs font-medium">
         {panel.videoTargetGroupNumber ?? panelIndex + 1}
       </div>
+
+      {panel.isVideoStale && media.currentVideoUrl && (
+        <div
+          className="absolute left-1/2 top-2 -translate-x-1/2 rounded-full border border-amber-300/70 bg-amber-100/95 px-2 py-0.5 text-[10px] font-semibold text-amber-800 shadow-sm"
+          title={t('panelCard.possiblyStaleHint')}
+        >
+          {t('panelCard.possiblyStale')}
+        </div>
+      )}
 
       {/* 两卡片中间唯一的链接/断开按钮 */}
 

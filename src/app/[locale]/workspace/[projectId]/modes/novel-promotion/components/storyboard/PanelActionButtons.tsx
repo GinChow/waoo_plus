@@ -32,19 +32,29 @@ export default function PanelActionButtons({
     onToggleLink,
 }: PanelActionButtonsProps) {
     const t = useTranslations('storyboard')
+    // 注意：背景/文字/边框色不能放进 baseButtonClass——同名工具类（如两个 bg-[...]）的优先级
+    // 取决于样式表顺序而非书写顺序，叠加会导致状态色被基础色覆盖（链接高亮失效）
     const baseButtonClass = `
         group relative h-7 w-7 rounded-full
-        glass-btn-base border border-[var(--glass-stroke-base)]
-        bg-[var(--glass-bg-surface)] text-[var(--glass-text-secondary)]
+        glass-btn-base border
         shadow-[var(--glass-shadow-sm)] transition-all duration-200 ease-out
         flex items-center justify-center
     `
     const enabledButtonClass = `
+        border-[var(--glass-stroke-base)]
+        bg-[var(--glass-bg-surface)] text-[var(--glass-text-secondary)]
         hover:-translate-y-0.5 hover:shadow-[var(--glass-shadow-md)]
         hover:border-[var(--glass-stroke-focus)] hover:bg-[var(--glass-tone-info-bg)]
     `
     const disabledButtonClass = `
+        border-[var(--glass-stroke-base)]
         bg-[var(--glass-bg-muted)] text-[var(--glass-text-tertiary)] cursor-not-allowed
+    `
+    const linkedButtonClass = `
+        border-[var(--glass-accent-from)]
+        bg-[var(--glass-accent-from)] text-white
+        shadow-[0_0_10px_rgba(99,102,241,0.5)]
+        hover:-translate-y-0.5 hover:shadow-[var(--glass-shadow-md)]
     `
 
     return (
@@ -107,7 +117,7 @@ export default function PanelActionButtons({
                     className={`
                         ${baseButtonClass}
                         ${linked
-                            ? 'bg-[var(--glass-accent-from)] !text-white border-[var(--glass-accent-from)] shadow-[0_0_10px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 hover:shadow-[var(--glass-shadow-md)]'
+                            ? linkedButtonClass
                             : (disabled || linkDisabled ? disabledButtonClass : enabledButtonClass)
                         }
                     `}

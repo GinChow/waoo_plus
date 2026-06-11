@@ -5,11 +5,12 @@ import { useTranslations } from 'next-intl'
 import { NovelPromotionPanel } from '@/types/project'
 import { StoryboardPanel } from './hooks/useStoryboardState'
 import { PanelEditData } from '../PanelEditForm'
-import { ASPECT_RATIO_CONFIGS } from '@/lib/constants'
 import PanelCard from './PanelCard'
-import GroupPanelCard from './GroupPanelCard'
+import PanelActionButtons from './PanelActionButtons'
+import GroupPanelCard, { GroupLinkToNextButton } from './GroupPanelCard'
 import { AppIcon } from '@/components/ui/icons'
 import type { PanelSaveState } from './hooks/usePanelCrudActions'
+import { StoryboardGroupVideoPane, StoryboardVideoPane } from './StoryboardVideoRuntime'
 
 interface PanelGroup {
   groupKey: string
@@ -109,7 +110,6 @@ export default function StoryboardPanelList({
 }: StoryboardPanelListProps) {
   const t = useTranslations('storyboard')
   const displayImages = useMemo(() => textPanels.map((panel) => panel.imageUrl || null), [textPanels])
-  const isVertical = ASPECT_RATIO_CONFIGS[videoRatio]?.isVertical ?? false
 
   // 计算 storyboard 内的连续链接组
   const groups: PanelGroup[] = useMemo(() => {
@@ -132,11 +132,11 @@ export default function StoryboardPanelList({
     return result
   }, [linkedPanels, storyboardId, textPanels])
 
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
 
   // 当组结构变化时，剪除不存在的组 key（避免无效 key 堆积）
   useEffect(() => {
-    setExpandedGroups((previous) => {
+    setCollapsedGroups((previous) => {
       if (previous.size === 0) return previous
       const validKeys = new Set(groups.map((group) => group.groupKey))
       let changed = false
@@ -150,7 +150,7 @@ export default function StoryboardPanelList({
   }, [groups])
 
   const toggleExpand = useCallback((groupKey: string) => {
-    setExpandedGroups((previous) => {
+    setCollapsedGroups((previous) => {
       const next = new Set(previous)
       if (next.has(groupKey)) next.delete(groupKey)
       else next.add(groupKey)
@@ -223,49 +223,76 @@ export default function StoryboardPanelList({
             )}
           </div>
         )}
-        <div className={inGroup ? 'ring-2 ring-[var(--glass-accent-from)] rounded-2xl overflow-visible' : ''}>
-          <PanelCard
-            panel={panel}
-            panelData={panelData}
-            imageUrl={imageUrl}
-            globalPanelNumber={globalPanelNumber}
-            storyboardId={storyboardId}
-            videoRatio={videoRatio}
-            isSaving={isPanelSaving}
-            hasUnsavedChanges={hasUnsavedChanges}
-            saveErrorMessage={panelSaveError}
-            isDeleting={isPanelDeleting}
-            isModifying={isPanelModifying}
-            isSubmittingPanelImageTask={panelTaskRunning}
-            failedError={panelFailedError}
-            candidateData={panelCandidateData}
-            onUpdate={(updates) => onPanelUpdate(panel.id, panel, updates)}
-            onDelete={() => onPanelDelete(panel.id)}
-            onOpenCharacterPicker={() => onOpenCharacterPicker(panel.id)}
-            onOpenLocationPicker={() => onOpenLocationPicker(panel.id)}
-            onRetrySave={() => onRetryPanelSave(panel.id)}
-            onRemoveCharacter={(characterIndex) => onRemoveCharacter(panel, characterIndex)}
-            onRemoveLocation={() => onRemoveLocation(panel)}
-            onRegeneratePanelImage={onRegeneratePanelImage}
-            onBatchGenerateNextPanels={onBatchGenerateNextPanels}
-            onOpenEditModal={() => onOpenEditModal(panel.panelIndex)}
-            onOpenAIDataModal={() => onOpenAIDataModal(panel.panelIndex)}
-            onSelectCandidateIndex={onSelectPanelCandidateIndex}
-            onConfirmCandidate={onConfirmPanelCandidate}
-            onCancelCandidate={onCancelPanelCandidate}
-            onClearError={() => onClearPanelTaskError(panel.id)}
-            onDeleteImage={onDeletePanelImage}
-            onUploadImage={onUploadPanelImage}
-            onSelectHistoryImage={onSelectPanelHistoryImage}
-            onDeleteHistoryImage={onDeletePanelHistoryImage}
-            isUploading={uploadingPanelIds.has(panel.id)}
-            onPreviewImage={onPreviewImage}
-            onInsertAfter={() => onInsertAfter(panel.panelIndex)}
+        <div className={`glass-surface-elevated overflow-visible ${inGroup ? 'ring-2 ring-[var(--glass-accent-from)] rounded-2xl' : ''}`}>
+          <div className="grid grid-cols-1 divide-y divide-[var(--glass-stroke-base)] xl:grid-cols-2 xl:divide-x xl:divide-y-0">
+            <section className="min-w-0 overflow-visible">
+              <div className="border-b border-[var(--glass-stroke-base)] px-3 py-2 text-xs font-semibold text-[var(--glass-text-secondary)]">
+                {t('production.image')}
+              </div>
+              <PanelCard
+                embedded
+                panel={panel}
+                panelData={panelData}
+                imageUrl={imageUrl}
+                globalPanelNumber={globalPanelNumber}
+                storyboardId={storyboardId}
+                videoRatio={videoRatio}
+                isSaving={isPanelSaving}
+                hasUnsavedChanges={hasUnsavedChanges}
+                saveErrorMessage={panelSaveError}
+                isDeleting={isPanelDeleting}
+                isModifying={isPanelModifying}
+                isSubmittingPanelImageTask={panelTaskRunning}
+                failedError={panelFailedError}
+                candidateData={panelCandidateData}
+                onUpdate={(updates) => onPanelUpdate(panel.id, panel, updates)}
+                onDelete={() => onPanelDelete(panel.id)}
+                onOpenCharacterPicker={() => onOpenCharacterPicker(panel.id)}
+                onOpenLocationPicker={() => onOpenLocationPicker(panel.id)}
+                onRetrySave={() => onRetryPanelSave(panel.id)}
+                onRemoveCharacter={(characterIndex) => onRemoveCharacter(panel, characterIndex)}
+                onRemoveLocation={() => onRemoveLocation(panel)}
+                onRegeneratePanelImage={onRegeneratePanelImage}
+                onBatchGenerateNextPanels={onBatchGenerateNextPanels}
+                onOpenEditModal={() => onOpenEditModal(panel.panelIndex)}
+                onOpenAIDataModal={() => onOpenAIDataModal(panel.panelIndex)}
+                onSelectCandidateIndex={onSelectPanelCandidateIndex}
+                onConfirmCandidate={onConfirmPanelCandidate}
+                onCancelCandidate={onCancelPanelCandidate}
+                onClearError={() => onClearPanelTaskError(panel.id)}
+                onDeleteImage={onDeletePanelImage}
+                onUploadImage={onUploadPanelImage}
+                onSelectHistoryImage={onSelectPanelHistoryImage}
+                onDeleteHistoryImage={onDeletePanelHistoryImage}
+                isUploading={uploadingPanelIds.has(panel.id)}
+                onPreviewImage={onPreviewImage}
+              />
+            </section>
+            <section className="min-w-0 overflow-visible">
+              <div className="border-b border-[var(--glass-stroke-base)] px-3 py-2 text-xs font-semibold text-[var(--glass-text-secondary)]">
+                {t('production.video')}
+              </div>
+              <StoryboardVideoPane
+                storyboardId={storyboardId}
+                panelIndex={panel.panelIndex}
+                onToggleLink={(nextPanelKey, nextStoryboardId, nextPanelIndex) => {
+                  void onToggleLink(nextPanelKey, nextStoryboardId, nextPanelIndex)
+                }}
+                onPreviewImage={onPreviewImage}
+              />
+            </section>
+          </div>
+        </div>
+        {/* 分镜间操作按钮：插入分镜 / 镜头变体 / 连接下一分镜，悬浮在统一卡片右缘（两张分镜卡之间） */}
+        <div className="absolute -right-[22px] top-1/2 -translate-y-1/2 z-50">
+          <PanelActionButtons
+            onInsertPanel={() => onInsertAfter(panel.panelIndex)}
             onVariant={() => onVariant(panel.panelIndex)}
-            isInsertDisabled={isInsertDisabled(panel.id)}
-            linkable={linkable}
-            linkedToNext={isLinkedToNext}
-            linkEnableAllowed={linkEnableAllowed}
+            disabled={isInsertDisabled(panel.id)}
+            hasImage={!!imageUrl}
+            showLink={linkable}
+            linked={isLinkedToNext}
+            linkDisabled={!isLinkedToNext && !linkEnableAllowed}
             onToggleLink={() => onToggleLink(linkPanelKey, storyboardId, panel.panelIndex)}
           />
         </div>
@@ -274,10 +301,10 @@ export default function StoryboardPanelList({
   }
 
   return (
-    <div className={`grid gap-4 isolate ${isVertical ? 'grid-cols-5' : 'grid-cols-3'} ${isSubmittingStoryboardTextTask ? 'opacity-50 pointer-events-none' : ''}`}>
+    <div className={`grid grid-cols-1 gap-5 isolate 2xl:grid-cols-2 ${isSubmittingStoryboardTextTask ? 'opacity-50 pointer-events-none' : ''}`}>
       {groups.flatMap((group) => {
         const isCollapsibleGroup = group.panelIndices.length > 1
-        const isExpanded = expandedGroups.has(group.groupKey)
+        const isExpanded = !collapsedGroups.has(group.groupKey)
         if (isCollapsibleGroup && !isExpanded) {
           const firstPanelIndex = group.panelIndices[0]
           const firstPanel = textPanels[firstPanelIndex]
@@ -294,19 +321,48 @@ export default function StoryboardPanelList({
               className="relative h-full"
               style={{ zIndex: textPanels.length - firstPanelIndex }}
             >
-              <GroupPanelCard
-                groupPanels={groupPanels}
-                groupStartGlobalNumber={groupStartGlobalNumber}
-                videoRatio={videoRatio}
-                projectId={projectId}
-                storyboardId={storyboardId}
-                onExpand={() => toggleExpand(group.groupKey)}
-                onUnlinkAll={() => { void handleUnlinkGroup(group) }}
-                onPreviewImage={onPreviewImage}
-                linkable={groupLinkable}
-                linkEnableAllowed={groupLinkEnableAllowed}
-                onToggleLinkToNext={() => onToggleLink(lastLinkPanelKey, storyboardId, lastPanel.panelIndex)}
-              />
+              <div className="glass-surface-elevated overflow-visible ring-2 ring-[var(--glass-accent-from)] rounded-2xl">
+                <div className="grid grid-cols-1 divide-y divide-[var(--glass-stroke-base)] xl:grid-cols-2 xl:divide-x xl:divide-y-0">
+                  <section className="min-w-0 overflow-visible">
+                    <div className="border-b border-[var(--glass-stroke-base)] px-3 py-2 text-xs font-semibold text-[var(--glass-text-secondary)]">
+                      {t('production.image')}
+                    </div>
+                    <GroupPanelCard
+                      embedded
+                      groupPanels={groupPanels}
+                      groupStartGlobalNumber={groupStartGlobalNumber}
+                      videoRatio={videoRatio}
+                      projectId={projectId}
+                      storyboardId={storyboardId}
+                      onExpand={() => toggleExpand(group.groupKey)}
+                      onUnlinkAll={() => { void handleUnlinkGroup(group) }}
+                      onPreviewImage={onPreviewImage}
+                    />
+                  </section>
+                  <section className="min-w-0 overflow-visible">
+                    <div className="border-b border-[var(--glass-stroke-base)] px-3 py-2 text-xs font-semibold text-[var(--glass-text-secondary)]">
+                      {t('production.video')}
+                    </div>
+                    <StoryboardGroupVideoPane
+                      storyboardId={storyboardId}
+                      panelIndexes={groupPanels.map((panel) => panel.panelIndex)}
+                      groupStartGlobalNumber={groupStartGlobalNumber}
+                      onExpand={() => toggleExpand(group.groupKey)}
+                      onUnlinkAll={() => { void handleUnlinkGroup(group) }}
+                      onPreviewImage={onPreviewImage}
+                    />
+                  </section>
+                </div>
+              </div>
+              {/* 组合卡片右缘：把下一个分镜拉入本组 */}
+              {groupLinkable && (
+                <div className="absolute -right-[22px] top-1/2 -translate-y-1/2 z-50">
+                  <GroupLinkToNextButton
+                    linkEnableAllowed={groupLinkEnableAllowed}
+                    onToggleLinkToNext={() => onToggleLink(lastLinkPanelKey, storyboardId, lastPanel.panelIndex)}
+                  />
+                </div>
+              )}
             </div>
           )]
         }

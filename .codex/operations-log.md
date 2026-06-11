@@ -109,3 +109,16 @@ Executor: Codex
 - 文件名采用三位分镜编号和分镜简介，清理非法字符、限制简介长度，并保留 MP4/MOV/WebM/M4V 扩展名。
 - 在视频卡片右下角增加下载按钮及下载中状态，并补充文件名和组件渲染测试。
 - 下载失败回归修复：`video-proxy` 原先把 `/m/publicId` 媒体路由直接当作 storageKey 签名，导致对象地址 404；现改为先通过 `resolveStorageKeyFromMediaValue` 还原真实 key，再调用 `getSignedObjectUrl` 流式代理。
+
+## Task: Unified Storyboard Production
+
+Date: 2026-06-10
+Executor: Codex
+
+- 工具降级：当前会话未暴露 sequential-thinking、shrimp-task-manager、code-index；使用 `rg`、仓库读取、`update_plan` 和本地验证替代。
+- 将主导航中的分镜与成片合并为“分镜制作”，并将旧 `videos`、`editor` stage 参数兼容映射到 `storyboard`。
+- 新增 `StoryboardVideoRuntimeProvider`，复用现有视频投影、模型能力、首尾帧、口型同步、下载及剪辑工程导出逻辑。
+- 分镜列表改为统一外层卡片：左侧图片制作，右侧视频制作；窄屏上下排列，宽屏左右排列。
+- 视频生成和本地上传时记录 `sourceImageUrls`；当前图片发生变化时保留旧视频并展示“可能已过期”。
+- 为满足 Next.js route export 约束，将下载代理辅助函数移动到 `src/lib/video-proxy.ts`，路由和测试统一引用该模块。
+- 首次生产构建发现上述 route export 既有阻塞并已修复；再次构建因用户正在运行的 Next.js 开发服务占用同一 `.next` 目录而停止，仅终止本次构建进程，未中断开发服务。

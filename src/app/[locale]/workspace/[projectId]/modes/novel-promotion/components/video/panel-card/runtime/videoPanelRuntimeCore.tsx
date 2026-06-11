@@ -12,6 +12,7 @@ import { usePanelLipSync } from './hooks/usePanelLipSync'
 import { usePanelVideoDownload } from './hooks/usePanelVideoDownload'
 
 export function useVideoPanelActions({
+  embedded = false,
   panel,
   panelIndex,
   defaultVideoModel,
@@ -143,6 +144,7 @@ export function useVideoPanelActions({
     lipSync,
     download,
     layout: {
+      embedded,
       isLinked,
       isLastFrame,
       nextPanel,

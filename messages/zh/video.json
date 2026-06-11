@@ -10,6 +10,8 @@
     "cancel": "取消",
     "generating": "生成中...",
     "failed": "失败",
+    "possiblyStale": "可能已过期",
+    "possiblyStaleHint": "当前分镜图片已不同于生成此视频时使用的图片，视频仍可继续使用。",
     "lipSync": "口型同步",
     "lipSyncVideo": "口型同步视频",
     "lipSyncLabel": "口型同步",

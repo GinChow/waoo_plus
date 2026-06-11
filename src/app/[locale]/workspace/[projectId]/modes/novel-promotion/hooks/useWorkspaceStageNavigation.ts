@@ -45,8 +45,7 @@ export function useWorkspaceStageNavigation({
   return [
     { id: 'config', icon: 'S', label: t('stages.story'), status: getStageStatus('config') },
     { id: 'script', icon: 'A', label: t('stages.script'), status: getStageStatus('assets') },
-    { id: 'storyboard', icon: 'B', label: t('stages.storyboard'), status: getStageStatus('storyboard') },
-    { id: 'videos', icon: 'V', label: t('stages.video'), status: getStageStatus('videos') },
+    { id: 'storyboard', icon: 'B', label: t('stages.storyboardProduction'), status: getStageStatus('storyboard') },
     {
       id: 'editor',
       icon: 'E',

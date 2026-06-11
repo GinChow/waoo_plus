@@ -3,7 +3,6 @@
 import { useTranslations } from 'next-intl'
 import PanelEditForm, { PanelEditData } from '../PanelEditForm'
 import ImageSection from './ImageSection'
-import PanelActionButtons from './PanelActionButtons'
 import { StoryboardPanel } from './hooks/useStoryboardState'
 import { GlassSurface } from '@/components/ui/primitives'
 import { AppIcon } from '@/components/ui/icons'
@@ -14,6 +13,7 @@ interface PanelCandidateData {
 }
 
 interface PanelCardProps {
+  embedded?: boolean
   panel: StoryboardPanel
   panelData: PanelEditData
   imageUrl: string | null
@@ -51,16 +51,10 @@ interface PanelCardProps {
   onDeleteHistoryImage?: (panelId: string, imageUrl: string) => Promise<void>
   isUploading?: boolean
   onPreviewImage?: (url: string) => void  // 放大预览图片
-  onInsertAfter?: () => void  // 在此镜头后插入
-  onVariant?: () => void  // 生成镜头变体
-  isInsertDisabled?: boolean  // 插入按钮是否禁用
-  linkable?: boolean  // 是否允许显示「链接到下一个分镜」按钮（最后一个分镜不显示）
-  linkedToNext?: boolean  // 当前是否已与下一个分镜链接
-  linkEnableAllowed?: boolean  // 开启链接是否会触发 6 上限（开启时为 false 表示禁用）
-  onToggleLink?: () => Promise<{ rejected: boolean; reason?: string; max?: number }> | void
 }
 
 export default function PanelCard({
+  embedded = false,
   panel,
   panelData,
   imageUrl,
@@ -98,22 +92,10 @@ export default function PanelCard({
   onDeleteHistoryImage,
   isUploading,
   onPreviewImage,
-  onInsertAfter,
-  onVariant,
-  isInsertDisabled,
-  linkable = false,
-  linkedToNext = false,
-  linkEnableAllowed = true,
-  onToggleLink,
 }: PanelCardProps) {
   const t = useTranslations('storyboard')
-  return (
-    <GlassSurface
-      variant="elevated"
-      padded={false}
-      className="relative h-full overflow-visible transition-all hover:shadow-[var(--glass-shadow-md)] group/card"
-      data-storyboard-id={storyboardId}
-    >
+  const content = (
+    <>
       {/* 删除按钮 - 右上角外部 */}
       {!isModifying && !isDeleting && (
         <button
@@ -125,7 +107,6 @@ export default function PanelCard({
         </button>
       )}
 
-      {/* 镜头图片区域 - 包含插入按钮 */}
       <div className="relative">
         <ImageSection
           panelId={panel.id}
@@ -157,24 +138,8 @@ export default function PanelCard({
           isUploading={isUploading}
           onPreviewImage={onPreviewImage}
         />
-        {/* 插入分镜/镜头变体/链接按钮 - 在图片区域右侧垂直居中 */}
-        {(onInsertAfter || onVariant || (linkable && onToggleLink)) && (
-          <div className="absolute -right-[22px] top-1/2 -translate-y-1/2 z-50">
-            <PanelActionButtons
-              onInsertPanel={onInsertAfter || (() => { })}
-              onVariant={onVariant || (() => { })}
-              disabled={isInsertDisabled}
-              hasImage={!!imageUrl}
-              showLink={linkable && !!onToggleLink}
-              linked={linkedToNext}
-              linkDisabled={!linkedToNext && !linkEnableAllowed}
-              onToggleLink={onToggleLink}
-            />
-          </div>
-        )}
       </div>
 
-      {/* 分镜信息编辑区 */}
       <div className="p-3">
         <PanelEditForm
           panelData={panelData}
@@ -189,6 +154,25 @@ export default function PanelCard({
           onRemoveLocation={onRemoveLocation}
         />
       </div>
+    </>
+  )
+
+  if (embedded) {
+    return (
+      <div className="relative h-full overflow-visible group/card" data-storyboard-id={storyboardId}>
+        {content}
+      </div>
+    )
+  }
+
+  return (
+    <GlassSurface
+      variant="elevated"
+      padded={false}
+      className="relative h-full overflow-visible transition-all hover:shadow-[var(--glass-shadow-md)] group/card"
+      data-storyboard-id={storyboardId}
+    >
+      {content}
     </GlassSurface>
   )
 }

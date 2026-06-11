@@ -1,4 +1,16 @@
 {
+    "production": {
+        "image": "Storyboard Image",
+        "video": "Storyboard Video",
+        "possiblyStale": "Possibly outdated",
+        "possiblyStaleHint": "The current storyboard image differs from the image used to generate this video. The video remains available.",
+        "generateMissingVideos": "Generate Missing Videos",
+        "generatingVideos": "Generating {count}",
+        "downloadVideos": "Download Videos {count}",
+        "downloadingVideos": "Downloading",
+        "exportTimeline": "Export Timeline",
+        "exportingTimeline": "Exporting"
+    },
     "phases": {
         "planning": "Planning Storyboard",
         "cinematography": "Cinematography Design",

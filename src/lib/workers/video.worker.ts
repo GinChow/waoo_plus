@@ -110,7 +110,7 @@ async function generateOmniGroupVideo(
   modelId: string,
   projectVideoRatio: string | null | undefined,
   groupVideoOptions: AnyObj,
-): Promise<{ cosKey: string; actualVideoTokens?: number }> {
+): Promise<{ cosKey: string; sourceImageUrls: string[]; actualVideoTokens?: number }> {
   const multiPrompt = normalizeGroupMultiPrompt(groupVideoOptions.multiPrompt)
   const totalDuration = multiPrompt.reduce((sum, item) => sum + Number(item.duration), 0)
   // 声音开关：尊重前端传入的 groupVideo.sound，缺省默认 'on'（omni 路径由 sound 字段控制
@@ -240,6 +240,10 @@ async function generateOmniGroupVideo(
   )
   return {
     cosKey,
+    sourceImageUrls: groupPanelIndices.flatMap((panelIndex) => {
+      const imageUrl = imageUrlByPanelIndex.get(panelIndex)
+      return imageUrl ? [imageUrl] : []
+    }),
     ...(typeof generatedVideo.actualVideoTokens === 'number'
       ? { actualVideoTokens: generatedVideo.actualVideoTokens }
       : {}),
@@ -403,6 +407,7 @@ async function generateVideoForPanel(
   prompt: string
   model: string
   groupNumber: number | null
+  sourceImageUrls: string[]
   actualVideoTokens?: number
 }> {
   const groupNumber = readPositiveGroupNumber(payload.groupNumber)
@@ -431,6 +436,7 @@ async function generateVideoForPanel(
   const sourceImageBase64 = await normalizeToBase64ForGeneration(sourceImageUrl)
 
   let lastFrameImageBase64: string | undefined
+  let lastFrameSourceImageUrl: string | undefined
   const generationMode: VideoGenerationMode = firstLastFramePayload ? 'firstlastframe' : 'normal'
   const requestedGenerateAudio = typeof generationOptions.generateAudio === 'boolean'
     ? generationOptions.generateAudio
@@ -456,6 +462,7 @@ async function generateVideoForPanel(
         Number(firstLastFramePayload.lastFramePanelIndex),
       )
       if (lastPanel?.imageUrl) {
+        lastFrameSourceImageUrl = lastPanel.imageUrl
         const lastFrameUrl = toSignedUrlIfCos(lastPanel.imageUrl, 3600)
         if (lastFrameUrl) {
           lastFrameImageBase64 = await normalizeToBase64ForGeneration(lastFrameUrl)
@@ -507,6 +514,7 @@ async function generateVideoForPanel(
     prompt,
     model,
     groupNumber,
+    sourceImageUrls: [sourceImageValue, lastFrameSourceImageUrl].filter((value): value is string => !!value),
     ...(typeof generatedVideo.actualVideoTokens === 'number'
       ? { actualVideoTokens: generatedVideo.actualVideoTokens }
       : {}),
@@ -535,7 +543,7 @@ async function handleVideoPanelTask(job: Job<TaskJobData>) {
       stage: 'generate_group_video',
       panelId: panel.id,
     })
-    const { cosKey, actualVideoTokens } = await generateOmniGroupVideo(
+    const { cosKey, sourceImageUrls, actualVideoTokens } = await generateOmniGroupVideo(
       job,
       panel,
       modelId,
@@ -552,6 +560,7 @@ async function handleVideoPanelTask(job: Job<TaskJobData>) {
       videoModel: modelId,
       generationMode: 'normal',
       taskId: job.data.taskId,
+      sourceImageUrls,
     })
     await prisma.novelPromotionPanel.update({
       where: { id: panel.id },
@@ -575,7 +584,7 @@ async function handleVideoPanelTask(job: Job<TaskJobData>) {
     panelId: panel.id,
   })
 
-  const { cosKey, generationMode, prompt, model, groupNumber, actualVideoTokens } = await generateVideoForPanel(
+  const { cosKey, generationMode, prompt, model, groupNumber, sourceImageUrls, actualVideoTokens } = await generateVideoForPanel(
     job,
     panel,
     payload,
@@ -594,6 +603,7 @@ async function handleVideoPanelTask(job: Job<TaskJobData>) {
     videoModel: model,
     generationMode,
     taskId: job.data.taskId,
+    sourceImageUrls,
   })
   await prisma.novelPromotionPanel.update({
     where: { id: panel.id },
