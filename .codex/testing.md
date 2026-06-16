@@ -247,3 +247,30 @@ Executor: Codex
 
 - `node scripts/guards/file-line-count-guard.mjs` reported existing oversized files across the repository.
 - The new `VideoFrameCaptureModal.tsx` is 381 lines and remains below the component budget of 500 lines.
+
+## Storyboard Group Insert/Delete Responsiveness
+
+Date: 2026-06-16
+Executor: Codex
+
+### Passed
+
+- `npm run typecheck`
+  - TypeScript check passed.
+- `npm run lint:all`
+  - 0 errors, 46 existing warnings.
+
+### Full Unit Suite
+
+- `npm run test:unit:all`
+  - 241 files passed, 4 files failed; 885 of 889 tests passed.
+  - Failures are outside this change surface:
+    - `tests/unit/helpers/prompt-suffix-regression.test.ts`
+    - `tests/unit/novel-promotion/project-global-analyze-mutation.test.ts`
+    - `tests/unit/task/async-poll-yunwu-omni.test.ts`
+    - `tests/unit/worker/video-worker.test.ts`
+
+### Residual Risk
+
+- No browser click-through/profiling was run in this turn; verification is static plus local suite execution.
+- The remaining full-suite failures predate or sit outside the touched storyboard group UI/cache files.

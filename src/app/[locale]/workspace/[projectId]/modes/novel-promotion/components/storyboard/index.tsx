@@ -342,7 +342,7 @@ export default function StoryboardStage({
           addingStoryboardGroupState={addingStoryboardGroupState}
           onDownloadAllImages={downloadAllImages}
           onGenerateAllPanels={handleGenerateAllPanels}
-          onAddStoryboardGroupAtStart={() => addStoryboardGroup(0)}
+          onAddStoryboardGroupAtStart={() => addStoryboardGroup(0, { showGlobalPending: true })}
           onBack={onBack}
         />
 
@@ -409,7 +409,6 @@ export default function StoryboardStage({
           onInsertPanel={insertPanel}
           onPanelVariant={generatePanelVariant}
           addStoryboardGroup={addStoryboardGroup}
-          addingStoryboardGroup={addingStoryboardGroup}
           setLocalStoryboards={setLocalStoryboards}
         />
 

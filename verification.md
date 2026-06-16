@@ -257,3 +257,26 @@ Executor: Codex
 
 - No interactive browser click-through was available in this turn; static render and pure behavior tests cover the UI contract and target logic.
 - The full suite remains red due to four failures outside this feature's changed surface.
+
+# Storyboard Group Insert/Delete Responsiveness
+
+Date: 2026-06-16
+Executor: Codex
+
+## Result
+
+- TypeScript: passed.
+- ESLint: passed with 0 errors and existing warnings only.
+- Full unit suite: 885 passed, 4 unrelated existing failures.
+
+## Verified Behavior
+
+- Newly created storyboard groups are patched into the current `episodeData` cache from the create API response.
+- Deleted storyboard groups are removed from both cached `storyboards` and cached `clips` immediately after the delete API succeeds.
+- The canvas-level “在此插入新分镜组” button uses local pending state instead of changing every insert button through global disabled state.
+- `episodeData` is invalidated after local patching so the cache is reconciled with the server response in the background.
+
+## Residual Risk
+
+- No browser performance profile was captured; the fix targets the observed synchronous cache/render path and is verified by type/lint/full-suite execution.
+- Full unit suite remains red due to unrelated existing assertions in prompt suffix, global analyze mutation, Yunwu Omni polling, and video worker tests.

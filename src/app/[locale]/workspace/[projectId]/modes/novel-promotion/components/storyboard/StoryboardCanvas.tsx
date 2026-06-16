@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { NovelPromotionClip, NovelPromotionPanel, NovelPromotionStoryboard } from '@/types/project'
 import StoryboardGroup from './StoryboardGroup'
@@ -82,8 +83,44 @@ interface StoryboardCanvasProps {
     options: VariantOptions,
   ) => Promise<void>
   addStoryboardGroup: (insertIndex: number) => Promise<void>
-  addingStoryboardGroup: boolean
   setLocalStoryboards: React.Dispatch<React.SetStateAction<NovelPromotionStoryboard[]>>
+}
+
+interface InsertStoryboardGroupButtonProps {
+  insertIndex: number
+  onAdd: (insertIndex: number) => Promise<void>
+  label: string
+}
+
+function InsertStoryboardGroupButton({
+  insertIndex,
+  onAdd,
+  label,
+}: InsertStoryboardGroupButtonProps) {
+  const [isPending, setIsPending] = useState(false)
+
+  const handleClick = async () => {
+    if (isPending) return
+    setIsPending(true)
+    try {
+      await onAdd(insertIndex)
+    } finally {
+      setIsPending(false)
+    }
+  }
+
+  return (
+    <GlassButton
+      variant="ghost"
+      size="sm"
+      onClick={() => { void handleClick() }}
+      loading={isPending}
+      className="opacity-60 hover:opacity-100"
+    >
+      {!isPending ? <AppIcon name="plusAlt" className="h-3 w-3" /> : null}
+      <span>{label}</span>
+    </GlassButton>
+  )
 }
 
 export default function StoryboardCanvas({
@@ -147,7 +184,6 @@ export default function StoryboardCanvas({
   onInsertPanel,
   onPanelVariant,
   addStoryboardGroup,
-  addingStoryboardGroup,
   setLocalStoryboards,
 }: StoryboardCanvasProps) {
   const t = useTranslations('storyboard')
@@ -249,16 +285,11 @@ export default function StoryboardCanvas({
             />
 
             <div className="flex justify-center py-2">
-              <GlassButton
-                variant="ghost"
-                size="sm"
-                onClick={() => addStoryboardGroup(sbIndex + 1)}
-                disabled={addingStoryboardGroup}
-                className="opacity-60 hover:opacity-100"
-              >
-                <AppIcon name="plusAlt" className="h-3 w-3" />
-                <span>{t('group.insertHere')}</span>
-              </GlassButton>
+              <InsertStoryboardGroupButton
+                insertIndex={sbIndex + 1}
+                onAdd={addStoryboardGroup}
+                label={t('group.insertHere')}
+              />
             </div>
           </div>
         )

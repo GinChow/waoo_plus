@@ -136,3 +136,15 @@ Executor: Codex
 - 上传链路：继续复用 `panel/update-image`，并为抽帧调用传播 HTTP/响应错误，失败时保留弹窗。
 - 验证：聚焦 3 个测试文件共 9 项通过；TypeScript、focused ESLint、`git diff --check` 通过。
 - 全量单测：875/879 通过；4 个失败位于既有的 worker、提示词、全局分析和 Yunwu 轮询测试，与本功能无关。
+
+## Task: Storyboard Group Insert/Delete Responsiveness
+
+Date: 2026-06-16
+Executor: Codex
+
+- 工具降级：当前会话未暴露 `sequential-thinking`、`shrimp-task-manager`、`code-index`、`exa`；使用 `rg`、`sed`、本地 TypeScript、ESLint 和单元测试替代。
+- 定位分镜制作界面中 `StoryboardCanvas` 的“在此插入新分镜组”按钮、`useStoryboardGroupActions` 的新增/删除动作，以及 React Query `episodeData` 数据来源。
+- 发现新增/删除成功后只刷新项目资产缓存，未直接更新当前剧集的 `clips/storyboards`；画布插入按钮还依赖全局 `addingStoryboardGroup`，点击时会让整张画布随全局 pending 变化重新渲染。
+- 实施：新增成功后将接口返回的 `clip/storyboard/panel` 合并进 `episodeData` 缓存；删除成功后按 `storyboardId` 同步移除对应 storyboard 和 clip；后台再失效 `episodeData` 做服务端校准。
+- 实施：画布中的每个“在此插入新分镜组”按钮改为局部 pending 状态；顶部“添加到开头”继续使用全局 pending 状态。
+- 验证：`npm run typecheck` 通过；`npm run lint:all` 0 errors；`npm run test:unit:all` 885/889 通过，4 个失败均位于未触及的既有测试断言。
