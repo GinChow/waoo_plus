@@ -26,6 +26,19 @@ async function resolveAppearanceImageArray(raw: unknown, fieldName: string): Pro
   }
 }
 
+async function resolveVideoHistorySourceImageUrls(record: Record<string, unknown>) {
+  const sourceImageUrls = Array.isArray(record.sourceImageUrls)
+    ? record.sourceImageUrls.filter((value): value is string => typeof value === 'string' && value.length > 0)
+    : []
+  if (sourceImageUrls.length === 0) return record.sourceImageUrls
+
+  return await Promise.all(sourceImageUrls.map(async (imageUrl) => {
+    if (imageUrl.startsWith('PENDING:')) return imageUrl
+    const media = await resolveMediaRefFromLegacyValue(imageUrl)
+    return media?.url || imageUrl
+  }))
+}
+
 async function attachMediaFieldsToAppearance<T extends Record<string, unknown>>(appearance: T) {
   const imageMedia = await resolveMediaRef(appearance.imageMediaId, appearance.imageUrl)
   const previousImageMedia = await resolveMediaRef(appearance.previousImageMediaId, appearance.previousImageUrl)
@@ -145,9 +158,11 @@ async function attachMediaFieldsToPanel<T extends Record<string, unknown>>(panel
           const videoUrl = typeof record.videoUrl === 'string' ? record.videoUrl : ''
           if (!videoUrl || videoUrl.startsWith('PENDING:')) return record
           const media = await resolveMediaRefFromLegacyValue(videoUrl)
+          const sourceImageUrls = await resolveVideoHistorySourceImageUrls(record)
           return {
             ...record,
             videoUrl: media?.url || videoUrl,
+            ...(sourceImageUrls !== record.sourceImageUrls ? { sourceImageUrls } : {}),
           }
         }))
         resolvedVideoHistoryJson = JSON.stringify(resolved)
@@ -189,7 +204,12 @@ async function attachMediaFieldsToPanelGroup<T extends Record<string, unknown>>(
           const videoUrl = typeof record.videoUrl === 'string' ? record.videoUrl : ''
           if (!videoUrl || videoUrl.startsWith('PENDING:')) return record
           const media = await resolveMediaRefFromLegacyValue(videoUrl)
-          return { ...record, videoUrl: media?.url || videoUrl }
+          const sourceImageUrls = await resolveVideoHistorySourceImageUrls(record)
+          return {
+            ...record,
+            videoUrl: media?.url || videoUrl,
+            ...(sourceImageUrls !== record.sourceImageUrls ? { sourceImageUrls } : {}),
+          }
         }))
         resolvedVideoHistoryJson = JSON.stringify(resolved)
       }
@@ -241,9 +261,11 @@ async function attachMediaFieldsToStoryboard<T extends Record<string, unknown>>(
             const videoUrl = typeof historyRecord.videoUrl === 'string' ? historyRecord.videoUrl : ''
             if (!videoUrl || videoUrl.startsWith('PENDING:')) return historyRecord
             const media = await resolveMediaRefFromLegacyValue(videoUrl)
+            const sourceImageUrls = await resolveVideoHistorySourceImageUrls(historyRecord)
             return {
               ...historyRecord,
               videoUrl: media?.url || videoUrl,
+              ...(sourceImageUrls !== historyRecord.sourceImageUrls ? { sourceImageUrls } : {}),
             }
           }))
           const videoMedia = await resolveMediaRefFromLegacyValue(record.videoUrl)

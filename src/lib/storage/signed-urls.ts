@@ -76,6 +76,15 @@ export function keyToSignedUrl(key: string | null, expires: number = 24 * 60 * 6
   return getSignedUrl(key, expires)
 }
 
+function signSourceImageUrls(value: unknown): unknown {
+  if (!Array.isArray(value)) return value
+  return value.map((item) => {
+    if (typeof item !== 'string') return item
+    if (!item || item.startsWith('PENDING:') || item.startsWith('/m/') || item.startsWith('/api/')) return item
+    return keyToSignedUrl(item) || item
+  })
+}
+
 export function addSignedUrlsToCharacter(character: CharacterLike) {
   const appearances = character.appearances?.map((app) => {
     const imageUrls = decodeImageUrlsFromDb(app.imageUrls, 'appearance.imageUrls')
@@ -185,6 +194,7 @@ export function addSignedUrlsToStoryboard(storyboard: StoryboardLike) {
                 videoUrl: videoUrl.startsWith('http')
                   ? videoUrl
                   : getSignedUrl(videoUrl, 7200) || videoUrl,
+                sourceImageUrls: signSourceImageUrls(record.sourceImageUrls),
               }
             })
             signedVideoHistory = JSON.stringify(signedHistory)
@@ -264,6 +274,7 @@ function signPanelGroups(raw: unknown) {
           videoUrl: typeof historyRecord.videoUrl === 'string' && !historyRecord.videoUrl.startsWith('http')
             ? getSignedUrl(historyRecord.videoUrl, 7200) || historyRecord.videoUrl
             : historyRecord.videoUrl,
+          sourceImageUrls: signSourceImageUrls(historyRecord.sourceImageUrls),
         }
       })
       : record.videoHistory
@@ -301,6 +312,7 @@ function signStoryboardCoarseGroups(raw: string | null | undefined) {
             videoUrl: typeof historyRecord.videoUrl === 'string' && !historyRecord.videoUrl.startsWith('http')
               ? getSignedUrl(historyRecord.videoUrl, 7200) || historyRecord.videoUrl
               : historyRecord.videoUrl,
+            sourceImageUrls: signSourceImageUrls(historyRecord.sourceImageUrls),
           }
         })
         : record.videoHistory

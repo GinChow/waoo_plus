@@ -123,4 +123,54 @@ describe('video panels projection error code', () => {
 
     expect(result.allPanels[0]?.isVideoStale).toBe(false)
   })
+
+  it('keeps a video current when current image is an api storage signed url for the recorded source key', () => {
+    const result = useVideoPanelsProjection({
+      clips: [{ id: 'clip-1', start: 0, end: 5, summary: 'clip' }],
+      storyboards: [{
+        id: 'sb-1',
+        clipId: 'clip-1',
+        panels: [{
+          id: 'panel-1',
+          panelIndex: 0,
+          imageUrl: '/api/storage/sign?key=images%2Fsource.png&expires=7200',
+          videoUrl: '/api/storage/sign?key=video%2Foutput.mp4&expires=7200',
+          videoHistory: JSON.stringify([{
+            videoUrl: 'video/output.mp4',
+            generatedAt: '2026-06-10T00:00:00.000Z',
+            sourceImageUrls: ['images/source.png'],
+          }]),
+        }],
+      }],
+      panelVideoStates: { getTaskState: () => null },
+      panelLipStates: { getTaskState: () => null },
+    })
+
+    expect(result.allPanels[0]?.isVideoStale).toBe(false)
+  })
+
+  it('keeps a video current when current image is wrapped by next image optimizer', () => {
+    const result = useVideoPanelsProjection({
+      clips: [{ id: 'clip-1', start: 0, end: 5, summary: 'clip' }],
+      storyboards: [{
+        id: 'sb-1',
+        clipId: 'clip-1',
+        panels: [{
+          id: 'panel-1',
+          panelIndex: 0,
+          imageUrl: '/_next/image?url=%2Fapi%2Fstorage%2Fsign%3Fkey%3Dimages%252Fsource.png%26expires%3D7200&w=1200&q=75',
+          videoUrl: '/api/storage/sign?key=video%2Foutput.mp4&expires=7200',
+          videoHistory: JSON.stringify([{
+            videoUrl: 'video/output.mp4',
+            generatedAt: '2026-06-10T00:00:00.000Z',
+            sourceImageUrls: ['images/source.png'],
+          }]),
+        }],
+      }],
+      panelVideoStates: { getTaskState: () => null },
+      panelLipStates: { getTaskState: () => null },
+    })
+
+    expect(result.allPanels[0]?.isVideoStale).toBe(false)
+  })
 })

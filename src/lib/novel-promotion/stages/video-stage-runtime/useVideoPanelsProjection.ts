@@ -56,9 +56,72 @@ function summarizeVideoUrl(value: string | null | undefined): string {
   return value.length > 96 ? `${value.slice(0, 48)}...${value.slice(-24)}` : value
 }
 
+const LOCAL_URL_ORIGIN = 'http://localhost'
+const NEXT_IMAGE_PATH = '/_next/image'
+const STORAGE_SIGN_PATH = '/api/storage/sign'
+const LOCAL_FILE_PATH_PREFIX = '/api/files/'
+const STORAGE_KEY_PREFIXES = ['images/', 'video/', 'voice/'] as const
+const MAX_MEDIA_REF_UNWRAP_DEPTH = 5
+
+function decodeUrlComponent(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+function parseMediaUrl(value: string): URL | null {
+  try {
+    return new URL(value, LOCAL_URL_ORIGIN)
+  } catch {
+    return null
+  }
+}
+
+function findStorageKeyInPath(pathname: string): string | null {
+  const normalizedPath = pathname.replace(/^\/+/, '')
+  for (const prefix of STORAGE_KEY_PREFIXES) {
+    const index = normalizedPath.indexOf(prefix)
+    if (index >= 0) return decodeUrlComponent(normalizedPath.slice(index))
+  }
+  return null
+}
+
 function canonicalMediaRef(value: string | null | undefined): string {
   if (!value) return ''
-  return value.split(/[?#]/, 1)[0]
+  let current = value.trim()
+  if (!current) return ''
+
+  for (let depth = 0; depth < MAX_MEDIA_REF_UNWRAP_DEPTH; depth += 1) {
+    const parsed = parseMediaUrl(current)
+    if (!parsed || parsed.pathname !== NEXT_IMAGE_PATH) break
+
+    const nestedUrl = parsed.searchParams.get('url')
+    if (!nestedUrl) break
+
+    const decoded = decodeUrlComponent(nestedUrl)
+    if (!decoded || decoded === current) break
+    current = decoded
+  }
+
+  const parsed = parseMediaUrl(current)
+  if (parsed?.pathname === STORAGE_SIGN_PATH) {
+    const key = parsed.searchParams.get('key')
+    if (key) return decodeUrlComponent(key)
+  }
+
+  if (parsed?.pathname.startsWith(LOCAL_FILE_PATH_PREFIX)) {
+    return decodeUrlComponent(parsed.pathname.slice(LOCAL_FILE_PATH_PREFIX.length))
+  }
+
+  if (parsed) {
+    const storageKey = findStorageKeyInPath(parsed.pathname)
+    if (storageKey) return storageKey
+  }
+
+  const stripped = current.split(/[?#]/, 1)[0]
+  return decodeUrlComponent(stripped)
 }
 
 function isCurrentVideoStale(params: {
