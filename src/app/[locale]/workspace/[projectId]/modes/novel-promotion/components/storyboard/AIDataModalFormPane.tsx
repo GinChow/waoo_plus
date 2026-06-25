@@ -393,6 +393,24 @@ export default function AIDataModalFormPane({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
+              <FL>{t('aiData.focalLength')}</FL>
+              <GlassInput
+                density="compact"
+                value={photographyRules.focal_length ?? ''}
+                onChange={e => onPhotographyFieldChange('focal_length', e.target.value)}
+              />
+            </div>
+            <div>
+              <FL>{t('aiData.spatialRendering')}</FL>
+              <GlassInput
+                density="compact"
+                value={photographyRules.spatial_rendering ?? ''}
+                onChange={e => onPhotographyFieldChange('spatial_rendering', e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <FL>{t('aiData.lightingDirection')}</FL>
               <GlassInput
                 density="compact"
@@ -426,6 +444,15 @@ export default function AIDataModalFormPane({
                 onChange={e => onPhotographyFieldChange('color_tone', e.target.value)}
               />
             </div>
+          </div>
+          <div>
+            <FL>{t('aiData.exposureContrast')}</FL>
+            <AutoGrowTextarea
+              density="compact"
+              rows={2}
+              value={photographyRules.exposure_contrast ?? ''}
+              onChange={e => onPhotographyFieldChange('exposure_contrast', e.target.value)}
+            />
           </div>
           <div>
             <FL>{t('aiData.focusPriority')}</FL>

@@ -54,6 +54,9 @@ function clonePhotographyRules(rules: PhotographyRules | null): PhotographyRules
     color_tone: rules.color_tone || '',
     camera_angle: rules.camera_angle || '',
     viewpoint_constraint: rules.viewpoint_constraint || '',
+    focal_length: rules.focal_length || '',
+    spatial_rendering: rules.spatial_rendering || '',
+    exposure_contrast: rules.exposure_contrast || '',
     focus_priority: rules.focus_priority || '',
     composition_note: rules.composition_note || '',
     characters: Array.isArray(rules.characters) ? rules.characters.map((character) => ({ ...character })) : [],
@@ -275,6 +278,9 @@ export function useAIDataModalState({
         || field === 'color_tone'
         || field === 'camera_angle'
         || field === 'viewpoint_constraint'
+        || field === 'focal_length'
+        || field === 'spatial_rendering'
+        || field === 'exposure_contrast'
         || field === 'focus_priority'
         || field === 'composition_note'
       ) {

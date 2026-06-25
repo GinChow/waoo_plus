@@ -523,6 +523,9 @@ function buildUnifiedPhotographyPlan(rule: PhotographyRule, panel: StoryboardPan
   const viewpointConstraint = asText(rule.viewpoint_constraint)
   const focusPriority = asText(rule.focus_priority)
   const compositionNote = asText(rule.composition_note)
+  const focalLength = asText(rule.focal_length)
+  const spatialRendering = asText(rule.spatial_rendering)
+  const exposureContrast = asText(rule.exposure_contrast)
   const composition = asText(rule.composition) || compositionNote || sceneSummary
   const atmosphere = asText(rule.atmosphere)
   const technicalNotes = asText(rule.technical_notes)
@@ -543,7 +546,10 @@ function buildUnifiedPhotographyPlan(rule: PhotographyRule, panel: StoryboardPan
     camera_angle: cameraAngle,
     viewpoint_constraint: viewpointConstraint,
     characters,
+    focal_length: focalLength,
+    spatial_rendering: spatialRendering,
     depth_of_field: depthOfField,
+    exposure_contrast: exposureContrast,
     color_tone: colorTone,
     focus_priority: focusPriority,
     composition_note: compositionNote,
@@ -715,7 +721,10 @@ function buildFinePanelsWithCinematography(params: {
       lighting: matchedRule.lighting,
       camera_angle: matchedRule.camera_angle,
       viewpoint_constraint: matchedRule.viewpoint_constraint,
+      focal_length: matchedRule.focal_length,
+      spatial_rendering: matchedRule.spatial_rendering,
       depth_of_field: matchedRule.depth_of_field,
+      exposure_contrast: matchedRule.exposure_contrast,
       color_tone: matchedRule.color_tone || matchedRule.color_palette,
       focus_priority: matchedRule.focus_priority,
       composition_note: matchedRule.composition_note,

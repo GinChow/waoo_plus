@@ -119,6 +119,9 @@ export type PhotographyRule = JsonRecord & {
     viewpoint_constraint?: string
     focus_priority?: string
     composition_note?: string
+    focal_length?: string
+    spatial_rendering?: string
+    exposure_contrast?: string
 }
 
 export type ActingDirection = JsonRecord & {

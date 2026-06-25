@@ -27,6 +27,9 @@ export interface PhotographyRules {
   viewpoint_constraint?: string
   focus_priority?: string
   composition_note?: string
+  focal_length?: string
+  spatial_rendering?: string
+  exposure_contrast?: string
   shot_purpose?: string
   scene_type?: string
   source_text?: string

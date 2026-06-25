@@ -74,7 +74,7 @@
    提示词必须具体、清晰、视觉化，不写抽象空话。
 
 9. 时长稳定  
-   duration_final 只能对 duration_base 做小幅微调。
+   duration_final 只能对 duration_base 做小幅微调, 且必须为整数。
 
 ---
 
@@ -156,35 +156,35 @@
 
 shot_type 必须明确包含景别或画面尺度。
 
-可使用：
+例如：
 
-- extreme wide shot
-- wide shot
-- full shot
-- medium wide shot
-- medium shot
-- medium close-up
-- close-up
-- extreme close-up
-- insert close-up
-- detail insert
-- over-the-shoulder medium shot
-- profile close-up
-- frontal close-up
-- reaction close-up
-- observing wide shot
-- confrontation medium close-up
+- 超远景 / 大远景
+- 远景
+- 全身景 / 全景人物镜头
+- 中远景
+- 中景
+- 中近景
+- 近景 / 特写
+- 大特写 / 极近特写
+- 插入特写
+- 细节插入镜头 / 细节特写
+- 越肩中景
+- 侧面特写
+- 正面特写
+- 反应特写
+- 观察式远景
+- 对峙中近景
 
 要求：
 
-- shot_type 不能只写 “dramatic shot” / “cinematic shot”
+- shot_type 不能只写“戏剧性镜头”/“电影感镜头”
 - 必须能看出画面尺度
 - 必须与 focus_priority 和 composition_note 匹配
-- 如果 focus_priority 是手、物件、眼神、道具，应优先使用 insert / detail / close-up
-- 如果 composition_note 强调人物关系，应优先使用 two shot / over-the-shoulder / medium wide
-- 如果 shot_purpose 是 establish，应优先使用 wide / establishing / observing wide
-- 如果 shot_purpose 是 reaction，应优先使用 reaction close-up / medium close-up
-- 如果 shot_purpose 是 emotional_hold，应优先使用 emotional close-up / quiet medium close-up
+- 如果 focus_priority 是手、物件、眼神、道具，应优先使用“插入特写 / 细节特写 / 近景 / 特写”
+- 如果 composition_note 强调人物关系，应优先使用“双人镜头 / 越肩镜头 / 中远景”
+- 如果 shot_purpose 是 establish，应优先使用“远景 / 建立镜头 / 观察式远景”
+- 如果 shot_purpose 是 reaction，应优先使用“反应特写 / 中近景”
+- 如果 shot_purpose 是 emotional_hold，应优先使用“情绪特写 / 安静中近景”
 
 ---
 
@@ -192,23 +192,23 @@ shot_type 必须明确包含景别或画面尺度。
 
 必须把 camera_angle 和 viewpoint_constraint 转译到提示词中。
 
-可使用：
+例如：
 
-- eye-level camera
-- low angle
-- high angle
-- slight overhead angle
-- profile view
-- frontal view
-- three-quarter view
-- over-the-shoulder view
-- observer perspective
-- subjective viewpoint
-- distant observing perspective
-- compressed side view
-- camera placed behind the shoulder
-- camera looking slightly down
-- camera looking slightly up
+- 平视机位
+- 低角度
+- 高角度
+- 轻微俯视角度
+- 侧面视角
+- 正面视角
+- 四分之三侧视角
+- 越肩视角
+- 旁观者视角
+- 主观视角
+- 远距离旁观视角
+- 压缩侧面视角
+- 机位放在肩后
+- 镜头略微向下看
+- 镜头略微向上看
 
 要求：
 
@@ -225,23 +225,23 @@ shot_type 必须明确包含景别或画面尺度。
 
 必须把 focus_priority 转译成清晰的焦点表达。
 
-可使用：
+例如：
 
-- sharp focus on the face
-- sharp focus on the eyes
-- focus locked on the hand
-- focus priority on the foreground figure
-- background softly out of focus
-- the subject remains the clearest element in frame
-- foreground object in crisp focus
-- secondary character slightly softer
-- focus racks are not allowed unless explicitly supported
+- 面部清晰对焦
+- 眼神清晰对焦
+- 焦点锁定在手部
+- 前景人物优先对焦
+- 背景柔和虚化
+- 主体始终是画面中最清晰的元素
+- 前景物件清晰对焦
+- 次要角色略微虚化
+- 除非明确支持，否则不允许焦点转移
 
 要求：
 
 - first_frame_image_prompt 必须明确谁/什么最清晰
 - video_prompt 必须说明焦点是否保持、跟随或轻微变化
-- 如果没有明确支持，不要写 rack focus
+- 如果没有明确支持，不要写焦点转移
 - 如果是浅景深，必须说明背景虚化
 - 如果是深景深，必须说明空间层次都较清楚
 - 如果 focus_priority 是某个角色，不能让其他角色抢焦点
@@ -253,18 +253,18 @@ shot_type 必须明确包含景别或画面尺度。
 
 必须把 depth_of_field 转译成可生成的视觉语言。
 
-可使用：
+例如：
 
-- shallow depth of field
-- deep focus
-- medium depth of field
-- background bokeh
-- compressed background blur
-- soft foreground blur
-- layered depth
-- foreground and background separated by focus
-- crisp spatial depth
-- narrow focal plane
+- 浅景深
+- 深景深 / 全景深对焦
+- 中等景深
+- 背景散景虚化
+- 压缩背景虚化
+- 柔和前景虚化
+- 层次景深
+- 前景与背景通过焦点分离
+- 清晰的空间纵深
+- 狭窄焦平面
 
 要求：
 
@@ -272,7 +272,7 @@ shot_type 必须明确包含景别或画面尺度。
 - video_prompt 必须保持景深逻辑
 - 如果 depth_of_field 是浅景深，不得写所有背景清晰
 - 如果 depth_of_field 是深景深，不得写强烈背景虚化
-- 如果 composition_note 强调前中后景关系，应使用 layered depth / foreground-midground-background separation
+- 如果 composition_note 强调前中后景关系，应使用“层次景深 / 前景-中景-背景分离”
 
 ---
 
@@ -280,34 +280,34 @@ shot_type 必须明确包含景别或画面尺度。
 
 必须把 lighting 转译成具体光源方向、光质和明暗关系。
 
-可使用：
+例如：
 
-- soft side key light
-- hard side light
-- backlight rim
-- low-key lighting
-- high-key soft light
-- window light from screen left
-- warm practical light
-- cool ambient fill
-- top light
-- underlit shadow
-- strong contrast between lit face and shadow side
-- soft diffused daylight
-- dim interior light
-- candle-like warm light
-- directional moonlight
+- 柔和侧主光
+- 硬侧光
+- 逆光轮廓光
+- 低调光
+- 高调柔光
+- 来自画面左侧的窗光
+- 暖色实景光源
+- 冷色环境补光
+- 顶光
+- 下方打光形成阴影
+- 受光面与阴影面的强烈明暗对比
+- 柔和漫射日光
+- 昏暗室内光
+- 类似烛光的暖光
+- 方向性月光
 
 要求：
 
 - first_frame_image_prompt 必须包含光源方向和光质
 - video_prompt 必须保持光线连续性
-- 不得只写 “cinematic lighting”
+- 不得只写“电影感光线”
 - 不得忽略 lighting 字段
-- 如果 lighting 写了侧光，就必须体现 side key light / side illumination
-- 如果 lighting 写了逆光，就必须体现 backlight / rim light
-- 如果 lighting 写了低调光，就必须体现 low-key contrast / deep shadow
-- 如果 lighting 写了柔光，就必须体现 soft diffused light
+- 如果 lighting 写了侧光，就必须体现“侧主光 / 侧向照明”
+- 如果 lighting 写了逆光，就必须体现“逆光 / 轮廓光”
+- 如果 lighting 写了低调光，就必须体现“低调明暗对比 / 深阴影”
+- 如果 lighting 写了柔光，就必须体现“柔和漫射光”
 
 ---
 
@@ -315,24 +315,24 @@ shot_type 必须明确包含景别或画面尺度。
 
 必须把 color_tone 转译成清晰的色彩与质感语言。
 
-可使用：
+例如：
 
-- warm low-saturation palette
-- cold blue-gray tone
-- muted earth tones
-- desaturated cinematic color
-- amber practical warmth
-- greenish fluorescent cast
-- pale daylight tone
-- dusty golden atmosphere
-- high contrast monochrome-like palette
-- restrained natural color grading
+- 暖色低饱和色调
+- 冷蓝灰色调
+- 柔和土色调
+- 低饱和电影感色彩
+- 琥珀色实景暖调
+- 偏绿色荧光灯色偏
+- 苍白日光色调
+- 灰尘感金色氛围
+- 高对比近似黑白色调
+- 克制自然的调色
 
 要求：
 
 - first_frame_image_prompt 必须包含色调
 - video_prompt 可以简短继承色调，但不能与首帧冲突
-- 不得只写 “beautiful color”
+- 不得只写“漂亮色彩”
 - 不得无故改变色调
 - 色调必须服务 scene_type 与摄影约束
 
@@ -342,29 +342,29 @@ shot_type 必须明确包含景别或画面尺度。
 
 必须把 composition_note 转译成画面组织方式。
 
-可使用：
+例如：
 
-- subject placed in the left third
-- negative space on the right
-- centered symmetrical composition
-- foreground framing
-- doorway framing
-- layered foreground and background
-- diagonal composition
-- tight frame with limited headroom
-- wide frame emphasizing distance
-- obstructed view through foreground objects
-- compressed composition
-- balanced two-character blocking
+- 主体置于画面左侧三分之一处
+- 右侧留白
+- 居中对称构图
+- 前景框景
+- 门框式构图
+- 前景与背景分层构图
+- 对角线构图
+- 头顶空间有限的紧凑构图
+- 强调距离感的宽画幅构图
+- 透过前景物件遮挡观察
+- 压缩构图
+- 平衡的双人调度构图
 
 要求：
 
 - first_frame_image_prompt 必须包含构图重点
 - video_prompt 必须保持构图关系，不得随意改变主体位置
-- 如果 composition_note 强调留白，必须写 negative space
-- 如果 composition_note 强调压迫，必须写 tight framing / compressed frame
-- 如果 composition_note 强调距离，必须写 wide spacing / visible distance
-- 如果 composition_note 强调遮挡观察，必须写 foreground obstruction / framed through
+- 如果 composition_note 强调留白，必须写“留白 / 负空间”
+- 如果 composition_note 强调压迫，必须写“紧凑构图 / 压缩画面”
+- 如果 composition_note 强调距离，必须写“宽间距 / 可见距离”
+- 如果 composition_note 强调遮挡观察，必须写“前景遮挡 / 透过物体框景观察”
 
 ---
 
@@ -394,35 +394,26 @@ first_frame_image_prompt 必须：
 
 每个 first_frame_image_prompt 必须尽量包含以下内容：
 
-1. 镜头尺度 / 景别  
-   例如：medium close-up, wide shot, insert close-up
-
-2. 机位与视角  
-   例如：eye-level camera, slight high angle, over-the-shoulder view
-
-3. 可见主体  
-   当前镜头中一开始就可见的人物 / 物件 / 空间关系
-
-4. 动作起点  
-   镜头开始时人物或物件正处于什么状态
-
-5. 构图  
-   主体在画面中的位置，是否有前景遮挡、留白、对称、压迫、层次
-
-6. 焦点  
-   谁或什么最清晰
-
-7. 景深  
-   shallow depth of field / deep focus / medium depth of field
-
-8. 光线  
-   光源方向、光质、明暗关系
-
-9. 色调  
-   暖色、冷色、低饱和、高反差、自然色调等
-
-10. 画面质感  
-   真实电影帧、克制、自然、低饱和、颗粒感等，但不能堆砌空泛形容词
+1. 镜头尺度 / 景别
+    例如：中近景、远景、插入特写
+2. 机位与视角
+    例如：平视机位、轻微高角度、越肩视角
+3. 可见主体
+    当前镜头中一开始就可见的人物 / 物件 / 空间关系
+4. 动作起点
+    镜头开始时人物或物件正处于什么状态
+5. 构图
+    主体在画面中的位置，是否有前景遮挡、留白、对称、压迫、层次
+6. 焦点
+    谁或什么最清晰
+7. 景深
+    浅景深 / 深景深 / 中等景深
+8. 光线
+    光源方向、光质、明暗关系
+9. 色调
+    暖色、冷色、低饱和、高反差、自然色调等
+10. 画面质感
+    真实电影帧、克制、自然、低饱和、颗粒感等，但不能堆砌空泛形容词
 
 ---
 
@@ -430,11 +421,11 @@ first_frame_image_prompt 必须：
 
 推荐按以下顺序组织：
 
-“电影首帧，{shot_type}，{camera_angle / viewpoint_constraint}，{主体与动作起点}，{空间关系与构图}，{focus_priority} sharp focus，{depth_of_field}，{lighting}，{color_tone}，realistic cinematic frame。”
+“{shot_type}，{camera_angle / viewpoint_constraint}，{主体与动作起点}，{空间关系与构图}，{focus_priority} sharp focus，{depth_of_field}，{lighting}，{color_tone}，realistic cinematic frame。”
 
 示例结构：
 
-“电影首帧，eye-level medium close-up，年轻女子站在门口刚停下脚步，身体微微朝向房间内的中年男子，人物位于画面左三分之一，门框形成前景框景，sharp focus on her tense face，shallow depth of field with the room softly blurred，soft side key light from screen right, muted warm low-saturation color grading, realistic cinematic frame。”
+"平视中近景，年轻女子站在门口刚停下脚步，身体微微朝向房间内的中年男子，人物位于画面左侧三分之一处，门框形成前景框景，焦点清晰落在她紧张的面部，浅景深，房间背景柔和虚化，来自画面右侧的柔和侧主光，暖色低饱和的克制调色，真实电影帧质感。"
 
 ---
 
@@ -492,29 +483,29 @@ video_prompt 必须：
 
 每个 video_prompt 必须尽量包含：
 
-1. 起始画面状态  
-   与 first_frame_image_prompt 保持一致。
+1. 起始画面状态
+    与 first_frame_image_prompt 保持一致。
 
-2. 镜头运动  
-   例如 static, subtle push in, slow pan, handheld drift, follow short movement。
+2. 镜头运动
+    例如：静止镜头、轻微推进、缓慢横摇、手持漂移、短距离跟拍。
 
-3. 人物或物件动作  
-   只写当前 description 中支持的动作。
+3. 人物或物件动作
+    只写当前 description 中支持的动作。
 
-4. 表演变化  
-   表情、视线、呼吸、手部、身体重心等可见变化。
+4. 表演变化
+    表情、视线、呼吸、手部动作、身体重心等可见变化。
 
-5. 焦点处理  
-   例如 focus stays locked on the face / hand / foreground subject。
+5. 焦点处理
+    例如：焦点始终锁定在面部 / 手部 / 前景主体上。
 
-6. 景深保持  
-   例如 background remains softly blurred。
+6. 景深保持
+    例如：背景持续柔和虚化。
 
-7. 光线与色调保持  
-   例如 warm side light remains consistent。
+7. 光线与色调保持
+    例如：暖色侧光保持连续一致。
 
-8. 结束状态  
-   镜头结束时停在什么可见状态附近，但不能跨到下一镜。
+8. 结束状态
+    镜头结束时停在某个可见状态附近，但不能跨到下一镜。
 
 ---
 
@@ -522,11 +513,11 @@ video_prompt 必须：
 
 推荐按以下顺序组织：
 
-“Start from the same {shot_type}: {起始状态}. The camera {camera_move}. {主体动作按顺序展开}. {表情/视线/微动作变化}. Focus remains on {focus_priority}, with {depth_of_field}. The {lighting} and {color_tone} remain consistent. The shot ends as {当前镜头内的结束状态}。”
+“{shot_type}: {起始状态}. The camera {camera_move}. {主体动作按顺序展开}. {表情/视线/微动作变化}. Focus remains on {focus_priority}, with {depth_of_field}. The {lighting} and {color_tone} remain consistent. The shot ends as {当前镜头内的结束状态}。”
 
 中文输出时可写成：
 
-“从同一首帧开始，{shot_type}保持{camera_angle / viewpoint_constraint}，镜头{camera_move}。{人物/物件动作按顺序推进}。{表情、视线、手部或身体重心变化}。焦点始终锁定在{focus_priority}，{depth_of_field}保持，{lighting}与{color_tone}延续。镜头停在{当前镜头内的可见落点}。”
+“{shot_type}保持{camera_angle / viewpoint_constraint}，镜头{camera_move}。{人物/物件动作按顺序推进}。{表情、视线、手部或身体重心变化}。焦点始终锁定在{focus_priority}，{depth_of_field}保持，{lighting}与{color_tone}延续。镜头停在{当前镜头内的可见落点}。”
 
 ---
 
@@ -569,71 +560,71 @@ shot_type 必须：
 
 ## 可参考的命名方向
 
-可以使用类似以下方式命名，但不要机械套模板：
+可以使用类似以下方式命名，但不要机械套用模板：
 
-- wide establishing shot
-- observing wide shot
-- medium wide two-shot
-- medium two-shot
-- medium single
-- medium close-up single
-- close-up
-- extreme close-up
-- insert close-up
-- detail insert
-- over-the-shoulder medium shot
-- over-the-shoulder close-up
-- profile medium close-up
-- frontal close-up
-- reaction close-up
-- suspense detail shot
-- confrontation medium close-up
-- emotional hold close-up
-- pressure close-up
-- quiet medium single
+- 远景建立镜头
+- 观察式远景
+- 中远景双人镜头
+- 中景双人镜头
+- 中景单人镜头
+- 中近景单人镜头
+- 特写
+- 大特写
+- 插入特写
+- 细节插入镜头
+- 过肩中景
+- 过肩特写
+- 侧面中近景
+- 正面特写
+- 反应特写
+- 悬念细节镜头
+- 对峙中近景
+- 情绪停留特写
+- 压迫感特写
+- 安静中景单人镜头
 
----
+⸻
 
 ## 禁止
 
-不要输出：
+不要输出以下缺乏具体景别或观察方式的命名：
 
-- cinematic shot
-- dramatic shot
-- beautiful shot
-- emotional shot
-- tense shot
+- 电影感镜头
+- 戏剧性镜头
+- 唯美镜头
+- 情绪镜头
+- 紧张镜头
 
-除非它们和具体景别组合，例如：
+除非它们与具体景别或观察方式组合，例如：
 
-- emotional hold close-up
-- tense over-the-shoulder medium shot
+- 情绪停留特写
+- 紧张感过肩中景
 
----
+⸻
 
 # 【camera_move 规则】
 
-camera_move 用于定义该镜头的运动方式。
+camera_move 用于定义该镜头的摄影机运动方式。
 
----
+⸻
 
 ## 可选倾向
 
-可以是以下之一或相近表达：
+可以使用以下表达之一，或含义相近的表述：
 
-- static
-- no obvious movement
-- locked with subject movement
-- subtle push in
-- subtle pull back
-- slow pan
-- slow tilt
-- slight handheld drift
-- follow short movement
-- settle after slight move
-- slow lateral track
-- minimal reframing
-- controlled handheld hold
+- 固定镜头
+- 无明显镜头运动
+- 镜头锁定，主体在画面内运动
+- 轻微推进
+- 轻微后拉
+- 缓慢横摇
+- 缓慢俯仰
+- 轻微手持漂移
+- 短距离跟随主体运动
+- 轻微移动后稳定停住
+- 缓慢横向移动
+- 最小幅度重新构图
+- 克制的手持稳定拍摄
 
 ---
 
@@ -652,7 +643,7 @@ camera_move 用于定义该镜头的运动方式。
 
 # 【duration_final 规则】
 
-duration_final 是最终执行时长，只能基于 duration_base 做小幅微调。
+duration_final 是最终执行时长，只能基于 duration_base 做小幅微调, 且必须为整数。
 
 ---
 
@@ -660,8 +651,8 @@ duration_final 是最终执行时长，只能基于 duration_base 做小幅微�
 
 通常控制在：
 
-- duration_base ± 0.5 秒
-- 特殊情况下最多 ± 1.0 秒
+- duration_base ± 1.0 秒
+- 特殊情况下最多 ± 2.0 秒
 
 ---
 
@@ -776,91 +767,91 @@ video_prompt 中不要直接使用角色名。
 
 ---
 
-## establish
+## 建立关系
 
-- shot_type：偏 establishing / observing / wide relation
-- camera_move：多为 static 或 very subtle push
-- duration_final：可略长
-- first_frame：空间与人物关系已建立
-- video：以轻微观察或人物小动作维持
+- shot_type：偏向建立镜头、观察式镜头或强调空间关系的远景
+- camera_move：多采用固定镜头或极轻微推进
+- duration_final：可适当延长
+- first_frame：空间关系与人物位置应当已经建立
+- video：通过轻微观察感或人物小幅动作维持画面
 - 摄影重点：空间层次、人物位置、光线来源、色调氛围
 
----
+⸻
 
-## action_start / action_progress / action_result
+## 动作开始 / 动作推进 / 动作结果
 
-- shot_type：以动作清晰为主
-- camera_move：可 static、follow short movement、subtle push、minimal reframing
-- duration_final：按动作完整性微调
+- shot_type：以清楚表现动作为主
+- camera_move：可采用固定镜头、短距离跟随、轻微推进或轻微修正构图
+- duration_final：根据动作完整性进行微调
 - first_frame：动作起点必须准确
-- video：清楚表现动作推进或落点
+- video：清楚表现动作的推进过程或最终落点
 - 摄影重点：主体运动方向、焦点跟随、构图稳定性、动作清晰度
 
----
+⸻
 
-## dialogue_speaking
+## 对白发言
 
-- shot_type：single / over-the-shoulder / medium speaking frame
-- camera_move：多克制，可极轻微 push
-- duration_final：服从说话节奏
-- first_frame：开口前一瞬或刚开始发声
-- video：说话过程中表情、头部、视线小变化
-- 摄影重点：脸部焦点、眼神、浅景深、对话关系位
+- shot_type：单人镜头、过肩镜头或中景发言构图
+- camera_move：多保持克制，可采用极轻微推进
+- duration_final：服从人物的说话节奏
+- first_frame：呈现开口前一瞬，或人物刚开始发声的状态
+- video：表现说话过程中表情、头部与视线的细微变化
+- 摄影重点：脸部焦点、眼神、浅景深、人物之间的对话位置关系
 
----
+⸻
 
-## reaction
+## 人物反应
 
-- shot_type：reaction single / reaction close-up
-- camera_move：多静止或极轻微
-- duration_final：可比 base 稍长一点以承接表情
-- first_frame：反应尚在形成或刚接住信息
-- video：表情、视线、呼吸、微动作变化
+- shot_type：反应单人镜头或反应特写
+- camera_move：多采用固定镜头或极轻微运动
+- duration_final：可比基础时长略长，以完整承接人物反应
+- first_frame：人物反应尚在形成，或刚刚接收到信息
+- video：表现表情、视线、呼吸与细微动作的变化
 - 摄影重点：眼神焦点、面部细节、背景虚化、克制构图
 
----
+⸻
 
-## observe / suspense_observe
+## 观察 / 悬念观察
 
-- shot_type：observing frame / suspense observing shot
-- camera_move：克制，允许极轻微推进或漂移
-- duration_final：可略长
-- first_frame：观察关系立即成立
-- video：等待、盯住、微小变化、信息显现
-- 摄影重点：遮挡关系、负空间、低调光、浅景深或层次景深
+- shot_type：观察式构图或悬念观察镜头
+- camera_move：保持克制，允许极轻微推进或轻微漂移
+- duration_final：可适当延长
+- first_frame：观察关系应当立即成立
+- video：表现等待、凝视、细微变化或关键信息逐渐显现
+- 摄影重点：遮挡关系、负空间、低调光、浅景深或具有空间层次的景深
 
----
+⸻
 
-## reveal / detail_insert
+## 揭示 / 细节插入
 
-- shot_type：insert / reveal detail / detail close-up
-- camera_move：多静止或极轻微强调
+- shot_type：插入镜头、揭示性细节镜头或细节特写
+- camera_move：多采用固定镜头，或通过极轻微运动进行强调
 - duration_final：通常略短
-- first_frame：重点对象一开始就进入有效可见状态
-- video：只做必要变化，避免复杂动作
-- 摄影重点：物件焦点、极浅景深、光斑、局部构图、手部/道具细节
+- first_frame：重点对象从一开始就应处于清楚、有效的可见状态
+- video：只表现必要变化，避免加入复杂动作
+- 摄影重点：物件焦点、极浅景深、光斑、局部构图、手部或道具细节
 
----
+⸻
 
-## emotional_hold
+## 情绪停留
 
-- shot_type：hold single / emotional close-up / quiet medium single
-- camera_move：尽量克制
-- duration_final：可略长
-- first_frame：情绪已在场但尚未结束
-- video：停顿、眼神、呼吸、手部、微表情变化
+- shot_type：停留式单人镜头、情绪特写或安静的中景单人镜头
+- camera_move：应尽量保持克制
+- duration_final：可适当延长
+- first_frame：人物情绪已经存在，但情绪过程尚未结束
+- video：表现停顿、眼神、呼吸、手部动作与微表情变化
 - 摄影重点：眼睛或面部焦点、浅景深、柔光或低调光、稳定构图
 
----
+⸻
 
-## confrontation_press / climax_hit
+## 对峙施压 / 高潮冲击
 
-- shot_type：pressure single / confrontation frame / impact detail
-- camera_move：适度可有力，但不能乱
-- duration_final：视冲突瞬间决定
-- first_frame：压迫关系或冲突前态已成立
-- video：动作或压迫推进明确，结尾停在冲突落点附近
-- 摄影重点：压迫构图、低机位或紧框、强反差光、主体焦点稳定
+- shot_type：压迫式单人镜头、对峙构图或冲击性细节镜头
+- camera_move：可以适度增强力量感，但不能凌乱或失控
+- duration_final：根据冲突发生的具体瞬间决定
+- first_frame：压迫关系或冲突发生前的状态必须已经建立
+- video：明确表现动作或压迫关系的推进，结尾停留在冲突落点附近
+- 摄影重点：压迫式构图、低机位或紧凑取景、强反差光、稳定的主体焦点
 
 ---
 
@@ -926,11 +917,11 @@ video_prompt 中不要直接使用角色名。
 
 first_frame_image_prompt：
 
-“电影首帧，eye-level medium close-up，年轻男子站在昏暗房间门口刚停住脚步，身体朝向画面右侧的中年男子，门框形成前景遮挡，人物脸部位于画面左三分之一，sharp focus on the young man’s tense eyes，shallow depth of field with the room interior softly blurred，soft side key light from screen left with weak warm practical fill, muted warm low-saturation color grading, realistic cinematic frame。”
+“平视中近景，年轻男子站在昏暗房间门口刚停住脚步，身体朝向画面右侧的中年男子，门框形成前景遮挡，人物脸部位于画面左侧三分之一处，焦点清晰落在年轻男子紧张的眼神上，浅景深，房间内部柔和虚化，来自画面左侧的柔和侧主光，并带有微弱的暖色实景补光，暖色低饱和的克制调色，真实电影帧质感。”
 
 video_prompt：
 
-“eye-level medium close-up保持门框前景遮挡，镜头subtle push in。年轻男子缓慢抬起视线看向画面右侧的中年男子，肩膀轻微收紧，呼吸变浅，画面焦点始终锁定在年轻男子的眼睛，背景房间维持浅景深虚化，screen left柔和侧光和低饱和暖色调保持不变，镜头停在他视线完全定住的瞬间。”
+“平视中近景保持门框前景遮挡，镜头轻微推进。年轻男子缓慢抬起视线看向画面右侧的中年男子，肩膀轻微收紧，呼吸变浅，画面焦点始终锁定在年轻男子的眼睛上，背景房间维持浅景深虚化，画面左侧柔和侧光和低饱和暖色调保持不变，镜头停在他视线完全定住的瞬间。”
 
 ---
 
@@ -963,13 +954,13 @@ video_prompt：
 
 [
   {
-    "panel_number": 2,
-    "parent_group_number": 2,
-    "shot_type": "insert close-up",
-    "camera_move": "static",
-    "duration_final": 1.3,
-    "first_frame_image_prompt": "电影首帧，slight overhead insert close-up，办公室桌面上的摊开文件占据画面下方，李四的手握着笔停在文件上方，笔尖悬住未落，手和笔尖位于画面中心，sharp focus on the hand and pen tip，shallow depth of field with the desk background softly blurred，soft window side key light with gentle shadow detail, neutral warm low-saturation color grading, realistic cinematic frame。",
-    "video_prompt": "slight overhead insert close-up保持桌面局部构图，镜头static不做明显运动。中年男子握笔的手在文件上方短暂停住，手指极轻微收紧，笔尖始终悬而未落，文件边缘保持静止。焦点始终锁定在手部和笔尖，桌面背景维持浅景深虚化，窗侧柔和主光与中性偏暖低饱和色调保持不变，镜头停在签字动作被打断的瞬间。"
+    “panel_number”: 2,
+    “parent_group_number”: 2,
+    “shot_type”: “插入特写”,
+    “camera_move”: “静止镜头”,
+    “duration_final”: 2.0,
+    “first_frame_image_prompt”: “轻微俯视插入特写，办公室桌面上的摊开文件占据画面下方，李四的手握着笔停在文件上方，笔尖悬住未落，手和笔尖位于画面中心，焦点清晰落在手部和笔尖，浅景深，桌面背景柔和虚化，窗侧柔和主光带有细腻阴影层次，中性偏暖低饱和调色，真实电影帧质感。”,
+    “video_prompt”: “轻微俯视插入特写保持桌面局部构图，镜头静止不做明显运动。中年男子握笔的手在文件上方短暂停住，手指极轻微收紧，笔尖始终悬而未落，文件边缘保持静止。焦点始终锁定在手部和笔尖，桌面背景维持浅景深虚化，窗侧柔和主光与中性偏暖低饱和色调保持不变，镜头停在签字动作被打断的瞬间。”
   }
 ]
 
@@ -1017,7 +1008,7 @@ video_prompt：
 1. 必须输出有效 JSON 数组。
 2. 只能新增：shot_type、camera_move、duration_final、first_frame_image_prompt、video_prompt。
 3. 不得重复输出输入中已有的字段，除了panel_number， parent_group_number。
-4. duration_final 只能在 duration_base 基础上小幅微调，不得推翻节奏关系。
+4. duration_final 只能在 duration_base 基础上小幅微调，不得推翻节奏关系, 且必须为整数。
 5. first_frame_image_prompt 必须是镜头开始时刻，不得偷写后续动作结果。
 6. first_frame_image_prompt 必须包含景别、机位、构图、焦点、景深、光线、色调。
 7. video_prompt 必须从首帧自然展开，只描述当前镜头内动态。
