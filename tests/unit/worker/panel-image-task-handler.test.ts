@@ -48,7 +48,10 @@ const outboundMock = vi.hoisted(() => ({
 }))
 
 const promptMock = vi.hoisted(() => ({
-  buildPrompt: vi.fn(() => 'panel-image-prompt'),
+  buildPrompt: vi.fn((_args: {
+    promptId: string
+    variables: Record<string, unknown>
+  }) => 'panel-image-prompt'),
 }))
 
 function buildGroupPanels(count: number) {
@@ -109,6 +112,7 @@ vi.mock('@/lib/prompt-i18n', () => ({
   PROMPT_IDS: {
     NP_SINGLE_PANEL_IMAGE: 'np_single_panel_image',
     NP_SINGLE_PANEL_IMAGE_V2: 'np_single_panel_image_v2',
+    NP_SINGLE_PANEL_IMAGE_V3: 'np_single_panel_image_v3',
   },
   buildPrompt: promptMock.buildPrompt,
 }))
@@ -147,6 +151,7 @@ describe('worker panel-image-task-handler behavior', () => {
       cameraMove: 'static',
       description: 'hero close-up',
       imagePrompt: 'panel anchor prompt',
+      firstLastFramePrompt: 'fused first frame prompt',
       videoPrompt: 'dramatic',
       location: 'Old Town',
       characters: JSON.stringify([{ name: 'Hero', appearance: 'default', slot: '街道左侧靠墙的留白位置' }]),
@@ -264,15 +269,18 @@ describe('worker panel-image-task-handler behavior', () => {
       }),
     )
     expect(promptMock.buildPrompt).toHaveBeenCalledWith(expect.objectContaining({
-      variables: expect.objectContaining({
-        storyboard_text_json_input: expect.stringContaining('"slot": "街道左侧靠墙的留白位置"'),
-      }),
+      promptId: 'np_single_panel_image_v3',
+      variables: {
+        aspect_ratio: '16:9',
+        storyboard_first_frame_prompt: 'fused first frame prompt',
+        style: expect.any(String),
+      },
     }))
-    expect(promptMock.buildPrompt).toHaveBeenCalledWith(expect.objectContaining({
-      variables: expect.objectContaining({
-        storyboard_text_json_input: expect.stringContaining('"available_slots"'),
-      }),
-    }))
+    const singlePanelPromptCall = promptMock.buildPrompt.mock.calls.find(
+      (call) => call[0]?.promptId === 'np_single_panel_image_v3',
+    )
+    expect(singlePanelPromptCall?.[0].variables).not.toHaveProperty('storyboard_text_json_input')
+    expect(singlePanelPromptCall?.[0].variables).not.toHaveProperty('source_text')
 
     const updateCall = prismaMock.novelPromotionPanel.update.mock.calls.find(
       (call: unknown[]) => (call[0] as { where?: { id?: string } })?.where?.id === 'panel-1',
@@ -336,6 +344,7 @@ describe('worker panel-image-task-handler behavior', () => {
       cameraMove: 'static',
       description: 'hero close-up',
       imagePrompt: null,
+      firstLastFramePrompt: null,
       videoPrompt: 'dramatic',
       location: 'Old Town',
       characters: '[]',

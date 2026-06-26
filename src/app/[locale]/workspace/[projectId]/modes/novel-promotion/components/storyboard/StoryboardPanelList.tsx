@@ -35,6 +35,7 @@ interface StoryboardPanelListProps {
   getPanelEditData: (panel: StoryboardPanel) => PanelEditData
   getPanelCandidates: (panel: NovelPromotionPanel) => { candidates: string[]; selectedIndex: number } | null
   onPanelUpdate: (panelId: string, panel: StoryboardPanel, updates: Partial<PanelEditData>) => void
+  onSavePanelData: (panelData: PanelEditData) => void | Promise<void>
   onPanelDelete: (panelId: string) => void
   onOpenCharacterPicker: (panelId: string) => void
   onOpenLocationPicker: (panelId: string) => void
@@ -81,6 +82,7 @@ export default function StoryboardPanelList({
   getPanelEditData,
   getPanelCandidates,
   onPanelUpdate,
+  onSavePanelData,
   onPanelDelete,
   onOpenCharacterPicker,
   onOpenLocationPicker,
@@ -244,6 +246,7 @@ export default function StoryboardPanelList({
                 failedError={panelFailedError}
                 candidateData={panelCandidateData}
                 onUpdate={(updates) => onPanelUpdate(panel.id, panel, updates)}
+                onSavePanelData={(updates) => onSavePanelData({ ...panelData, ...updates })}
                 onDelete={() => onPanelDelete(panel.id)}
                 onOpenCharacterPicker={() => onOpenCharacterPicker(panel.id)}
                 onOpenLocationPicker={() => onOpenLocationPicker(panel.id)}

@@ -69,6 +69,19 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
   const aiFlPromptMutation = useAiFirstLastFramePrompt(projectId)
   const [isAiGeneratingFlPrompt, setIsAiGeneratingFlPrompt] = useState(false)
   const [flUserInstruction, setFlUserInstruction] = useState('')
+  const promptTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const resizePromptTextarea = useCallback(() => {
+    const textarea = promptTextareaRef.current
+    if (!textarea) return
+    textarea.style.height = '0px'
+    textarea.style.height = `${textarea.scrollHeight}px`
+  }, [])
+
+  useEffect(() => {
+    if (!promptEditor.isEditing) return
+    resizePromptTextarea()
+  }, [promptEditor.editingPrompt, promptEditor.isEditing, resizePromptTextarea])
+
   const handleAiGenerateFlPrompt = useCallback(async () => {
     const nextLinkedPanel = layout.nextPanel
     if (!nextLinkedPanel) return
@@ -203,11 +216,15 @@ export default function VideoPanelCardBody({ runtime, onUpdateDuration }: VideoP
             {promptEditor.isEditing ? (
               <div className="relative mb-3">
                 <textarea
+                  ref={promptTextareaRef}
                   value={promptEditor.editingPrompt}
-                  onChange={(event) => promptEditor.setEditingPrompt(event.target.value)}
+                  onChange={(event) => {
+                    promptEditor.setEditingPrompt(event.target.value)
+                    resizePromptTextarea()
+                  }}
                   autoFocus
-                  className="w-full text-xs p-2 pr-16 border border-[var(--glass-stroke-focus)] rounded-lg bg-[var(--glass-bg-surface)] text-[var(--glass-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--glass-tone-info-fg)] resize-none"
-                  rows={3}
+                  className="w-full overflow-hidden text-xs p-2 pr-16 border border-[var(--glass-stroke-focus)] rounded-lg bg-[var(--glass-bg-surface)] text-[var(--glass-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--glass-tone-info-fg)] resize-none"
+                  rows={8}
                   placeholder={t('promptModal.placeholder')}
                 />
                 <div className="absolute right-1 top-1 flex flex-col gap-1">

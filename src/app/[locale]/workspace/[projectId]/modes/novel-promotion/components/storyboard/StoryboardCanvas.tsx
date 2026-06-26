@@ -44,6 +44,7 @@ interface StoryboardCanvasProps {
   onPreviewImage: (url: string) => void
   onCloseStoryboardError: (storyboardId: string) => void
   onPanelUpdate: (panelId: string, panel: StoryboardPanel, updates: Partial<PanelEditData>) => void
+  onSavePanelData: (storyboardId: string, panelData: PanelEditData) => void | Promise<void>
   onPanelDelete: (
     panelId: string,
     storyboardId: string,
@@ -155,6 +156,7 @@ export default function StoryboardCanvas({
   onPreviewImage,
   onCloseStoryboardError,
   onPanelUpdate,
+  onSavePanelData,
   onPanelDelete,
   onOpenCharacterPicker,
   onOpenLocationPicker,
@@ -242,6 +244,7 @@ export default function StoryboardCanvas({
               onCloseError={() => onCloseStoryboardError(storyboard.id)}
               getPanelEditData={getPanelEditData}
               onPanelUpdate={onPanelUpdate}
+              onSavePanelData={onSavePanelData}
               onPanelDelete={(panelId) => onPanelDelete(panelId, storyboard.id, setLocalStoryboards)}
               onOpenCharacterPicker={onOpenCharacterPicker}
               onOpenLocationPicker={onOpenLocationPicker}

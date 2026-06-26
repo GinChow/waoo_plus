@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { PanelEditData } from '@/app/[locale]/workspace/[projectId]/modes/novel-promotion/components/PanelEditForm'
 import {
@@ -17,6 +18,7 @@ export interface PanelEditFormV2Props {
   saveStatus?: 'idle' | 'saving' | 'error'
   saveErrorMessage?: string | null
   onRetrySave?: () => void
+  onSave?: (updates?: Partial<PanelEditData>) => void | Promise<void>
   onUpdate: (updates: Partial<PanelEditData>) => void
   onOpenCharacterPicker: () => void
   onOpenLocationPicker: () => void
@@ -31,6 +33,7 @@ export default function PanelEditFormV2({
   saveStatus = 'idle',
   saveErrorMessage = null,
   onRetrySave,
+  onSave,
   onUpdate,
   onOpenCharacterPicker,
   onOpenLocationPicker,
@@ -39,6 +42,27 @@ export default function PanelEditFormV2({
   uiMode = 'flow'
 }: PanelEditFormV2Props) {
   const t = useTranslations('storyboard')
+  const savedFirstFramePrompt = panelData.firstLastFramePrompt || ''
+  const [firstFramePromptDraft, setFirstFramePromptDraft] = useState(savedFirstFramePrompt)
+  const [isFirstFramePromptDirty, setIsFirstFramePromptDirty] = useState(false)
+
+  useEffect(() => {
+    if (!isFirstFramePromptDirty) {
+      setFirstFramePromptDraft(savedFirstFramePrompt)
+    }
+  }, [isFirstFramePromptDirty, savedFirstFramePrompt])
+
+  const handleFirstFramePromptSave = () => {
+    const updates = { firstLastFramePrompt: firstFramePromptDraft || null }
+    onUpdate(updates)
+    setIsFirstFramePromptDirty(false)
+    void onSave?.(updates)
+  }
+
+  const handleFirstFramePromptCancel = () => {
+    setFirstFramePromptDraft(savedFirstFramePrompt)
+    setIsFirstFramePromptDirty(false)
+  }
 
   return (
     <div className={`ui-pattern-form ui-pattern-form-${uiMode} space-y-2`}>
@@ -84,32 +108,47 @@ export default function PanelEditFormV2({
         </GlassField>
       </div>
 
-      {panelData.sourceText ? (
-        <GlassField label={t('panel.sourceText')}>
-          <div className="rounded-[var(--glass-radius-md)] bg-[var(--glass-bg-surface-strong)] px-3 py-2.5">
-            <p className="text-sm leading-6 text-[var(--glass-text-secondary)]">&ldquo;{panelData.sourceText}&rdquo;</p>
-          </div>
-        </GlassField>
-      ) : null}
-
-      <GlassField label={t('panel.sceneDescription')}>
-        <GlassTextarea
-          density="compact"
-          rows={2}
-          value={panelData.description || ''}
-          onChange={(event) => onUpdate({ description: event.target.value })}
-          placeholder={t('panel.sceneDescriptionPlaceholder')}
-        />
-      </GlassField>
-
-      <GlassField label={t('panel.videoPrompt')} hint={t('panel.videoPromptHint')}>
-        <GlassTextarea
-          density="compact"
-          rows={2}
-          value={panelData.videoPrompt || ''}
-          onChange={(event) => onUpdate({ videoPrompt: event.target.value })}
-          placeholder={t('panel.videoPromptPlaceholder')}
-        />
+      <GlassField
+        label={t('panel.firstFramePrompt')}
+        hint={t('panel.firstFramePromptHint')}
+      >
+        <div className="relative">
+          <GlassTextarea
+            density="compact"
+            rows={11}
+            value={firstFramePromptDraft}
+            onChange={(event) => {
+              setFirstFramePromptDraft(event.target.value)
+              setIsFirstFramePromptDirty(true)
+            }}
+            placeholder={t('panel.firstFramePromptPlaceholder')}
+            className="text-xs leading-[1.45] pr-16"
+          />
+          {onSave ? (
+            <div className="absolute right-1 top-1 flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={handleFirstFramePromptSave}
+                disabled={isSaving || saveStatus === 'saving'}
+                className="px-2 py-1 text-[10px] bg-[var(--glass-accent-from)] text-white rounded disabled:opacity-50"
+                title={t('common.save')}
+                aria-label={t('common.save')}
+              >
+                {saveStatus === 'saving' || isSaving ? '...' : t('common.save')}
+              </button>
+              <button
+                type="button"
+                onClick={handleFirstFramePromptCancel}
+                disabled={!isFirstFramePromptDirty || isSaving || saveStatus === 'saving'}
+                className="px-2 py-1 text-[10px] bg-[var(--glass-bg-muted)] text-[var(--glass-text-secondary)] rounded disabled:opacity-40"
+                title={t('common.cancel')}
+                aria-label={t('common.cancel')}
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          ) : null}
+        </div>
       </GlassField>
 
       <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">

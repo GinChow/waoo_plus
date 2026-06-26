@@ -47,6 +47,7 @@ export default function StoryboardGroup({
   onCloseError,
   getPanelEditData,
   onPanelUpdate,
+  onSavePanelData,
   onPanelDelete,
   onOpenCharacterPicker,
   onOpenLocationPicker,
@@ -284,6 +285,7 @@ export default function StoryboardGroup({
         getPanelEditData={getPanelEditData}
         getPanelCandidates={getPanelCandidates}
         onPanelUpdate={onPanelUpdate}
+        onSavePanelData={(panelData) => onSavePanelData(storyboard.id, panelData)}
         onPanelDelete={onPanelDelete}
         onOpenCharacterPicker={onOpenCharacterPicker}
         onOpenLocationPicker={onOpenLocationPicker}

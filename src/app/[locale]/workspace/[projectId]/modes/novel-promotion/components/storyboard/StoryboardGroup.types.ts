@@ -37,6 +37,7 @@ export interface StoryboardGroupProps {
   onCloseError: () => void
   getPanelEditData: (panel: StoryboardPanel) => PanelEditData
   onPanelUpdate: (panelId: string, panel: StoryboardPanel, updates: Partial<PanelEditData>) => void
+  onSavePanelData: (storyboardId: string, panelData: PanelEditData) => void | Promise<void>
   onPanelDelete: (panelId: string) => void
   onOpenCharacterPicker: (panelId: string) => void
   onOpenLocationPicker: (panelId: string) => void

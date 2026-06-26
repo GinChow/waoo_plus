@@ -379,6 +379,7 @@ export default function StoryboardStage({
           onPreviewImage={setPreviewImage}
           onCloseStoryboardError={clearStoryboardError}
           onPanelUpdate={handlePanelUpdate}
+          onSavePanelData={savePanelWithData}
           onPanelDelete={deletePanel}
           onOpenCharacterPicker={(panelId) => setAssetPickerPanel({ panelId, type: 'character' })}
           onOpenLocationPicker={(panelId) => setAssetPickerPanel({ panelId, type: 'location' })}

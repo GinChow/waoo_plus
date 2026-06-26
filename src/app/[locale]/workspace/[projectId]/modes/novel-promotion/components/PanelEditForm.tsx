@@ -39,6 +39,7 @@ interface PanelEditFormProps {
   saveStatus?: 'idle' | 'saving' | 'error'
   saveErrorMessage?: string | null
   onRetrySave?: () => void
+  onSave?: (updates?: Partial<PanelEditData>) => void | Promise<void>
   onUpdate: (updates: Partial<PanelEditData>) => void
   onOpenCharacterPicker: () => void
   onOpenLocationPicker: () => void
@@ -52,6 +53,7 @@ export default function PanelEditForm({
   saveStatus = 'idle',
   saveErrorMessage = null,
   onRetrySave,
+  onSave,
   onUpdate,
   onOpenCharacterPicker,
   onOpenLocationPicker,
@@ -65,6 +67,7 @@ export default function PanelEditForm({
       saveStatus={saveStatus}
       saveErrorMessage={saveErrorMessage}
       onRetrySave={onRetrySave}
+      onSave={onSave}
       onUpdate={onUpdate}
       onOpenCharacterPicker={onOpenCharacterPicker}
       onOpenLocationPicker={onOpenLocationPicker}

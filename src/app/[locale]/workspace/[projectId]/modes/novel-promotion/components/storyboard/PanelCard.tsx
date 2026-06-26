@@ -30,6 +30,7 @@ interface PanelCardProps {
   candidateData: PanelCandidateData | null
   previousImageUrl?: string | null  // 支持撤回
   onUpdate: (updates: Partial<PanelEditData>) => void
+  onSavePanelData?: (updates?: Partial<PanelEditData>) => void | Promise<void>
   onDelete: () => void
   onOpenCharacterPicker: () => void
   onOpenLocationPicker: () => void
@@ -71,6 +72,7 @@ export default function PanelCard({
   candidateData,
   previousImageUrl,
   onUpdate,
+  onSavePanelData,
   onDelete,
   onOpenCharacterPicker,
   onOpenLocationPicker,
@@ -147,6 +149,7 @@ export default function PanelCard({
           saveStatus={hasUnsavedChanges ? 'error' : (isSaving ? 'saving' : 'idle')}
           saveErrorMessage={saveErrorMessage}
           onRetrySave={onRetrySave}
+          onSave={onSavePanelData}
           onUpdate={onUpdate}
           onOpenCharacterPicker={onOpenCharacterPicker}
           onOpenLocationPicker={onOpenLocationPicker}

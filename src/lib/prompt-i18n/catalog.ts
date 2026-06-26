@@ -248,6 +248,10 @@ export const PROMPT_CATALOG: Record<PromptId, PromptCatalogEntry> = {
     pathStem: 'novel-promotion/single_panel_image_v2',
     variableKeys: ['aspect_ratio', 'panel_layout', 'style', 'multi_panel_image_prompt'],
   },
+  [PROMPT_IDS.NP_SINGLE_PANEL_IMAGE_V3]: {
+    pathStem: 'novel-promotion/single_panel_image_v3',
+    variableKeys: ['storyboard_first_frame_prompt', 'aspect_ratio', 'style'],
+  },
   [PROMPT_IDS.NP_STORYBOARD_EDIT]: {
     pathStem: 'novel-promotion/storyboard_edit',
     variableKeys: ['user_input'],
