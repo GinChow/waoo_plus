@@ -274,3 +274,21 @@ Executor: Codex
 
 - No browser click-through/profiling was run in this turn; verification is static plus local suite execution.
 - The remaining full-suite failures predate or sit outside the touched storyboard group UI/cache files.
+
+## Single Storyboard Image First Frame Prompt
+
+Date: 2026-06-26
+Executor: Codex
+
+### Passed
+
+- `npx vitest run tests/unit/worker/panel-image-task-handler.test.ts tests/unit/generator-api.test.ts`
+  - 2 files passed, 29 tests passed.
+- `npm run typecheck`
+  - TypeScript check passed.
+- `git diff --check`
+  - Passed.
+
+### Residual Risk
+
+- Full repository test suite was not run for this narrow worker/generator parameter change.

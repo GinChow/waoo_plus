@@ -148,3 +148,15 @@ Executor: Codex
 - 实施：新增成功后将接口返回的 `clip/storyboard/panel` 合并进 `episodeData` 缓存；删除成功后按 `storyboardId` 同步移除对应 storyboard 和 clip；后台再失效 `episodeData` 做服务端校准。
 - 实施：画布中的每个“在此插入新分镜组”按钮改为局部 pending 状态；顶部“添加到开头”继续使用全局 pending 状态。
 - 验证：`npm run typecheck` 通过；`npm run lint:all` 0 errors；`npm run test:unit:all` 885/889 通过，4 个失败均位于未触及的既有测试断言。
+
+## Task: Single Storyboard Image First Frame Prompt
+
+Date: 2026-06-26
+Executor: Codex
+
+- 工具降级：当前会话未暴露 `sequential-thinking`、`shrimp-task-manager`、`code-index`、`exa`；使用 `rg`、`sed`、本地 Vitest 和 TypeScript 验证替代。
+- 定位单张分镜图片生成链路：`regenerate-panel-image` 提交 `IMAGE_PANEL` 任务，`handlePanelImageTask` 读取 panel 并调用 `resolveImageSourceFromGeneration`。
+- 实施：单张分镜图片生成不再构建完整包装 prompt，实际传给生成器的 `prompt` 直接使用当前 panel 的首帧提示词解析结果。
+- 实施：若其他调用方仍通过 options 传入 `first_frame_image_prompt`，`generateImage` 会将其提升为实际 `prompt` 值，并从 provider options 中过滤该专用字段。
+- 修正：命中 Yunwu official 路由的 OpenAI-compatible Gemini 图片模型，如果携带首帧提示词且存在兼容模板，则优先走模板协议；official 路径兜底过滤该专用字段，避免 `YUNWU_IMAGE_OPTION_UNSUPPORTED`。
+- 验证：受影响 worker/generator 单测通过，`npm run typecheck` 通过。

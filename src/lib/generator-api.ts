@@ -80,6 +80,33 @@ function aspectRatioToOpenAISize(aspectRatio: string | undefined): string | unde
     return mapping[ratio] || undefined
 }
 
+function splitImageGenerationOptions(options: {
+    referenceImages?: string[]
+    [key: string]: unknown
+} | undefined) {
+    const { referenceImages, ...generatorOptions } = options || {}
+    const firstFrameImagePrompt = typeof generatorOptions.first_frame_image_prompt === 'string'
+        ? generatorOptions.first_frame_image_prompt
+        : typeof generatorOptions.firstFrameImagePrompt === 'string'
+            ? generatorOptions.firstFrameImagePrompt
+            : undefined
+    return {
+        referenceImages,
+        generatorOptions,
+        firstFrameImagePrompt,
+        hasFirstFrameImagePrompt: typeof firstFrameImagePrompt === 'string' && firstFrameImagePrompt.trim().length > 0,
+    }
+}
+
+function omitStoryboardOnlyImageOptions<T extends Record<string, unknown>>(options: T): Omit<T, 'first_frame_image_prompt' | 'firstFrameImagePrompt'> {
+    const {
+        first_frame_image_prompt: _firstFrameImagePrompt,
+        firstFrameImagePrompt: _firstFrameImagePromptCamel,
+        ...rest
+    } = options
+    return rest
+}
+
 /**
  * 生成图片（简化版）
  * 
@@ -99,19 +126,24 @@ export async function generateImage(
         outputFormat?: string
         keepOriginalAspectRatio?: boolean  // 🔥 编辑时保持原图比例
         size?: string  // 🔥 直接指定像素尺寸如 "5016x3344"（优先于 aspectRatio）
+        [key: string]: unknown
     }
 ): Promise<GenerateResult> {
     const selection = await resolveModelSelection(userId, modelKey, 'image')
     _ulogInfo(`[generateImage] resolved model selection: ${selection.modelKey}`)
     const providerConfig = await getProviderConfig(userId, selection.provider)
     const providerKey = getProviderKey(selection.provider).toLowerCase()
+    // 调用生成（提取 referenceImages 单独传递，其余选项合并进 options）
+    const { referenceImages, generatorOptions, firstFrameImagePrompt, hasFirstFrameImagePrompt } = splitImageGenerationOptions(options)
+    const effectivePrompt = firstFrameImagePrompt?.trim() || prompt
     if (providerKey === 'bailian') {
+        const officialOptions = omitStoryboardOnlyImageOptions(options || {})
         return await generateBailianImage({
             userId,
-            prompt,
-            referenceImages: options?.referenceImages,
+            prompt: effectivePrompt,
+            referenceImages,
             options: {
-                ...(options || {}),
+                ...officialOptions,
                 provider: selection.provider,
                 modelId: selection.modelId,
                 modelKey: selection.modelKey,
@@ -119,12 +151,13 @@ export async function generateImage(
         })
     }
     if (providerKey === 'siliconflow') {
+        const officialOptions = omitStoryboardOnlyImageOptions(options || {})
         return await generateSiliconFlowImage({
             userId,
-            prompt,
-            referenceImages: options?.referenceImages,
+            prompt: effectivePrompt,
+            referenceImages,
             options: {
-                ...(options || {}),
+                ...officialOptions,
                 provider: selection.provider,
                 modelId: selection.modelId,
                 modelKey: selection.modelKey,
@@ -140,13 +173,15 @@ export async function generateImage(
         // Runtime now resolves route by apiMode to avoid requiring data migration SQL.
         gatewayRoute = providerConfig.apiMode === 'openai-official' ? 'openai-compat' : 'official'
     }
-    if (isYunwuImageOfficialRoute(providerKey, selection.modelId, providerConfig.baseUrl)) {
+    if (
+        isYunwuImageOfficialRoute(providerKey, selection.modelId, providerConfig.baseUrl)
+        && !(hasFirstFrameImagePrompt && selection.compatMediaTemplate)
+    ) {
         // yunwu 的原生图片模型不是 OpenAI 兼容模板协议，必须走对应 official generator 分支。
+        // 单张分镜首帧生成需要模板字段 first_frame_image_prompt，存在模板时优先走模板协议。
         gatewayRoute = 'official'
     }
 
-    // 调用生成（提取 referenceImages 单独传递，其余选项合并进 options）
-    const { referenceImages, ...generatorOptions } = options || {}
     _ulogInfo(`[generateImage] gatewayRoute=${gatewayRoute}, referenceImageCount=${referenceImages?.length ?? 0}`)
     if (gatewayRoute === 'openai-compat') {
         const compatTemplate = selection.compatMediaTemplate
@@ -154,15 +189,16 @@ export async function generateImage(
             throw new Error(`MODEL_COMPAT_MEDIA_TEMPLATE_REQUIRED: ${selection.modelKey}`)
         }
         if (compatTemplate) {
+            const templateOptions = omitStoryboardOnlyImageOptions(generatorOptions)
             return await generateImageViaOpenAICompatTemplate({
                 userId,
                 providerId: selection.provider,
                 modelId: selection.modelId,
                 modelKey: selection.modelKey,
-                prompt,
+                prompt: effectivePrompt,
                 referenceImages,
                 options: {
-                    ...generatorOptions,
+                    ...templateOptions,
                     provider: selection.provider,
                     modelId: selection.modelId,
                     modelKey: selection.modelKey,
@@ -173,8 +209,9 @@ export async function generateImage(
         }
 
         // OpenAI 兼容模式：将 aspectRatio 转换为 size
-        let openaiCompatOptions = { ...generatorOptions }
-        if (openaiCompatOptions.aspectRatio) {
+        const standardGeneratorOptions = omitStoryboardOnlyImageOptions(generatorOptions)
+        let openaiCompatOptions = { ...standardGeneratorOptions }
+        if (typeof openaiCompatOptions.aspectRatio === 'string') {
             const mappedSize = aspectRatioToOpenAISize(openaiCompatOptions.aspectRatio)
             if (mappedSize && !openaiCompatOptions.size) {
                 openaiCompatOptions = { ...openaiCompatOptions, size: mappedSize }
@@ -187,7 +224,7 @@ export async function generateImage(
             userId,
             providerId: selection.provider,
             modelId: selection.modelId,
-            prompt,
+            prompt: effectivePrompt,
             referenceImages,
             options: {
                 ...openaiCompatOptions,
@@ -202,13 +239,14 @@ export async function generateImage(
     const generatorProvider = isYunwuImageOfficialRoute(providerKey, selection.modelId, providerConfig.baseUrl)
         ? 'yunwu'
         : selection.provider
+    const officialGeneratorOptions = omitStoryboardOnlyImageOptions(generatorOptions)
     const generator = createImageGenerator(generatorProvider, selection.modelId)
     return await generator.generate({
         userId,
-        prompt,
+        prompt: effectivePrompt,
         referenceImages,
         options: {
-            ...generatorOptions,
+            ...officialGeneratorOptions,
             provider: selection.provider,
             modelId: selection.modelId,
             modelKey: selection.modelKey,

@@ -312,23 +312,6 @@ function resolveCoarseGroupPanelLayout(panelCount: number) {
   return 'auto'
 }
 
-function buildPanelPrompt(params: {
-  locale: TaskJobData['locale']
-  aspectRatio: string
-  styleText: string
-  firstFramePrompt: string
-}) {
-  return buildPrompt({
-    promptId: PROMPT_IDS.NP_SINGLE_PANEL_IMAGE_V3,
-    locale: params.locale,
-    variables: {
-      aspect_ratio: params.aspectRatio,
-      storyboard_first_frame_prompt: params.firstFramePrompt || '无画面描述',
-      style: params.styleText,
-    },
-  })
-}
-
 function buildStoryboardGroupPrompt(params: {
   locale: TaskJobData['locale']
   aspectRatio: string
@@ -398,16 +381,10 @@ export async function handlePanelImageTask(job: Job<TaskJobData>) {
     },
   })
 
-  const artStyle = getArtStylePrompt(modelConfig.artStyle, job.data.locale)
   if (!projectData.videoRatio) throw new Error('Project videoRatio not configured')
   const aspectRatio = projectData.videoRatio
   const firstFramePrompt = panel.firstLastFramePrompt || panel.imagePrompt || panel.description || ''
-  const prompt = buildPanelPrompt({
-    locale: job.data.locale,
-    aspectRatio,
-    styleText: artStyle || '与参考图风格一致',
-    firstFramePrompt,
-  })
+  const prompt = firstFramePrompt.trim() || '无画面描述'
   logger.info({
     message: 'panel image prompt resolved',
     details: {

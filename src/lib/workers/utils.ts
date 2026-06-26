@@ -218,6 +218,7 @@ export async function resolveImageSourceFromGeneration(
       size?: string
       quality?: string
       provider?: string
+      [key: string]: unknown
     }
     allowTaskExternalIdResume?: boolean
     pollProgress?: { start?: number; end?: number }

@@ -258,7 +258,7 @@ describe('worker panel-image-task-handler behavior', () => {
       expect.anything(),
       expect.objectContaining({
         modelId: 'storyboard-model-1',
-        prompt: 'panel-image-prompt',
+        prompt: 'fused first frame prompt',
         allowTaskExternalIdResume: false,
         options: expect.objectContaining({
           referenceImages: ['normalized-ref-1'],
@@ -268,19 +268,9 @@ describe('worker panel-image-task-handler behavior', () => {
         }),
       }),
     )
-    expect(promptMock.buildPrompt).toHaveBeenCalledWith(expect.objectContaining({
-      promptId: 'np_single_panel_image_v3',
-      variables: {
-        aspect_ratio: '16:9',
-        storyboard_first_frame_prompt: 'fused first frame prompt',
-        style: expect.any(String),
-      },
-    }))
-    const singlePanelPromptCall = promptMock.buildPrompt.mock.calls.find(
-      (call) => call[0]?.promptId === 'np_single_panel_image_v3',
-    )
-    expect(singlePanelPromptCall?.[0].variables).not.toHaveProperty('storyboard_text_json_input')
-    expect(singlePanelPromptCall?.[0].variables).not.toHaveProperty('source_text')
+    const generationCall = utilsMock.resolveImageSourceFromGeneration.mock.calls[0]
+    expect(generationCall[1].options).not.toHaveProperty('first_frame_image_prompt')
+    expect(promptMock.buildPrompt).not.toHaveBeenCalled()
 
     const updateCall = prismaMock.novelPromotionPanel.update.mock.calls.find(
       (call: unknown[]) => (call[0] as { where?: { id?: string } })?.where?.id === 'panel-1',

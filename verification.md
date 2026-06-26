@@ -280,3 +280,25 @@ Executor: Codex
 
 - No browser performance profile was captured; the fix targets the observed synchronous cache/render path and is verified by type/lint/full-suite execution.
 - Full unit suite remains red due to unrelated existing assertions in prompt suffix, global analyze mutation, Yunwu Omni polling, and video worker tests.
+
+# Single Storyboard Image First Frame Prompt
+
+Date: 2026-06-26
+Executor: Codex
+
+## Result
+
+- Focused worker/generator tests: 29 passed.
+- TypeScript: passed.
+- Diff whitespace validation: passed.
+
+## Verified Behavior
+
+- Single panel storyboard image generation sends the panel first-frame prompt as the actual generator `prompt`.
+- Template-based OpenAI-compatible image generation receives the first-frame prompt as `prompt`, so upstream templates that require `prompt` do not fail with `prompt is required`.
+- Standard OpenAI-compatible and official image generation filter storyboard-only prompt fields before calling provider adapters.
+- OpenAI-compatible Yunwu Gemini image models with a compatible template and first-frame prompt use the template route instead of the Yunwu official generator.
+
+## Residual Risk
+
+- Full repository test suite was not run for this narrow worker/generator parameter change.

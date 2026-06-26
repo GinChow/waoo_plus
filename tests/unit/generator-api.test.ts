@@ -111,11 +111,54 @@ describe('generator-api gateway routing', () => {
 
     const result = await generateImage('user-1', 'openai-compatible:oa-1::gpt-image-1', 'draw cat', {
       size: '1024x1024',
+      first_frame_image_prompt: 'single storyboard first frame',
     })
 
     expect(generateImageViaOpenAICompatTemplateMock).toHaveBeenCalledTimes(1)
+    expect(generateImageViaOpenAICompatTemplateMock).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: 'single storyboard first frame',
+      options: expect.not.objectContaining({
+        first_frame_image_prompt: expect.anything(),
+      }),
+    }))
     expect(createImageGeneratorMock).not.toHaveBeenCalled()
     expect(result).toEqual({ success: true, imageUrl: 'compat-template-image' })
+  })
+
+  it('filters storyboard-only image prompt fields before standard openai-compatible image calls', async () => {
+    resolveModelSelectionMock.mockResolvedValueOnce({
+      provider: 'google',
+      modelId: 'gpt-image-1',
+      modelKey: 'google::gpt-image-1',
+      mediaType: 'image',
+    })
+    getProviderConfigMock.mockResolvedValueOnce({
+      id: 'google',
+      name: 'Google',
+      apiKey: 'google-key',
+      gatewayRoute: 'openai-compat',
+      apiMode: undefined,
+    })
+    resolveModelGatewayRouteMock.mockReturnValueOnce('openai-compat')
+
+    await generateImage('user-1', 'google::gpt-image-1', 'draw cat', {
+      aspectRatio: '16:9',
+      first_frame_image_prompt: 'single storyboard first frame',
+      firstFrameImagePrompt: 'camel fallback',
+    })
+
+    expect(generateImageViaOpenAICompatMock).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: 'single storyboard first frame',
+      options: expect.not.objectContaining({
+        first_frame_image_prompt: expect.anything(),
+        firstFrameImagePrompt: expect.anything(),
+      }),
+    }))
+    expect(generateImageViaOpenAICompatMock).toHaveBeenCalledWith(expect.objectContaining({
+      options: expect.objectContaining({
+        size: '1792x1024',
+      }),
+    }))
   })
 
   it('routes official image requests to provider generator', async () => {
@@ -274,6 +317,51 @@ describe('generator-api gateway routing', () => {
     }))
     expect(generateImageViaOpenAICompatTemplateMock).not.toHaveBeenCalled()
     expect(result).toEqual({ success: true, imageUrl: 'official-image' })
+  })
+
+  it('routes yunwu-compatible storyboard first-frame image requests through compat template', async () => {
+    resolveModelSelectionMock.mockResolvedValueOnce({
+      provider: 'openai-compatible:yunwu-1',
+      modelId: 'gemini-3.1-flash-image-preview',
+      modelKey: 'openai-compatible:yunwu-1::gemini-3.1-flash-image-preview',
+      mediaType: 'image',
+      compatMediaTemplate: {
+        version: 1,
+        mediaType: 'image',
+        mode: 'sync',
+        create: {
+          method: 'POST',
+          path: '/v1/images/generations',
+          bodyTemplate: { prompt: '{{prompt}}' },
+        },
+        response: { outputUrlPath: '$.data[0].url' },
+      },
+    })
+    getProviderConfigMock.mockResolvedValueOnce({
+      id: 'openai-compatible:yunwu-1',
+      name: 'Yunwu Compat',
+      apiKey: 'yunwu-key',
+      baseUrl: 'https://yunwu.ai/v1',
+      apiMode: undefined,
+      gatewayRoute: 'openai-compat',
+    })
+    resolveModelGatewayRouteMock.mockReturnValueOnce('openai-compat')
+
+    const result = await generateImage(
+      'user-1',
+      'openai-compatible:yunwu-1::gemini-3.1-flash-image-preview',
+      'full storyboard prompt',
+      { first_frame_image_prompt: 'single storyboard first frame', aspectRatio: '16:9' },
+    )
+
+    expect(generateImageViaOpenAICompatTemplateMock).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: 'single storyboard first frame',
+      options: expect.not.objectContaining({
+        first_frame_image_prompt: expect.anything(),
+      }),
+    }))
+    expect(createImageGeneratorMock).not.toHaveBeenCalledWith('yunwu', 'gemini-3.1-flash-image-preview')
+    expect(result).toEqual({ success: true, imageUrl: 'compat-template-image' })
   })
 
   it('routes openai-compatible video requests to openai-compat gateway', async () => {
